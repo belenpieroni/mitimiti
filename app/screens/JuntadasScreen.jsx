@@ -1,68 +1,18 @@
-import { useState } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, StyleSheet } from 'react-native';
+import { useState, useCallback } from 'react';
+import { View, Text, ScrollView, TouchableOpacity, StyleSheet, ActivityIndicator } from 'react-native';
+import { useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { colors } from '../theme/colors';
+import { listarJuntadas } from '../services/juntadasService';
 
-const coloresDisponibles = [
+// ── Colores disponibles para asignar a participantes ──────────────────────────
+export const coloresDisponibles = [
   '#473472', '#526D82', '#9DB2BF', '#42b271',
-  '#c084fc', '#f97316', '#ec6c6a', '#38bdf8'
+  '#c084fc', '#f97316', '#ec6c6a', '#38bdf8',
 ];
 
-const juntadasIniciales = [
-  {
-    id: '1',
-    nombre: 'Asado del sábado',
-    descripcion: '',
-    fecha: '28 abr 2026',
-    personas: [
-      { nombre: 'Martín', iniciales: 'MR', color: colors.primary },
-      { nombre: 'Jorge', iniciales: 'JL', color: '#526D82' },
-      { nombre: 'Sofía', iniciales: 'SO', color: '#9DB2BF' },
-      { nombre: 'Alan', iniciales: 'AL', color: '#42b271' },
-    ],
-    gastos: [
-      { id: 'g1', nombre: 'Carne y verduras', pagador: 'Martín', monto: 7200 },
-      { id: 'g2', nombre: 'Bebidas', pagador: 'Jorge', monto: 3400 },
-      { id: 'g3', nombre: 'Carbón y leña', pagador: 'Sofía', monto: 1900 },
-    ],
-    deuda: 4075,
-    tipo: 'cobrar',
-  },
-  {
-    id: '2',
-    nombre: 'Viaje Bariloche',
-    descripcion: '',
-    fecha: '15 mar 2026',
-    personas: [
-      { nombre: 'Martín', iniciales: 'MR', color: colors.primary },
-      { nombre: 'Jorge', iniciales: 'JL', color: '#526D82' },
-      { nombre: 'Sofía', iniciales: 'SO', color: '#9DB2BF' },
-      { nombre: 'Alan', iniciales: 'AL', color: '#42b271' },
-      { nombre: 'Laura', iniciales: 'LU', color: '#c084fc' },
-      { nombre: 'Camila', iniciales: 'CA', color: '#f97316' },
-    ],
-    gastos: [],
-    deuda: 0,
-    tipo: 'ninguna',
-  },
-  {
-    id: '3',
-    nombre: 'Cumple Lau',
-    descripcion: '',
-    fecha: '10 abr 2026',
-    personas: [
-      { nombre: 'Martín', iniciales: 'MR', color: colors.primary },
-      { nombre: 'Sofía', iniciales: 'SO', color: '#9DB2BF' },
-      { nombre: 'Laura', iniciales: 'LU', color: '#c084fc' },
-      { nombre: 'Camila', iniciales: 'CA', color: '#f97316' },
-    ],
-    gastos: [],
-    deuda: 0,
-    tipo: 'ninguna',
-  },
-];
-
-function getIniciales(nombre) {
+// ── Helpers ───────────────────────────────────────────────────────────────────
+export function getIniciales(nombre) {
   const partes = nombre.trim().split(' ');
   if (partes.length >= 2) return (partes[0][0] + partes[1][0]).toUpperCase();
   return nombre.slice(0, 2).toUpperCase();
@@ -91,21 +41,52 @@ function AvatarStack({ personas }) {
   );
 }
 
-// Estado global simple compartido entre pantallas
-export let juntadasData = [...juntadasIniciales];
-export function agregarJuntada(nueva) {
-  juntadasData = [nueva, ...juntadasData];
-}
-
-export { getIniciales, coloresDisponibles };
-
+// ── Componente ────────────────────────────────────────────────────────────────
 export default function JuntadasScreen({ navigation }) {
-  const [juntadas, setJuntadas] = useState(juntadasIniciales);
+  const [juntadas, setJuntadas] = useState([]);
+  const [cargando, setCargando] = useState(true);
+  const [error, setError] = useState(null);
 
-  // Actualiza la lista cuando vuelve de CrearJuntada
-  navigation.addListener('focus', () => {
-    setJuntadas([...juntadasData]);
-  });
+  // Recarga los datos cada vez que la pantalla recibe el foco.
+  // useFocusEffect no acepta async directo → definimos la función adentro y la llamamos.
+  const cargarJuntadas = useCallback(async () => {
+    setCargando(true);
+    setError(null);
+    try {
+      const datos = await listarJuntadas();
+      setJuntadas(datos);
+    } catch (e) {
+      setError('No se pudo conectar con el servidor.\nVerificá que el backend esté corriendo.');
+    } finally {
+      setCargando(false);
+    }
+  }, []);
+
+  useFocusEffect(
+    useCallback(() => { cargarJuntadas(); }, [cargarJuntadas])
+  );
+
+  // ── Render estados ────────────────────────────────────────────────────────
+  if (cargando) {
+    return (
+      <View style={[styles.container, styles.centrado]}>
+        <ActivityIndicator size="large" color={colors.primary} />
+        <Text style={styles.cargandoTexto}>Cargando juntadas...</Text>
+      </View>
+    );
+  }
+
+  if (error) {
+    return (
+      <View style={[styles.container, styles.centrado]}>
+        <Ionicons name="cloud-offline-outline" size={48} color={colors.textSecondary} />
+        <Text style={styles.errorTexto}>{error}</Text>
+        <TouchableOpacity style={styles.btnReintentar} onPress={cargarJuntadas}>
+          <Text style={styles.btnReintentarTexto}>Reintentar</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
 
   return (
     <View style={styles.container}>
@@ -123,43 +104,50 @@ export default function JuntadasScreen({ navigation }) {
         </TouchableOpacity>
       </View>
 
-      <ScrollView contentContainerStyle={styles.lista}>
-        {juntadas.map((j) => (
-          <TouchableOpacity
-            key={j.id}
-            style={styles.card}
-            onPress={() => navigation.navigate('JuntadaDetalle', { juntadaId: j.id })}
-          >
-            <View style={styles.cardFila}>
-              <View style={styles.iconoContenedor}>
-                <Ionicons name="people-outline" size={22} color={colors.primary} />
+      {juntadas.length === 0 ? (
+        <View style={styles.centrado}>
+          <Ionicons name="people-outline" size={48} color={colors.textSecondary} />
+          <Text style={styles.vacioPrincipal}>Sin juntadas todavía</Text>
+          <Text style={styles.vacioSub}>Tocá "Nueva" para crear la primera</Text>
+        </View>
+      ) : (
+        <ScrollView contentContainerStyle={styles.lista}>
+          {juntadas.map((j) => (
+            <TouchableOpacity
+              key={j.id}
+              style={styles.card}
+              onPress={() => navigation.navigate('JuntadaDetalle', { juntadaId: j.id })}
+            >
+              <View style={styles.cardFila}>
+                <View style={styles.iconoContenedor}>
+                  <Ionicons name="people-outline" size={22} color={colors.primary} />
+                </View>
+                <View style={styles.cardInfo}>
+                  <Text style={styles.cardNombre}>{j.nombre}</Text>
+                  <Text style={styles.cardSub}>
+                    {j.cantidadParticipantes} personas · {j.cantidadGastos} gastos
+                  </Text>
+                  <AvatarStack personas={j.participantes} />
+                </View>
+                <View style={styles.cardDerecha}>
+                  <Text style={styles.cardMonto}>{formatPesos(j.totalGastado)}</Text>
+                  {j.tipo === 'cobrar' && <Text style={styles.teCobrar}>Te deben {formatPesos(j.deuda)}</Text>}
+                  {j.tipo === 'pagar'  && <Text style={styles.teDebes}>Debés {formatPesos(j.deuda)}</Text>}
+                  {j.tipo === 'ninguna'&& <Text style={styles.sinDeuda}>Sin deudas</Text>}
+                </View>
+                <Ionicons name="ellipsis-horizontal" size={18} color={colors.textSecondary} />
               </View>
-              <View style={styles.cardInfo}>
-                <Text style={styles.cardNombre}>{j.nombre}</Text>
-                <Text style={styles.cardSub}>
-                  {j.personas.length} personas · {j.gastos.length} gastos
-                </Text>
-                <AvatarStack personas={j.personas} />
-              </View>
-              <View style={styles.cardDerecha}>
-                <Text style={styles.cardMonto}>
-                  {j.gastos.length > 0 ? formatPesos(j.gastos.reduce((a, g) => a + g.monto, 0)) : '$0'}
-                </Text>
-                {j.tipo === 'cobrar' && <Text style={styles.teCobrar}>Te deben {formatPesos(j.deuda)}</Text>}
-                {j.tipo === 'pagar' && <Text style={styles.teDebes}>Debés {formatPesos(j.deuda)}</Text>}
-                {j.tipo === 'ninguna' && <Text style={styles.sinDeuda}>Sin deudas</Text>}
-              </View>
-              <Ionicons name="ellipsis-horizontal" size={18} color={colors.textSecondary} />
-            </View>
-          </TouchableOpacity>
-        ))}
-      </ScrollView>
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
+      )}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background },
+  centrado: { flex: 1, justifyContent: 'center', alignItems: 'center', gap: 12, padding: 32 },
   header: {
     flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
     paddingHorizontal: 20, paddingTop: 56, paddingBottom: 16,
@@ -193,4 +181,13 @@ const styles = StyleSheet.create({
     borderWidth: 1.5, borderColor: colors.cardBg,
   },
   avatarTexto: { color: 'white', fontSize: 8, fontWeight: 'bold' },
+  cargandoTexto: { color: colors.textSecondary, marginTop: 8 },
+  errorTexto: { color: colors.textSecondary, textAlign: 'center', lineHeight: 22 },
+  btnReintentar: {
+    backgroundColor: colors.primary, borderRadius: 12,
+    paddingHorizontal: 24, paddingVertical: 12, marginTop: 8,
+  },
+  btnReintentarTexto: { color: 'white', fontWeight: '600' },
+  vacioPrincipal: { fontSize: 16, fontWeight: '600', color: colors.textPrimary },
+  vacioSub: { fontSize: 13, color: colors.textSecondary },
 });
