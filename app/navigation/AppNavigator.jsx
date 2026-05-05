@@ -10,6 +10,7 @@ import JuntadasScreen from '../screens/JuntadasScreen';
 import JuntadaDetalleScreen from '../screens/JuntadaDetalleScreen';
 import CrearJuntadaScreen from '../screens/CrearJuntadaScreen';
 import PerfilScreen from '../screens/PerfilScreen';
+import BalanceScreen from '../screens/BalanceScreen';
 
 const Tab = createBottomTabNavigator();
 const Stack = createNativeStackNavigator();
@@ -20,6 +21,7 @@ function JuntadasStack() {
       <Stack.Screen name="JuntadasList" component={JuntadasScreen} />
       <Stack.Screen name="JuntadaDetalle" component={JuntadaDetalleScreen} />
       <Stack.Screen name="CrearJuntada" component={CrearJuntadaScreen} />
+      <Stack.Screen name="Balance" component={BalanceScreen} />
     </Stack.Navigator>
   );
 }
