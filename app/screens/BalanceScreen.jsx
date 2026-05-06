@@ -14,6 +14,7 @@ export default function BalanceScreen({ route, navigation }) {
   const [balance, setBalance] = useState(null);
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState(null);
+  const [mostrarDetalle, setMostrarDetalle] = useState(false);
 
   const cargarBalance = useCallback(async () => {
     setCargando(true);
@@ -54,95 +55,120 @@ export default function BalanceScreen({ route, navigation }) {
 
   return (
     <View style={styles.container}>
-
       {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity style={styles.btnVolver} onPress={() => navigation.goBack()}>
-          <Ionicons name="chevron-back" size={22} color={colors.textPrimary} />
+          <Ionicons name="chevron-back" size={24} color={colors.primary} />
         </TouchableOpacity>
         <View>
           <Text style={styles.titulo}>Balance</Text>
-          <Text style={styles.subtitulo}>División equitativa</Text>
+          <Text style={styles.subtitulo}>{balance.nombreEvento || 'Resumen de gastos'}</Text>
         </View>
       </View>
 
       <ScrollView contentContainerStyle={styles.content}>
-
-        {/* Card resumen */}
-        <View style={styles.cardResumen}>
-          <Text style={styles.resumenLabel}>Total gastado</Text>
-          <Text style={styles.resumenMonto}>{formatPesos(balance.totalGastado)}</Text>
-          <View style={styles.resumenFila}>
-            <View style={styles.resumenItem}>
-              <Text style={styles.resumenSubLabel}>Participantes</Text>
-              <Text style={styles.resumenSubValor}>{balance.cantidadParticipantes}</Text>
-            </View>
-            <View style={styles.resumenItem}>
-              <Text style={styles.resumenSubLabel}>Le toca a cada uno</Text>
-              <Text style={styles.resumenSubValor}>{formatPesos(balance.parteIgualPorPersona)}</Text>
-            </View>
-          </View>
-        </View>
-
-        {/* Saldos individuales */}
-        <Text style={styles.seccionTitulo}>SALDOS</Text>
-        {balance.saldos.map((s, i) => (
-          <View key={i} style={styles.saldoCard}>
-            <View style={[styles.saldoAvatar, { backgroundColor: s.color }]}>
-              <Text style={styles.saldoAvatarTexto}>{s.iniciales}</Text>
-            </View>
-            <View style={styles.saldoInfo}>
-              <Text style={styles.saldoNombre}>{s.nombre}</Text>
-              <Text style={styles.saldoPago}>Pagó {formatPesos(s.pagado)}</Text>
-            </View>
-            <View style={styles.saldoDerecha}>
-              {Math.abs(s.saldo) < 0.01 ? (
-                <Text style={styles.saldoEmpate}>Justo</Text>
-              ) : s.saldo > 0 ? (
-                <>
-                  <Text style={styles.saldoPositivo}>+{formatPesos(s.saldo)}</Text>
-                  <Text style={styles.saldoEtiqueta}>le deben</Text>
-                </>
-              ) : (
-                <>
-                  <Text style={styles.saldoNegativo}>-{formatPesos(s.saldo)}</Text>
-                  <Text style={styles.saldoEtiqueta}>debe</Text>
-                </>
-              )}
-            </View>
-          </View>
-        ))}
-
-        {/* Transferencias para saldar */}
-        {balance.transferencias.length > 0 && (
-          <>
-            <Text style={[styles.seccionTitulo, { marginTop: 24 }]}>PARA SALDAR TODO</Text>
-            <Text style={styles.seccionSubtitulo}>
-              {balance.transferencias.length} transferencia{balance.transferencias.length > 1 ? 's' : ''} necesaria{balance.transferencias.length > 1 ? 's' : ''}
-            </Text>
-            {balance.transferencias.map((t, i) => (
-              <View key={i} style={styles.transCard}>
-                <View style={styles.transNombre}>
-                  <Ionicons name="arrow-forward-circle" size={20} color={colors.primary} />
-                  <Text style={styles.transTexto}>
-                    <Text style={styles.transNombreResaltado}>{t.de}</Text>
-                    {' le paga a '}
-                    <Text style={styles.transNombreResaltado}>{t.para}</Text>
-                  </Text>
-                </View>
-                <Text style={styles.transMonto}>{formatPesos(t.monto)}</Text>
-              </View>
-            ))}
-          </>
-        )}
-
-        {balance.transferencias.length === 0 && balance.totalGastado > 0 && (
+        
+        {/* Transferencias Necesarias */}
+        <Text style={styles.seccionTituloPrincipal}>TRANSFERENCIAS NECESARIAS</Text>
+        {balance.transferencias.length === 0 ? (
           <View style={styles.saldadoCentrado}>
-            <Ionicons name="checkmark-circle" size={36} color={colors.greenGlobal} />
+            <Ionicons name="checkmark-circle" size={32} color={colors.greenGlobal} />
             <Text style={styles.saldadoTexto}>¡Todo está saldado!</Text>
           </View>
+        ) : (
+          balance.transferencias.map((t, i) => (
+            <View key={i} style={styles.transCard}>
+              <View style={styles.transNombreContainer}>
+                <Ionicons name="arrow-forward-circle" size={20} color={colors.primary} />
+                <Text style={styles.transTexto}>
+                  <Text style={styles.transNombreResaltado}>{t.de}</Text>
+                  {' le paga a '}
+                  <Text style={styles.transNombreResaltado}>{t.para}</Text>
+                </Text>
+              </View>
+              <Text style={styles.transMonto}>{formatPesos(t.monto)}</Text>
+            </View>
+          ))
         )}
 
+        {/* Resumen Individual */}
+        <Text style={[styles.seccionTituloPrincipal, { marginTop: 24 }]}>RESUMEN INDIVIDUAL</Text>
+        <View style={styles.listaSaldos}>
+          {balance.saldos.map((s, i) => (
+            <View key={i} style={styles.saldoFila}>
+              <View style={[styles.avatarChico, { backgroundColor: s.color || colors.primary }]}>
+                <Text style={styles.avatarTexto}>{s.iniciales}</Text>
+              </View>
+              <Text style={styles.saldoNombre}>{s.nombre}</Text>
+              <Text style={[
+                styles.saldoMonto, 
+                { color: s.saldo >= 0 ? colors.greenGlobal : colors.redGlobal }
+              ]}>
+                {s.saldo >= 0 ? '+' : '−'} {formatPesos(s.saldo)}
+              </Text>
+            </View>
+          ))}
+        </View>
+
+        {/* Desplegable de Cálculos */}
+        <TouchableOpacity 
+          style={styles.acordeonHeader} 
+          onPress={() => setMostrarDetalle(!mostrarDetalle)}
+        >
+          <Text style={styles.acordeonTitulo}>VER DETALLE DE CÁLCULOS</Text>
+          <Ionicons name={mostrarDetalle ? "chevron-up" : "chevron-down"} size={18} color={colors.primary} />
+        </TouchableOpacity>
+
+        {mostrarDetalle && (
+          <View style={styles.cardDetalle}>
+            <Text style={styles.detalleSubtitulo}>Total gastado</Text>
+            {balance.gastosDetallados?.map((g, i) => (
+              <View key={i} style={styles.filaCalculo}>
+                <Text style={styles.calcLabel}>{g.categoria || g.nombre}</Text>
+                <Text style={styles.calcValor}>{formatPesos(g.monto)}</Text>
+              </View>
+            ))}
+            <View style={styles.linea} />
+            <View style={styles.filaCalculo}>
+              <Text style={styles.calcTotalLabel}>Total</Text>
+              <Text style={styles.calcTotalValor}>{formatPesos(balance.totalGastado)}</Text>
+            </View>
+
+            <Text style={styles.detalleSubtitulo}>División de gastos</Text>
+            <View style={styles.filaCalculo}>
+              <Text style={styles.calcLabel}>{formatPesos(balance.totalGastado)} ÷ {balance.cantidadParticipantes} personas</Text>
+              <Text style={styles.calcValorResaltado}>{formatPesos(balance.parteIgualPorPersona)} c/u</Text>
+            </View>
+
+            <Text style={styles.detalleSubtitulo}>Cuánto puso cada uno</Text>
+            {balance.saldos.map((s, i) => (
+              <View key={i} style={styles.filaCalculo}>
+                <Text style={styles.calcLabel}>{s.nombre}</Text>
+                <Text style={styles.calcValor}>{formatPesos(s.pagado)}</Text>
+              </View>
+            ))}
+
+            <Text style={styles.detalleSubtitulo}>Por qué cada uno debe lo que debe</Text>
+            <Text style={styles.formula}>Balance = lo que pagó − lo que le corresponde ({formatPesos(balance.parteIgualPorPersona)})</Text>
+            
+            {balance.saldos.map((s, i) => (
+              <View key={i} style={styles.filaExplicacion}>
+                <View style={[styles.avatarExtraChico, { backgroundColor: s.color || colors.primary }]}>
+                  <Text style={styles.avatarTextoExtraChico}>{s.iniciales}</Text>
+                </View>
+                <View style={styles.explicacionTextos}>
+                  <Text style={styles.explicacionNombre}>{s.nombre}</Text>
+                  <Text style={styles.explicacionCalculo}>
+                    {formatPesos(s.pagado)} - {formatPesos(balance.parteIgualPorPersona)}
+                  </Text>
+                </View>
+                <Text style={[styles.explicacionMonto, { color: s.saldo >= 0 ? colors.greenGlobal : colors.redGlobal }]}>
+                  {s.saldo >= 0 ? '+' : '−'}{formatPesos(s.saldo)}
+                </Text>
+              </View>
+            ))}
+          </View>
+        )}
       </ScrollView>
     </View>
   );
@@ -159,64 +185,65 @@ const styles = StyleSheet.create({
     width: 36, height: 36, borderRadius: 18,
     backgroundColor: colors.cardBg, justifyContent: 'center', alignItems: 'center',
   },
-  titulo: { fontSize: 18, fontWeight: 'bold', color: colors.textPrimary },
-  subtitulo: { fontSize: 12, color: colors.textSecondary },
+  titulo: { fontSize: 20, fontWeight: 'bold', color: colors.textPrimary },
+  subtitulo: { fontSize: 13, color: colors.textSecondary },
   content: { padding: 16, paddingBottom: 40 },
 
-  cardResumen: {
-    backgroundColor: colors.primary, borderRadius: 20,
-    padding: 20, marginBottom: 24,
+  seccionTituloPrincipal: {
+    fontSize: 12, fontWeight: 'bold', color: colors.textSecondary,
+    letterSpacing: 0.8, marginBottom: 12, marginLeft: 4
   },
-  resumenLabel: { color: 'rgba(255,255,255,0.7)', fontSize: 13, marginBottom: 4 },
-  resumenMonto: { color: 'white', fontSize: 36, fontWeight: 'bold', marginBottom: 16 },
-  resumenFila: { flexDirection: 'row', gap: 12 },
-  resumenItem: {
-    flex: 1, backgroundColor: 'rgba(255,255,255,0.15)',
-    borderRadius: 12, padding: 12,
-  },
-  resumenSubLabel: { color: 'rgba(255,255,255,0.7)', fontSize: 11, marginBottom: 4 },
-  resumenSubValor: { color: 'white', fontSize: 15, fontWeight: 'bold' },
-
-  seccionTitulo: {
-    fontSize: 11, fontWeight: '600', color: colors.textSecondary,
-    letterSpacing: 0.5, marginBottom: 4,
-  },
-  seccionSubtitulo: { fontSize: 12, color: colors.textSecondary, marginBottom: 12 },
-
-  saldoCard: {
-    backgroundColor: colors.cardBg, borderRadius: 16, padding: 14,
-    marginBottom: 10, flexDirection: 'row', alignItems: 'center', gap: 12,
-  },
-  saldoAvatar: {
-    width: 40, height: 40, borderRadius: 20,
-    justifyContent: 'center', alignItems: 'center',
-  },
-  saldoAvatarTexto: { color: 'white', fontWeight: 'bold', fontSize: 13 },
-  saldoInfo: { flex: 1 },
-  saldoNombre: { fontSize: 15, fontWeight: '600', color: colors.textPrimary },
-  saldoPago: { fontSize: 12, color: colors.textSecondary, marginTop: 2 },
-  saldoDerecha: { alignItems: 'flex-end' },
-  saldoPositivo: { color: colors.greenGlobal, fontWeight: '700', fontSize: 15 },
-  saldoNegativo: { color: colors.redGlobal, fontWeight: '700', fontSize: 15 },
-  saldoEmpate: { color: colors.textSecondary, fontWeight: '600', fontSize: 13 },
-  saldoEtiqueta: { fontSize: 11, color: colors.textSecondary },
 
   transCard: {
-    backgroundColor: colors.cardBg, borderRadius: 16, padding: 14,
-    marginBottom: 10, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    backgroundColor: colors.cardBg, borderRadius: 16, padding: 16,
+    marginBottom: 8, flexDirection: 'row', alignItems: 'center',
+    justifyContent: 'space-between', elevation: 1
   },
-  transNombre: { flexDirection: 'row', alignItems: 'center', gap: 8, flex: 1 },
-  transTexto: { fontSize: 13, color: colors.textSecondary, flexShrink: 1 },
-  transNombreResaltado: { color: colors.textPrimary, fontWeight: '600' },
-  transMonto: { fontSize: 15, fontWeight: '700', color: colors.primary },
+  transNombreContainer: { flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1 },
+  transTexto: { fontSize: 13, color: colors.textSecondary },
+  transNombreResaltado: { color: colors.textPrimary, fontWeight: 'bold' },
+  transMonto: { fontSize: 16, fontWeight: 'bold', color: colors.primary },
 
-  saldadoCentrado: { alignItems: 'center', paddingVertical: 24, gap: 8 },
-  saldadoTexto: { fontSize: 15, fontWeight: '600', color: colors.greenGlobal },
-
-  errorTexto: { color: colors.textSecondary, textAlign: 'center' },
-  btnReintentar: {
-    backgroundColor: colors.primary, borderRadius: 12,
-    paddingHorizontal: 24, paddingVertical: 12,
+  listaSaldos: { backgroundColor: colors.cardBg, borderRadius: 16, padding: 5 },
+  saldoFila: { 
+    flexDirection: 'row', alignItems: 'center', padding: 14, 
   },
-  btnReintentarTexto: { color: 'white', fontWeight: '600' },
+  avatarChico: { width: 32, height: 32, borderRadius: 16, justifyContent: 'center', alignItems: 'center' },
+  avatarTexto: { color: 'white', fontSize: 11, fontWeight: 'bold' },
+  saldoNombre: { flex: 1, marginLeft: 12, fontSize: 15, color: colors.textPrimary },
+  saldoMonto: { fontSize: 15, fontWeight: 'bold' },
+
+  acordeonHeader: {
+    flexDirection: 'row', justifyContent: 'center', alignItems: 'center',
+    padding: 20, gap: 8, marginTop: 16
+  },
+  acordeonTitulo: { fontSize: 13, fontWeight: 'bold', color: colors.primary },
+  
+  cardDetalle: {
+    backgroundColor: colors.cardBg, borderRadius: 16, padding: 16, marginBottom: 20,
+    borderWidth: 1, borderColor: '#eee'
+  },
+  detalleSubtitulo: { fontSize: 14, fontWeight: 'bold', color: colors.textPrimary, marginTop: 18, marginBottom: 10 },
+  filaCalculo: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 4 },
+  calcLabel: { fontSize: 13, color: colors.textSecondary },
+  calcValor: { fontSize: 13, color: colors.textPrimary },
+  calcValorResaltado: { fontSize: 13, fontWeight: 'bold', color: colors.primary },
+  calcTotalLabel: { fontSize: 14, fontWeight: 'bold', color: colors.textPrimary },
+  calcTotalValor: { fontSize: 14, fontWeight: 'bold', color: colors.primary },
+  linea: { height: 1, backgroundColor: '#eee', marginVertical: 8 },
+  formula: { fontSize: 11, color: colors.textSecondary, fontStyle: 'italic', marginBottom: 12 },
+
+  filaExplicacion: { flexDirection: 'row', alignItems: 'center', paddingVertical: 8 },
+  avatarExtraChico: { width: 24, height: 24, borderRadius: 12, justifyContent: 'center', alignItems: 'center' },
+  avatarTextoExtraChico: { color: 'white', fontSize: 8, fontWeight: 'bold' },
+  explicacionTextos: { flex: 1, marginLeft: 10 },
+  explicacionNombre: { fontSize: 13, fontWeight: '600', color: colors.textPrimary },
+  explicacionCalculo: { fontSize: 11, color: colors.textSecondary },
+  explicacionMonto: { fontSize: 13, fontWeight: 'bold' },
+
+  saldadoCentrado: { alignItems: 'center', padding: 20 },
+  saldadoTexto: { color: colors.greenGlobal, fontWeight: 'bold', marginTop: 8 },
+  errorTexto: { color: colors.textSecondary, textAlign: 'center', marginBottom: 16 },
+  btnReintentar: { backgroundColor: colors.primary, borderRadius: 12, paddingHorizontal: 24, paddingVertical: 12 },
+  btnReintentarTexto: { color: 'white', fontWeight: 'bold' },
 });
