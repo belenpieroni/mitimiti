@@ -32,9 +32,11 @@ function ProximamenteScreen() {
 
 function BotonMas({ onPress }) {
   return (
-    <TouchableOpacity style={styles.botonMas} onPress={onPress}>
-      <Ionicons name="add" size={32} color="white" />
-    </TouchableOpacity>
+    <View style={styles.botonMasContainer}>
+      <TouchableOpacity style={styles.botonMas} onPress={onPress}>
+        <Ionicons name="add" size={40} color="white" />
+      </TouchableOpacity>
+    </View>
   );
 }
 
@@ -46,9 +48,10 @@ export default function AppNavigator() {
           headerShown: false,
           tabBarStyle: {
             backgroundColor: colors.tabBarBg,
-            height: 64,
-            paddingBottom: 8,
+            height: 90,
+            paddingBottom: 16,
           },
+          tabBarHideOnKeyboard: true,
           tabBarActiveTintColor: colors.primary,
           tabBarInactiveTintColor: colors.textSecondary,
         }}
@@ -117,18 +120,23 @@ export default function AppNavigator() {
 }
 
 const styles = StyleSheet.create({
+  botonMasContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingBottom: 16,
+  },
   botonMas: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
+    width: 72,
+    height: 72,
+    borderRadius: 36,
     backgroundColor: colors.primary,
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 16,
     shadowColor: colors.primary,
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.4,
-    shadowRadius: 8,
-    elevation: 8,
+    shadowOpacity: 0.5,
+    shadowRadius: 12,
+    elevation: 10,
   },
 });
