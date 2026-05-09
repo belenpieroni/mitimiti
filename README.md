@@ -47,3 +47,15 @@ npm run start:tunnel
 ```
 
 Si alguna vez necesitás forzar una URL distinta, definí `EXPO_PUBLIC_API_URL`.
+
+## Variables de Entorno
+
+1. Copiá `.env.example` a `.env`:
+
+```bash
+cp .env.example .env
+```
+
+2. Editá `.env` con tus valores locales si es necesario. **Nunca commitees `.env` con credenciales**.
+
+**Importante**: En Expo, solo las variables que empiezan con `EXPO_PUBLIC_` son accesibles desde la app. Las otras se usan en backend/Docker..
