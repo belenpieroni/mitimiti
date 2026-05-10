@@ -56,7 +56,7 @@ export default function JuntadasScreen({ navigation }) {
       const datos = await listarJuntadas();
       setJuntadas(datos);
     } catch (e) {
-      setError('No se pudo conectar con el servidor.\nVerificá que el backend esté corriendo.');
+      setError('No se pudo conectar con el servidor.');
     } finally {
       setCargando(false);
     }
