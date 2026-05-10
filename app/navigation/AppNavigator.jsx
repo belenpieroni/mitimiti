@@ -1,7 +1,8 @@
-import { NavigationContainer } from '@react-navigation/native';
+import { useState } from 'react';
+import { NavigationContainer, useNavigation } from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
-import { Alert, View, TouchableOpacity, StyleSheet } from 'react-native';
+import { View, TouchableOpacity, StyleSheet, Modal, Text } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { colors } from '../theme/colors';
 
@@ -27,7 +28,13 @@ function JuntadasStack() {
 }
 
 function ProximamenteScreen() {
-  return null;
+  return (
+    <View style={styles.proximamenteContainer}>
+      <Text style={styles.proximamenteTexto}>
+        Este módulo estará disponible en próximas versiones
+      </Text>
+    </View>
+  );
 }
 
 function BotonMas({ onPress }) {
@@ -40,9 +47,12 @@ function BotonMas({ onPress }) {
   );
 }
 
-export default function AppNavigator() {
+function RootTabs() {
+  const navigation = useNavigation();
+  const [modalVisible, setModalVisible] = useState(false);
+
   return (
-    <NavigationContainer>
+    <>
       <Tab.Navigator
         screenOptions={{
           headerShown: false,
@@ -80,7 +90,7 @@ export default function AppNavigator() {
           options={{
             tabBarLabel: '',
             tabBarButton: (props) => (
-              <BotonMas onPress={() => Alert.alert('¿Qué querés agregar?', 'Próximamente')} />
+              <BotonMas onPress={() => setModalVisible(true)} />
             ),
           }}
         />
@@ -92,12 +102,6 @@ export default function AppNavigator() {
               <Ionicons name="home-outline" size={size} color={color} />
             ),
           }}
-          listeners={{
-            tabPress: (e) => {
-              e.preventDefault();
-              Alert.alert('Próximamente', 'Este módulo estará disponible en la próxima versión.');
-            },
-          }}
         />
         <Tab.Screen
           name="Viajes"
@@ -107,17 +111,75 @@ export default function AppNavigator() {
               <Ionicons name="airplane-outline" size={size} color={color} />
             ),
           }}
-          listeners={{
-            tabPress: (e) => {
-              e.preventDefault();
-              Alert.alert('Próximamente', 'Este módulo estará disponible en la próxima versión.');
-            },
-          }}
         />
       </Tab.Navigator>
+      <Modal visible={modalVisible} transparent animationType="fade">
+        <View style={mStyles.overlay}>
+          <TouchableOpacity style={StyleSheet.absoluteFill} onPress={() => setModalVisible(false)} />
+          
+          <View style={mStyles.sheet}>
+            <View style={mStyles.sheetHeader}>
+              <Text style={mStyles.sheetTitle}>¿Qué querés crear?</Text>
+              <TouchableOpacity style={mStyles.btnClose} onPress={() => setModalVisible(false)}>
+                <Ionicons name="close" size={20} color={colors.textSecondary} />
+              </TouchableOpacity>
+            </View>
+
+            {/* Nueva Juntada */}
+            <TouchableOpacity
+              style={mStyles.optionCard}
+              onPress={() => {
+                setModalVisible(false);
+                navigation.navigate('Juntadas', { screen: 'CrearJuntada' });
+              }}
+            >
+              <View style={[mStyles.optionIconBg, { backgroundColor: colors.secondary }]}>
+                <Ionicons name="people-outline" size={24} color={colors.primary} />
+              </View>
+              <View>
+                <Text style={mStyles.optionTitle}>Nueva juntada</Text>
+                <Text style={mStyles.optionSubtitle}>Asado, cumple, salida...</Text>
+              </View>
+            </TouchableOpacity>
+
+            {/* Nuevo gasto de Vivienda */}
+            <View style={[mStyles.optionCard, mStyles.optionDisabled]}>
+              <View style={[mStyles.optionIconBg, { backgroundColor: '#F0F5F9' }]}>
+                <Ionicons name="home-outline" size={24} color={colors.textSecondary} />
+              </View>
+              <View>
+                <Text style={mStyles.optionTitle}>Nuevo gasto de vivienda</Text>
+                <Text style={mStyles.optionTitle}>(Próximamente)</Text>
+                <Text style={mStyles.optionSubtitle}>Super, internet, expensas...</Text>
+              </View>
+            </View>
+
+            {/* Nuevo Viaje */}
+            <View style={[mStyles.optionCard, mStyles.optionDisabled]}>
+              <View style={[mStyles.optionIconBg, { backgroundColor: '#E9F7EF' }]}>
+                <Ionicons name="airplane-outline" size={24} color={colors.greenGlobal} />
+              </View>
+              <View>
+                <Text style={mStyles.optionTitle}>Nuevo viaje (Próximamente)</Text>
+                <Text style={mStyles.optionSubtitle}>Escapada, vacaciones...</Text>
+              </View>
+            </View>
+          </View>
+        </View>
+      </Modal>
+    </>
+  );
+}
+
+export default function AppNavigator() {
+  return (
+    <NavigationContainer>
+      <RootTabs />
     </NavigationContainer>
   );
 }
+
+// ── Constants ─────────────────────────────────────────────────────────────────
 
 const styles = StyleSheet.create({
   botonMasContainer: {
@@ -138,5 +200,83 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.5,
     shadowRadius: 12,
     elevation: 10,
+  },
+  proximamenteContainer: {
+    flex: 1,
+    backgroundColor: colors.background,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 32,
+  },
+  proximamenteTexto: {
+    color: colors.textSecondary,
+    textAlign: 'center',
+    lineHeight: 24,
+    fontSize: 16,
+  }
+});
+
+const mStyles = StyleSheet.create({
+  overlay: { 
+    flex: 1, 
+    backgroundColor: 'rgba(0,0,0,0.4)', 
+    justifyContent: 'flex-end' 
+  },
+  sheet: {
+    backgroundColor: colors.background, 
+    borderTopLeftRadius: 24, 
+    borderTopRightRadius: 24,
+    padding: 24, 
+    paddingBottom: 40,
+    marginTop: 'auto',
+  },
+  sheetHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  sheetTitle: { 
+    fontSize: 18, 
+    fontWeight: 'bold', 
+    color: colors.textPrimary 
+  },
+  btnClose: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: colors.cardBg,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  optionCard: {
+    backgroundColor: colors.cardBg, 
+    borderRadius: 16, 
+    padding: 16,
+    marginBottom: 12, 
+    flexDirection: 'row', 
+    alignItems: 'center', 
+    gap: 16,
+  },
+  optionDisabled: {
+    opacity: 0.5,
+    backgroundColor: '#E8E8E8',
+  },
+  optionIconBg: {
+    width: 48,
+    height: 48,
+    borderRadius: 16,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  optionTitle: { 
+    fontSize: 16, 
+    fontWeight: '600', 
+    color: colors.textPrimary,
+    marginBottom: 2
+  },
+  optionSubtitle: { 
+    fontSize: 13, 
+    color: colors.textSecondary 
   },
 });
