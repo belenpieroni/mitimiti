@@ -1,11 +1,12 @@
 import { useState } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity,
-  ScrollView, StyleSheet, KeyboardAvoidingView, Platform
+  ScrollView, StyleSheet, KeyboardAvoidingView, Platform, Alert
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { colors } from '../theme/colors';
-import { agregarJuntada, getIniciales, coloresDisponibles } from './JuntadasScreen';
+import { getIniciales, coloresDisponibles } from './JuntadasScreen';
+import { crearJuntada as crearJuntadaService } from '../services/juntadasService';
 
 const usuarioActual = { nombre: 'Martín', iniciales: 'MR', color: colors.primary };
 
@@ -40,20 +41,25 @@ export default function CrearJuntadaScreen({ navigation }) {
     setPersonas(personas.filter(p => p.nombre !== nombre));
   }
 
-  function crearJuntada() {
+  async function crearJuntada() {
     if (!nombre.trim()) return;
     const nueva = {
       id: Date.now().toString(),
       nombre: nombre.trim(),
       descripcion: descripcion.trim(),
       fecha: getFechaHoy(),
-      personas,
+      participantes: personas,
       gastos: [],
       deuda: 0,
       tipo: 'ninguna',
     };
-    agregarJuntada(nueva);
-    navigation.goBack();
+    try {
+      await crearJuntadaService(nueva);
+      navigation.goBack();
+    } catch (e) {
+      console.error('Error creando juntada', e);
+      Alert.alert('Error', 'No se pudo crear la juntada. Revisá la conexión.');
+    }
   }
 
   const puedeCrear = nombre.trim().length > 0;

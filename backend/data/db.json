@@ -1,6 +1,67 @@
 {
   "juntadas": [
     {
+      "id": "5ed6472e-1067-4a60-a37b-6372b45f4526",
+      "nombre": "Noche de Bowling 🎳",
+      "descripcion": "Festejamos la aprobación de la entrega 1",
+      "fecha": "2026-05-20",
+      "creadaEn": "2026-05-20T19:11:58.196Z",
+      "participantes": [
+        {
+          "id": "9c2996a2-3924-4593-b521-02351946b9e8",
+          "nombre": "Martín",
+          "iniciales": "MR",
+          "color": "#473472"
+        },
+        {
+          "id": "eb46bbcf-a297-4470-85ed-baac612850b4",
+          "nombre": "Thiago",
+          "iniciales": "TH",
+          "color": "#526D82"
+        },
+        {
+          "id": "7666c71a-e33b-4edb-b428-7275ea96627f",
+          "nombre": "Ori",
+          "iniciales": "OR",
+          "color": "#9DB2BF"
+        },
+        {
+          "id": "ba661444-9ddd-4c3f-9cfc-3e45bccb0b17",
+          "nombre": "Belen",
+          "iniciales": "BE",
+          "color": "#42b271"
+        },
+        {
+          "id": "04a3944c-b9f3-49ed-9a3e-1f940a9d5ed4",
+          "nombre": "Ivo",
+          "iniciales": "IV",
+          "color": "#c084fc"
+        },
+        {
+          "id": "c471a70d-55d9-440a-a853-c934bd2e167a",
+          "nombre": "Conrado",
+          "iniciales": "CO",
+          "color": "#f97316"
+        }
+      ],
+      "gastos": [
+        {
+          "id": "89feeb45-1c89-42e1-a01c-d9e6240afffd",
+          "nombre": "Pizza",
+          "pagador": "Belen",
+          "monto": 12500,
+          "creadoEn": "2026-05-20T19:12:22.149Z"
+        },
+        {
+          "id": "93e31a77-c80d-4232-8f05-a8812b9ae850",
+          "nombre": "Gaseosa",
+          "pagador": "Thiago",
+          "monto": 12000,
+          "creadoEn": "2026-05-20T19:12:31.590Z"
+        }
+      ]
+    },
+    {
       "id": "1",
       "nombre": "Asado del sábado",
       "descripcion": "",
@@ -55,52 +116,6 @@
           "creadoEn": "2026-04-28T12:02:00.000Z"
         }
       ]
-    },
-    {
-      "id": "2",
-      "nombre": "Viaje Bariloche",
-      "descripcion": "",
-      "fecha": "2026-03-15",
-      "creadaEn": "2026-03-15T09:00:00.000Z",
-      "participantes": [
-        {
-          "id": "p1",
-          "nombre": "Martín",
-          "iniciales": "MR",
-          "color": "#473472"
-        },
-        {
-          "id": "p2",
-          "nombre": "Jorge",
-          "iniciales": "JL",
-          "color": "#526D82"
-        },
-        {
-          "id": "p3",
-          "nombre": "Sofía",
-          "iniciales": "SO",
-          "color": "#9DB2BF"
-        },
-        {
-          "id": "p4",
-          "nombre": "Alan",
-          "iniciales": "AL",
-          "color": "#42b271"
-        },
-        {
-          "id": "p5",
-          "nombre": "Laura",
-          "iniciales": "LU",
-          "color": "#c084fc"
-        },
-        {
-          "id": "p6",
-          "nombre": "Camila",
-          "iniciales": "CA",
-          "color": "#f97316"
-        }
-      ],
-      "gastos": []
     },
     {
       "id": "3",
