@@ -34,6 +34,7 @@ router.get('/balance/global/:nombre', ctrl.obtenerBalanceGlobal);
 router.get('/',     ctrl.listarJuntadas);
 router.post('/',    ctrl.crearJuntada);
 router.get('/:id',  ctrl.obtenerJuntada);
+router.patch('/:id', ctrl.editarJuntada);
 router.delete('/:id', ctrl.eliminarJuntada);
 
 // ── Participantes ─────────────────────────────────────────────────────────────
@@ -46,6 +47,8 @@ router.delete('/:id/gastos/:gid', ctrl.eliminarGasto);
 
 // Subgrupos
 router.post('/:id/subgrupos', ctrl.agregarSubgrupo);
+router.patch('/:id/subgrupos/:sgid', ctrl.editarSubgrupo);
+router.delete('/:id/subgrupos/:sgid', ctrl.eliminarSubgrupo);
 
 // ── Balance de juntada ────────────────────────────────────────────────────────
 router.get('/:id/balance', ctrl.obtenerBalance);

@@ -6,7 +6,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { colors } from '../theme/colors';
 import { getIniciales, coloresDisponibles } from './JuntadasScreen';
-import { crearJuntada as crearJuntadaService } from '../services/juntadasService';
+import { crearJuntada as crearJuntadaService, editarJuntada as editarJuntadaService } from '../services/juntadasService';
 
 const usuarioActual = { nombre: 'Martín', iniciales: 'MR', color: colors.primary };
 
@@ -15,11 +15,13 @@ function getFechaHoy() {
   return hoy.toLocaleDateString('es-AR', { day: 'numeric', month: 'short', year: 'numeric' });
 }
 
-export default function CrearJuntadaScreen({ navigation }) {
-  const [nombre, setNombre] = useState('');
-  const [descripcion, setDescripcion] = useState('');
+export default function CrearJuntadaScreen({ navigation, route }) {
+  const editando = route.params?.juntadaId ? route.params : null;
+
+  const [nombre, setNombre] = useState(editando?.nombre || '');
+  const [descripcion, setDescripcion] = useState(editando?.descripcion || '');
   const [inputPersona, setInputPersona] = useState('');
-  const [personas, setPersonas] = useState([usuarioActual]);
+  const [personas, setPersonas] = useState(editando?.participantes || [usuarioActual]);
 
   function agregarPersona() {
     const nombreLimpio = inputPersona.trim();
@@ -43,22 +45,25 @@ export default function CrearJuntadaScreen({ navigation }) {
 
   async function crearJuntada() {
     if (!nombre.trim()) return;
-    const nueva = {
-      id: Date.now().toString(),
-      nombre: nombre.trim(),
-      descripcion: descripcion.trim(),
-      fecha: getFechaHoy(),
-      participantes: personas,
-      gastos: [],
-      deuda: 0,
-      tipo: 'ninguna',
-    };
     try {
-      await crearJuntadaService(nueva);
+      if (editando) {
+        await editarJuntadaService(editando.juntadaId, { nombre: nombre.trim(), descripcion: descripcion.trim() });
+      } else {
+        const nueva = {
+          id: Date.now().toString(),
+          nombre: nombre.trim(),
+          descripcion: descripcion.trim(),
+          fecha: getFechaHoy(),
+          participantes: personas,
+          gastos: [],
+          deuda: 0,
+          tipo: 'ninguna',
+        };
+        await crearJuntadaService(nueva);
+      }
       navigation.goBack();
     } catch (e) {
-      console.error('Error creando juntada', e);
-      Alert.alert('Error', 'No se pudo crear la juntada. Revisá la conexión.');
+      Alert.alert('Error', 'No se pudo guardar la juntada. Revisá la conexión.');
     }
   }
 
@@ -77,8 +82,8 @@ export default function CrearJuntadaScreen({ navigation }) {
             <Ionicons name="chevron-back" size={22} color={colors.textPrimary} />
           </TouchableOpacity>
           <View>
-            <Text style={styles.titulo}>Nueva juntada</Text>
-            <Text style={styles.subtitulo}>Creá un evento para dividir gastos</Text>
+            <Text style={styles.titulo}>{editando ? 'Editar juntada' : 'Nueva juntada'}</Text>
+            <Text style={styles.subtitulo}>{editando ? 'Modificar nombre y descripción' : 'Creá un evento para dividir gastos'}</Text>
           </View>
         </View>
 
@@ -163,7 +168,7 @@ export default function CrearJuntadaScreen({ navigation }) {
             onPress={crearJuntada}
             disabled={!puedeCrear}
           >
-            <Text style={styles.btnCrearTexto}>Crear juntada</Text>
+            <Text style={styles.btnCrearTexto}>{editando ? 'Guardar cambios' : 'Crear juntada'}</Text>
           </TouchableOpacity>
         </View>
 
