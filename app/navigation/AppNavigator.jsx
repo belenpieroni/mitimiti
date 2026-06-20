@@ -27,6 +27,15 @@ function JuntadasStack() {
   );
 }
 
+function HomeStack() {
+  return (
+    <Stack.Navigator screenOptions={{ headerShown: false }}>
+      <Stack.Screen name="HomeMain" component={HomeScreen} />
+      <Stack.Screen name="Perfil" component={PerfilScreen} />
+    </Stack.Navigator>
+  );
+}
+
 function ProximamenteScreen() {
   return (
     <View style={styles.proximamenteContainer}>
@@ -68,7 +77,7 @@ function RootTabs() {
       >
         <Tab.Screen
           name="Inicio"
-          component={HomeScreen}
+          component={HomeStack}
           options={{
             tabBarIcon: ({ color, size }) => (
               <Ionicons name="home" size={size} color={color} />
