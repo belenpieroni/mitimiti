@@ -160,6 +160,14 @@ function obtenerJuntada(req, res, next) {
     }
 
     const balance = calcularBalance(juntada);
+    
+    if (db.perfiles) {
+      balance.transferencias = balance.transferencias.map(t => ({
+        ...t,
+        aliasDestino: db.perfiles[t.para] ? db.perfiles[t.para].alias : null
+      }));
+    }
+
     res.json({ ok: true, data: { ...juntada, balance } });
   } catch (err) {
     next(err);
@@ -398,6 +406,14 @@ function obtenerBalance(req, res, next) {
     }
 
     const balance = calcularBalance(juntada);
+    
+    if (db.perfiles) {
+      balance.transferencias = balance.transferencias.map(t => ({
+        ...t,
+        aliasDestino: db.perfiles[t.para] ? db.perfiles[t.para].alias : null
+      }));
+    }
+
     res.json({ ok: true, data: balance });
   } catch (err) {
     next(err);
