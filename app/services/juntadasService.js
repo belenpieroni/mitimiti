@@ -17,3 +17,18 @@ export const eliminarGasto       = (juntadaId, gid) => api.delete(`/juntadas/${j
 // Balance
 export const obtenerBalance      = (juntadaId) => api.get(`/juntadas/${juntadaId}/balance`);
 export const obtenerBalanceGlobal = (nombre)   => api.get(`/juntadas/balance/global/${encodeURIComponent(nombre)}`);
+
+export async function agregarSubgrupo(juntadaId, datos) {
+  // datos espera un objeto: { nombre: string, integrantes: string[] }
+  const response = await fetch(`${API_URL}/juntadas/${juntadaId}/subgrupos`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(datos),
+  });
+  
+  const data = await response.json();
+  if (!response.ok) {
+    throw new Error(data.error || 'Error al crear el subgrupo');
+  }
+  return data;
+}
