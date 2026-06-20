@@ -4,6 +4,7 @@ WORKDIR /app
 
 COPY package*.json ./
 RUN npm install
+RUN npx expo install
 
 EXPOSE 8081 19000 19001 19002
 

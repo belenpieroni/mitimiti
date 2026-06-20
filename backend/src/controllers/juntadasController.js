@@ -311,7 +311,7 @@ function agregarGasto(req, res, next) {
       return next(err);
     }
 
-    const { nombre, pagador, monto } = req.body;
+    const { nombre, pagador, monto, splitMode = 'equal', splitSubgroups = [] } = req.body;
 
     // Validaciones
     if (!nombre || nombre.trim() === '') {
@@ -341,8 +341,6 @@ function agregarGasto(req, res, next) {
       err.status = 422;
       return next(err);
     }
-
-    const { nombre, pagador, monto, splitMode = 'equal', splitSubgroups = [] } = req.body;
 
     const nuevo = {
       id: uuidv4(),
