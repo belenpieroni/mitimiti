@@ -67,6 +67,16 @@
           "splitSubgroups": [],
           "monto": 10000,
           "creadoEn": "2026-06-20T18:39:49.456Z"
+        },
+        {
+          "id": "047cb93e-d2dd-411c-b2b5-e6db3cd64894",
+          "nombre": "Restaurante",
+          "pagador": "Thiago",
+          "splitMode": "equal",
+          "splitSubgroups": [],
+          "monto": 2628,
+          "ticketPhoto": "/uploads/ticket-1781992868028-407866012.jpg",
+          "creadoEn": "2026-06-20T22:01:27.290Z"
         }
       ],
       "subgrupos": [

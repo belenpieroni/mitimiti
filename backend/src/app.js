@@ -12,7 +12,7 @@ const PORT = process.env.PORT || 3000;
 // ── Middlewares globales ──────────────────────────────────────────────────────
 app.use(cors());                        // Permite peticiones desde la app Expo
 app.use(express.json());                // Parsea body JSON
-app.use('/uploads', express.static(path.join(__dirname, '../uploads'))); // Servir archivos estáticos
+app.use('/uploads', express.static(path.join(__dirname, 'uploads'))); // Servir archivos estáticos (mismo dir que multer: src/uploads)
 
 // ── Rutas ─────────────────────────────────────────────────────────────────────
 app.get('/', (req, res) => {

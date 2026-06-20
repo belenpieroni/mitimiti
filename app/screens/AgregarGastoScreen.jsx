@@ -28,6 +28,7 @@ export default function AgregarGastoScreen({ route, navigation }) {
   const [mostrarFecha, setMostrarFecha] = useState(false);
   const [mostrarOCR, setMostrarOCR] = useState(false);
   const [adjuntoTicket, setAdjuntoTicket] = useState(null);
+  const [ticketUrl, setTicketUrl] = useState(null); // URL en el server (si vino del OCR)
   useFocusEffect(
     useCallback(() => { cargarJuntada(); }, [juntadaId])
   );
@@ -46,9 +47,10 @@ export default function AgregarGastoScreen({ route, navigation }) {
     }
   }
 
-  function handleOCRExtracted({ amount, photo }) {
+  function handleOCRExtracted({ amount, photo, ticketUrl: urlDelServer }) {
     setMonto(amount.toString());
     setAdjuntoTicket(photo);
+    if (urlDelServer) setTicketUrl(urlDelServer); // ya quedó subida al escanear
     Alert.alert('✓ Listo', `Importe $${amount.toFixed(2)} cargado y ticket adjunto`);
   }
 
@@ -86,12 +88,17 @@ export default function AgregarGastoScreen({ route, navigation }) {
 
       // Subir foto del ticket si existe
       if (adjuntoTicket) {
-        try {
-          const uploadResult = await uploadTicketPhoto(adjuntoTicket);
-          datosGasto.ticketPhoto = uploadResult.url;
-        } catch (uploadError) {
-          console.warn('Error subiendo foto del ticket:', uploadError);
-          // Continuar sin foto si falla el upload
+        if (ticketUrl) {
+          // Ya se subió durante el escaneo OCR: reutilizamos esa URL.
+          datosGasto.ticketPhoto = ticketUrl;
+        } else {
+          try {
+            const uploadResult = await uploadTicketPhoto(adjuntoTicket);
+            datosGasto.ticketPhoto = uploadResult.url;
+          } catch (uploadError) {
+            console.warn('Error subiendo foto del ticket:', uploadError);
+            // Continuar sin foto si falla el upload
+          }
         }
       }
 

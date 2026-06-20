@@ -1,87 +1,71 @@
-import { createWorker } from 'tesseract.js';
-
-let worker = null;
+import { API_URL } from './api';
 
 /**
- * Inicializa el worker de Tesseract (una sola vez)
+ * OCR de tickets — versión que corre contra el BACKEND.
+ *
+ * Antes esto usaba tesseract.js directamente en la app, pero Tesseract.js
+ * necesita APIs de navegador (Worker, Blob, canvas) que React Native / Expo
+ * NO tiene -> de ahí el error "Property 'Worker' doesn't exist".
+ *
+ * Ahora la app solo manda la foto al backend (POST /api/uploads/scan),
+ * el server corre el OCR y nos devuelve el importe ya extraído.
  */
-const initWorker = async () => {
-  if (worker) return worker;
-  
+
+/**
+ * Arma el objeto de archivo en el formato que React Native espera para
+ * FormData ({ uri, name, type }). NO usar fetch(uri).blob() en nativo.
+ */
+function buildFilePart(imageUri) {
+  const filename = imageUri.split('/').pop() || `ticket-${Date.now()}.jpg`;
+  // Inferir el mime a partir de la extensión
+  const match = /\.(\w+)$/.exec(filename);
+  const ext = (match ? match[1] : 'jpg').toLowerCase();
+  const type = ext === 'png' ? 'image/png' : ext === 'webp' ? 'image/webp' : 'image/jpeg';
+  return { uri: imageUri, name: filename, type };
+}
+
+/**
+ * Sube la foto del ticket y corre OCR en el backend.
+ * @param {string} imageUri - URI local de la imagen (file://...)
+ * @returns {Promise<{ amount: number|null, text: string, ticketUrl: string }>}
+ */
+export const scanTicket = async (imageUri) => {
   try {
-    worker = await createWorker('spa'); // Español para mejor detección
-    return worker;
+    const formData = new FormData();
+    formData.append('file', buildFilePart(imageUri));
+
+    const response = await fetch(`${API_URL}/api/uploads/scan`, {
+      method: 'POST',
+      body: formData,
+      // OJO: no seteamos 'Content-Type' a mano. fetch/RN ya pone el
+      // multipart/form-data con el boundary correcto.
+    });
+
+    if (!response.ok) {
+      throw new Error(`Error del servidor: ${response.status}`);
+    }
+
+    const result = await response.json();
+    if (!result.ok) {
+      throw new Error(result.error || 'Error desconocido en el OCR');
+    }
+
+    return {
+      amount: result.data.amount,     // number | null
+      text: result.data.text || '',
+      ticketUrl: result.data.url,     // ej: /uploads/ticket-123.jpg
+    };
   } catch (error) {
-    console.error('Error inicializando OCR:', error);
+    console.error('Error escaneando ticket:', error);
     throw error;
   }
 };
 
 /**
- * Extrae texto de una imagen usando OCR
- */
-export const extractTextFromImage = async (imageUri) => {
-  try {
-    const ocr = await initWorker();
-    
-    const result = await ocr.recognize(imageUri);
-    return result.data.text;
-  } catch (error) {
-    console.error('Error en OCR:', error);
-    throw error;
-  }
-};
-
-/**
- * Extrae el importe total de un ticket
- * Busca números con decimales y retorna el más probable (el mayor)
+ * Compat: mantiene el nombre viejo por si lo usás en otro lado.
+ * Devuelve solo el importe (o null).
  */
 export const extractAmountFromTicket = async (imageUri) => {
-  try {
-    const text = await extractTextFromImage(imageUri);
-    
-    // Busca números con formato: 123.45, 123,45, 123456, etc.
-    // Prioriza números con decimales (más probable que sea el total)
-    const patterns = [
-      /\$?\s*(\d+[.,]\d{2})/g,           // 123.45 o 123,45 o $123.45
-      /total[:\s]*\$?\s*(\d+[.,]\d{2})/gi, // "Total: 123.45"
-      /total[:\s]*(\d+)/gi,              // "Total: 12345"
-      /(\d+[.,]\d{2})/g,                 // Cualquier número con 2 decimales
-    ];
-
-    let amounts = [];
-    
-    // Ejecuta cada patrón
-    for (const pattern of patterns) {
-      const matches = text.matchAll(pattern);
-      for (const match of matches) {
-        let value = match[1].replace(',', '.'); // Normaliza a punto
-        amounts.push(parseFloat(value));
-      }
-    }
-
-    // Si encontró números, retorna el mayor (probablemente el total)
-    if (amounts.length > 0) {
-      const maxAmount = Math.max(...amounts);
-      // Valida que sea un importe razonable (entre 0.01 y 1000000)
-      if (maxAmount > 0 && maxAmount < 1000000) {
-        return maxAmount;
-      }
-    }
-
-    return null;
-  } catch (error) {
-    console.error('Error extrayendo importe:', error);
-    throw error;
-  }
-};
-
-/**
- * Libera recursos del worker cuando termina la app
- */
-export const terminateOCRWorker = async () => {
-  if (worker) {
-    await worker.terminate();
-    worker = null;
-  }
+  const { amount } = await scanTicket(imageUri);
+  return amount;
 };

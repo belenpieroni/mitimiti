@@ -330,7 +330,7 @@ function agregarGasto(req, res, next) {
       return next(err);
     }
 
-    const { nombre, pagador, monto, splitMode = 'equal', splitSubgroups = [] } = req.body;
+    const { nombre, pagador, monto, splitMode = 'equal', splitSubgroups = [], ticketPhoto = null } = req.body;
 
     // Validaciones
     if (!nombre || nombre.trim() === '') {
@@ -368,6 +368,7 @@ function agregarGasto(req, res, next) {
       splitMode,     
       splitSubgroups, 
       monto: Math.round(monto * 100) / 100, // redondear a 2 decimales
+      ticketPhoto,   // URL de la foto del ticket (null si se cargó manual)
       creadoEn: new Date().toISOString(),
     };
 

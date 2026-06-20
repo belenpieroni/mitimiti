@@ -1,12 +1,12 @@
 import { useState, useCallback } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet,
-  ActivityIndicator, TextInput, Modal, Alert, KeyboardAvoidingView, Platform,
+  ActivityIndicator, TextInput, Modal, Alert, KeyboardAvoidingView, Platform, Image,
 } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { colors } from '../theme/colors';
-import api from '../services/api';
+import api, { API_URL } from '../services/api';
 import { obtenerJuntada, agregarGasto, eliminarGasto, agregarSubgrupo, editarSubgrupo, eliminarSubgrupo } from '../services/juntadasService';
 
 function formatPesos(monto) {
@@ -25,6 +25,7 @@ export default function JuntadaDetalleScreen({ route, navigation }) {
   const [subgruposVisible, setSubgruposVisible] = useState(false);
   const [actionsVisible, setActionsVisible]     = useState(false);
   const [confirmEliminar, setConfirmEliminar]   = useState(false);
+  const [fotoTicket, setFotoTicket]             = useState(null); // URL de la foto que se está viendo
   
   const cargarJuntada = useCallback(async () => {
     setCargando(true);
@@ -179,6 +180,14 @@ export default function JuntadaDetalleScreen({ route, navigation }) {
                 <Text style={styles.gastoPagador}>Pagó {g.pagador}</Text>
               </View>
               <Text style={styles.gastoMonto}>{formatPesos(g.monto)}</Text>
+              {g.ticketPhoto && (
+                <TouchableOpacity
+                  style={styles.btnClip}
+                  onPress={() => setFotoTicket(`${API_URL}${g.ticketPhoto}`)}
+                >
+                  <Ionicons name="attach" size={18} color={colors.primary} />
+                </TouchableOpacity>
+              )}
               <TouchableOpacity style={styles.btnEliminar} onPress={() => handleEliminarGasto(g.id)}>
                 <Ionicons name="trash-outline" size={18} color={colors.redGlobal} />
               </TouchableOpacity>
@@ -242,11 +251,26 @@ export default function JuntadaDetalleScreen({ route, navigation }) {
           }}
         />
       )}
+      {/* Visor de foto del ticket (clip) */}
+      <Modal visible={!!fotoTicket} transparent animationType="fade" onRequestClose={() => setFotoTicket(null)}>
+        <View style={styles.fotoOverlay}>
+          <TouchableOpacity style={StyleSheet.absoluteFill} activeOpacity={1} onPress={() => setFotoTicket(null)} />
+          <View style={styles.fotoBox}>
+            <View style={styles.fotoHeader}>
+              <Text style={styles.fotoTitulo}>Ticket adjunto</Text>
+              <TouchableOpacity style={styles.fotoClose} onPress={() => setFotoTicket(null)}>
+                <Ionicons name="close" size={18} color={colors.textSecondary} />
+              </TouchableOpacity>
+            </View>
+            {fotoTicket && (
+              <Image source={{ uri: fotoTicket }} style={styles.fotoImagen} resizeMode="contain" />
+            )}
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
-
-// ── Estilos compartidos ActionsSheet / ConfirmSheet ─────────────────────────
 const actSheet = StyleSheet.create({
   sheet: {
     backgroundColor: colors.background, borderTopLeftRadius: 24, borderTopRightRadius: 24,
@@ -633,7 +657,32 @@ const styles = StyleSheet.create({
   gastoNombre: { fontSize: 15, fontWeight: '600', color: colors.textPrimary },
   gastoPagador: { fontSize: 12, color: colors.textSecondary, marginTop: 2 },
   gastoMonto: { fontSize: 15, fontWeight: '700', color: colors.textPrimary },
+  btnClip: {
+    width: 30, height: 30, borderRadius: 15,
+    backgroundColor: colors.primary + '18',
+    justifyContent: 'center', alignItems: 'center',
+    marginLeft: 8,
+  },
   btnEliminar: { padding: 4 },
+  // Visor de foto del ticket
+  fotoOverlay: {
+    flex: 1, justifyContent: 'center', alignItems: 'center',
+    backgroundColor: 'rgba(0,0,0,0.75)', padding: 20,
+  },
+  fotoBox: {
+    backgroundColor: colors.background, borderRadius: 20,
+    width: '100%', maxWidth: 420, overflow: 'hidden',
+  },
+  fotoHeader: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    paddingHorizontal: 16, paddingVertical: 14,
+  },
+  fotoTitulo: { fontSize: 15, fontWeight: '600', color: colors.textPrimary },
+  fotoClose: {
+    width: 32, height: 32, borderRadius: 16,
+    backgroundColor: 'white', justifyContent: 'center', alignItems: 'center',
+  },
+  fotoImagen: { width: '100%', height: 420, backgroundColor: '#000' },
   footer: {
     position: 'absolute', bottom: 0, left: 0, right: 0,
     padding: 16, backgroundColor: colors.background,

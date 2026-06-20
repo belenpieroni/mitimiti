@@ -13,7 +13,7 @@ import {
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { colors } from '../theme/colors';
-import { extractAmountFromTicket } from '../services/ocrService';
+import { scanTicket } from '../services/ocrService';
 
 export default function CaptureTicketModal({ visible, onClose, onAmountExtracted }) {
   const [permission, requestPermission] = useCameraPermissions();
@@ -46,8 +46,9 @@ export default function CaptureTicketModal({ visible, onClose, onAmountExtracted
 
     setIsProcessing(true);
     try {
-      const amount = await extractAmountFromTicket(capturedPhoto);
-      
+      // El OCR ahora corre en el backend: sube la foto y devuelve el importe.
+      const { amount, ticketUrl } = await scanTicket(capturedPhoto);
+
       if (amount) {
         // Éxito: retorna el importe extraído
         Alert.alert(
@@ -62,7 +63,9 @@ export default function CaptureTicketModal({ visible, onClose, onAmountExtracted
             {
               text: 'Usar',
               onPress: () => {
-                onAmountExtracted({ amount, photo: capturedPhoto });
+                // Pasamos también ticketUrl (ya quedó subida en el server)
+                // para no volver a subir la foto al guardar el gasto.
+                onAmountExtracted({ amount, photo: capturedPhoto, ticketUrl });
                 handleClose();
               },
             },
@@ -89,7 +92,6 @@ export default function CaptureTicketModal({ visible, onClose, onAmountExtracted
   const handleClose = () => {
     setCapturedPhoto(null);
     setIsProcessing(false);
-    setSimulateBlurry(false);
     onClose();
   };
 
