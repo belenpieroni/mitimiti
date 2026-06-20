@@ -6,10 +6,12 @@ import {
 } from 'react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Ionicons } from '@expo/vector-icons';
+import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
 import { colors } from '../theme/colors';
 import { obtenerJuntada, agregarGasto } from '../services/juntadasService';
+import { uploadTicketPhoto } from '../services/uploadService';
+import CaptureTicketModal from '../components/CaptureTicketModal';
 
 export default function AgregarGastoScreen({ route, navigation }) {
   const { juntadaId } = route.params;
@@ -24,6 +26,8 @@ export default function AgregarGastoScreen({ route, navigation }) {
   const [guardando, setGuardando] = useState(false);
   const [mostrarPagadores, setMostrarPagadores] = useState(false);  const [fecha, setFecha]        = useState(new Date());
   const [mostrarFecha, setMostrarFecha] = useState(false);
+  const [mostrarOCR, setMostrarOCR] = useState(false);
+  const [adjuntoTicket, setAdjuntoTicket] = useState(null);
   useFocusEffect(
     useCallback(() => { cargarJuntada(); }, [juntadaId])
   );
@@ -40,6 +44,12 @@ export default function AgregarGastoScreen({ route, navigation }) {
     } catch (e) {
       Alert.alert('Error', 'No se pudo cargar la juntada');
     }
+  }
+
+  function handleOCRExtracted({ amount, photo }) {
+    setMonto(amount.toString());
+    setAdjuntoTicket(photo);
+    Alert.alert('✓ Listo', `Importe $${amount.toFixed(2)} cargado y ticket adjunto`);
   }
 
   function toggleParticipante(nombreP) {
@@ -72,6 +82,17 @@ export default function AgregarGastoScreen({ route, navigation }) {
 
       if (splitMode === 'equal' && seleccionados.length > 0) {
         datosGasto.dividirEntre = seleccionados;
+      }
+
+      // Subir foto del ticket si existe
+      if (adjuntoTicket) {
+        try {
+          const uploadResult = await uploadTicketPhoto(adjuntoTicket);
+          datosGasto.ticketPhoto = uploadResult.url;
+        } catch (uploadError) {
+          console.warn('Error subiendo foto del ticket:', uploadError);
+          // Continuar sin foto si falla el upload
+        }
       }
 
       await agregarGasto(juntadaId, datosGasto);
@@ -129,6 +150,24 @@ export default function AgregarGastoScreen({ route, navigation }) {
             placeholderTextColor={colors.textSecondary}
           />
         </View>
+
+        {/* Botón Escanear ticket con borde punteado */}
+        <TouchableOpacity 
+          style={[styles.btnEscanearTicket, adjuntoTicket && styles.btnEscanearTicketActivo]}
+          onPress={() => setMostrarOCR(true)}
+          disabled={guardando}
+        >
+          <MaterialCommunityIcons name="camera" size={20} color={colors.primary} />
+          <Text style={styles.btnEscanearTicketText}>Escanear ticket</Text>
+          {adjuntoTicket && (
+            <MaterialCommunityIcons 
+              name="check-circle" 
+              size={20} 
+              color={colors.primary}
+              style={{ marginLeft: 'auto' }}
+            />
+          )}
+        </TouchableOpacity>
 
         {/* Concepto */}
         <Text style={styles.label}>CONCEPTO</Text>
@@ -316,6 +355,12 @@ export default function AgregarGastoScreen({ route, navigation }) {
         </TouchableOpacity>
       </ScrollView>
       </KeyboardAvoidingView>
+
+      <CaptureTicketModal
+        visible={mostrarOCR}
+        onClose={() => setMostrarOCR(false)}
+        onAmountExtracted={handleOCRExtracted}
+      />
     </View>
   );
 }
@@ -622,5 +667,31 @@ const styles = StyleSheet.create({
     color: 'white',
     fontWeight: '700',
     fontSize: 15,
+  },
+  btnOCR: {
+    padding: 8,
+    marginLeft: 8,
+  },
+  btnEscanearTicket: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+    marginTop: 16,
+    borderWidth: 2,
+    borderColor: colors.primary,
+    borderStyle: 'dashed',
+    borderRadius: 8,
+    backgroundColor: 'rgba(104, 70, 220, 0.05)',
+  },
+  btnEscanearTicketActivo: {
+    backgroundColor: 'rgba(104, 70, 220, 0.1)',
+  },
+  btnEscanearTicketText: {
+    flex: 1,
+    fontSize: 14,
+    fontWeight: '600',
+    color: colors.primary,
   },
 });
