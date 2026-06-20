@@ -44,6 +44,9 @@ router.delete('/:id/participantes/:pid',  ctrl.quitarParticipante);
 router.post('/:id/gastos',        ctrl.agregarGasto);
 router.delete('/:id/gastos/:gid', ctrl.eliminarGasto);
 
+// Subgrupos
+router.post('/:id/subgrupos', ctrl.agregarSubgrupo);
+
 // ── Balance de juntada ────────────────────────────────────────────────────────
 router.get('/:id/balance', ctrl.obtenerBalance);
 

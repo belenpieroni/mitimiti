@@ -132,6 +132,7 @@ function crearJuntada(req, res, next) {
       creadaEn: new Date().toISOString(),
       participantes: nuevosParticipantes,
       gastos: [],
+      subgrupos: [],
     };
 
     const db = leerDB();
@@ -341,10 +342,14 @@ function agregarGasto(req, res, next) {
       return next(err);
     }
 
+    const { nombre, pagador, monto, splitMode = 'equal', splitSubgroups = [] } = req.body;
+
     const nuevo = {
       id: uuidv4(),
       nombre: nombre.trim(),
       pagador: pagador.trim(),
+      splitMode,     
+      splitSubgroups, 
       monto: Math.round(monto * 100) / 100, // redondear a 2 decimales
       creadoEn: new Date().toISOString(),
     };
@@ -436,6 +441,39 @@ function obtenerBalanceGlobal(req, res, next) {
   }
 }
 
+const agregarSubgrupo = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { nombre, integrantes } = req.body;
+
+    // Validación del CA1: Mínimo 2 participantes
+    if (!nombre || !integrantes || integrantes.length < 2) {
+      return res.status(400).json({ error: 'El subgrupo debe tener un nombre y al menos 2 integrantes.' });
+    }
+
+    const data = await leerDB();
+    const juntada = data.juntadas.find(j => j.id === id);
+
+    if (!juntada) return res.status(404).json({ error: 'Juntada no encontrada' });
+
+    // Si por ser una juntada vieja no tiene el array, se lo creamos
+    if (!juntada.subgrupos) juntada.subgrupos = [];
+
+    const nuevoSubgrupo = {
+      id: uuidv4(),
+      nombre: nombre.trim(),
+      integrantes
+    };
+
+    juntada.subgrupos.push(nuevoSubgrupo);
+    await guardarDB(data);
+
+    res.status(201).json(nuevoSubgrupo);
+  } catch (error) {
+    res.status(500).json({ error: 'Error al crear el subgrupo' });
+  }
+};
+
 module.exports = {
   listarJuntadas,
   crearJuntada,
@@ -447,4 +485,5 @@ module.exports = {
   eliminarGasto,
   obtenerBalance,
   obtenerBalanceGlobal,
+  agregarSubgrupo,
 };
