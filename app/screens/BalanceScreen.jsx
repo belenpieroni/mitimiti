@@ -1,7 +1,8 @@
-import { useState, useCallback } from 'react';
-import { View, Text, ScrollView, StyleSheet, TouchableOpacity, ActivityIndicator } from 'react-native';
+import { useState, useCallback, useRef, useEffect } from 'react';
+import { View, Text, ScrollView, StyleSheet, TouchableOpacity, ActivityIndicator, Animated } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
+import * as Clipboard from 'expo-clipboard';
 import { colors } from '../theme/colors';
 import { obtenerBalance } from '../services/juntadasService';
 
@@ -9,12 +10,56 @@ function formatPesos(monto) {
   return '$' + Math.abs(monto).toLocaleString('es-AR');
 }
 
+// Toast Component
+const Toast = ({ visible, message, type }) => {
+  const translateY = useRef(new Animated.Value(-100)).current;
+
+  useEffect(() => {
+    if (visible) {
+      Animated.spring(translateY, {
+        toValue: 50,
+        useNativeDriver: true,
+      }).start();
+    } else {
+      Animated.timing(translateY, {
+        toValue: -100,
+        duration: 250,
+        useNativeDriver: true,
+      }).start();
+    }
+  }, [visible]);
+
+  const bgColor = type === 'error' ? colors.redGlobal : colors.greenGlobal;
+  const icon = type === 'error' ? 'alert-circle' : 'checkmark-circle';
+
+  return (
+    <Animated.View style={[styles.toastContainer, { transform: [{ translateY }], backgroundColor: bgColor }]}>
+      <Ionicons name={icon} size={20} color="white" />
+      <Text style={styles.toastText}>{message}</Text>
+    </Animated.View>
+  );
+};
+
 export default function BalanceScreen({ route, navigation }) {
   const { juntadaId } = route.params;
   const [balance, setBalance] = useState(null);
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState(null);
   const [mostrarDetalle, setMostrarDetalle] = useState(false);
+  
+  const [toast, setToast] = useState({ visible: false, message: '', type: 'success' });
+
+  const mostrarToast = (message, type = 'success') => {
+    setToast({ visible: true, message, type });
+    setTimeout(() => {
+      setToast(prev => ({ ...prev, visible: false }));
+    }, 3000);
+  };
+
+  const handleCopiarAlias = async (alias) => {
+    await Clipboard.setStringAsync(alias);
+    mostrarToast('¡Alias/CBU copiado al portapapeles!');
+  };
 
   const cargarBalance = useCallback(async () => {
     setCargando(true);
@@ -55,6 +100,8 @@ export default function BalanceScreen({ route, navigation }) {
 
   return (
     <View style={styles.container}>
+      <Toast visible={toast.visible} message={toast.message} type={toast.type} />
+      
       {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity style={styles.btnVolver} onPress={() => navigation.goBack()}>
@@ -77,17 +124,31 @@ export default function BalanceScreen({ route, navigation }) {
           </View>
         ) : (
           balance.transferencias.map((t, i) => (
-            <View key={i} style={styles.transCard}>
+            <TouchableOpacity 
+              key={i} 
+              style={styles.transCard}
+              onPress={() => t.aliasDestino && handleCopiarAlias(t.aliasDestino)}
+              disabled={!t.aliasDestino}
+              activeOpacity={0.7}
+            >
               <View style={styles.transNombreContainer}>
                 <Ionicons name="arrow-forward-circle" size={20} color={colors.primary} />
-                <Text style={styles.transTexto}>
-                  <Text style={styles.transNombreResaltado}>{t.de}</Text>
-                  {' le paga a '}
-                  <Text style={styles.transNombreResaltado}>{t.para}</Text>
-                </Text>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.transTexto}>
+                    <Text style={styles.transNombreResaltado}>{t.de}</Text>
+                    {' le paga a '}
+                    <Text style={styles.transNombreResaltado}>{t.para}</Text>
+                  </Text>
+                  {t.aliasDestino ? (
+                    <View style={styles.aliasContainer}>
+                      <Text style={styles.aliasTexto}>Alias/CBU: {t.aliasDestino}</Text>
+                      <Ionicons name="copy-outline" size={14} color={colors.textSecondary} style={{ marginLeft: 4, marginTop: 2 }} />
+                    </View>
+                  ) : null}
+                </View>
               </View>
               <Text style={styles.transMonto}>{formatPesos(t.monto)}</Text>
-            </View>
+            </TouchableOpacity>
           ))
         )}
 
@@ -176,6 +237,13 @@ export default function BalanceScreen({ route, navigation }) {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background },
+  toastContainer: {
+    position: 'absolute', top: 0, left: 20, right: 20, zIndex: 1000,
+    flexDirection: 'row', alignItems: 'center', padding: 16, borderRadius: 12,
+    shadowColor: '#000', shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1, shadowRadius: 8, elevation: 5, gap: 8,
+  },
+  toastText: { color: 'white', fontWeight: 'bold', fontSize: 14, flex: 1 },
   centrado: { flex: 1, justifyContent: 'center', alignItems: 'center', gap: 12, padding: 32 },
   header: {
     flexDirection: 'row', alignItems: 'center',
@@ -202,6 +270,8 @@ const styles = StyleSheet.create({
   transNombreContainer: { flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1 },
   transTexto: { fontSize: 13, color: colors.textSecondary },
   transNombreResaltado: { color: colors.textPrimary, fontWeight: 'bold' },
+  aliasContainer: { flexDirection: 'row', alignItems: 'center' },
+  aliasTexto: { fontSize: 11, color: colors.textSecondary, marginTop: 2 },
   transMonto: { fontSize: 16, fontWeight: 'bold', color: colors.primary },
 
   listaSaldos: { backgroundColor: colors.cardBg, borderRadius: 16, padding: 5 },

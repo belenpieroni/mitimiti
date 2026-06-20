@@ -1,6 +1,7 @@
 const express = require('express');
 const cors = require('cors');
 const juntadasRouter = require('./routes/juntadas');
+const perfilesRouter = require('./routes/perfiles');
 const { errorHandler, notFound } = require('./middleware/errorHandler');
 
 const app = express();
@@ -16,6 +17,7 @@ app.get('/', (req, res) => {
 });
 
 app.use('/api/juntadas', juntadasRouter);
+app.use('/api/perfiles', perfilesRouter);
 
 // ── Manejo de errores ─────────────────────────────────────────────────────────
 app.use(notFound);

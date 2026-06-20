@@ -114,6 +114,13 @@
           "pagador": "Sofía",
           "monto": 1900,
           "creadoEn": "2026-04-28T12:02:00.000Z"
+        },
+        {
+          "id": "d46af825-8cd4-4f81-b186-4dfa4cbd7ddd",
+          "nombre": "Verduras",
+          "pagador": "Sofía",
+          "monto": 10000,
+          "creadoEn": "2026-06-20T08:41:05.170Z"
         }
       ]
     },
@@ -151,5 +158,19 @@
       ],
       "gastos": []
     }
-  ]
+  ],
+  "perfiles": {
+    "Martín": {
+      "alias": ""
+    },
+    "Thiago": {
+      "alias": "thiago.pago.mp"
+    },
+    "Belen": {
+      "alias": "belen.dinero"
+    },
+    "Jorge": {
+      "alias": "3840200500000028844555"
+    }
+  }
 }
