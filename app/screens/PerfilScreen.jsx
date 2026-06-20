@@ -5,7 +5,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { colors } from '../theme/colors';
 import { obtenerPerfil, actualizarPerfil, eliminarPerfil } from '../services/perfilService';
 
-// Custom Toast Component
+// Toast Component
 const Toast = ({ visible, message, type }) => {
   const translateY = useRef(new Animated.Value(-100)).current;
 
@@ -42,7 +42,7 @@ export default function PerfilScreen() {
   const nombreUsuario = 'Martín';
   
   const [alias, setAlias] = useState('');
-  const [aliasGuardado, setAliasGuardado] = useState(false); // To know if we can delete
+  const [aliasGuardado, setAliasGuardado] = useState(false);
   const [cargando, setCargando] = useState(true);
   const [guardando, setGuardando] = useState(false);
   const [eliminando, setEliminando] = useState(false);

@@ -10,7 +10,7 @@ function formatPesos(monto) {
   return '$' + Math.abs(monto).toLocaleString('es-AR');
 }
 
-// Custom Toast Component
+// Toast Component
 const Toast = ({ visible, message, type }) => {
   const translateY = useRef(new Animated.Value(-100)).current;
 
