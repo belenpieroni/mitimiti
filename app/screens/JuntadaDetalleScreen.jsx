@@ -7,6 +7,7 @@ import { useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { colors } from '../theme/colors';
 import { obtenerJuntada, agregarGasto, eliminarGasto } from '../services/juntadasService';
+import { obtenerJuntada, agregarGasto, eliminarGasto, agregarSubgrupo } from '../services/juntadasService';
 
 function formatPesos(monto) {
   return '$' + Math.abs(monto).toLocaleString('es-AR');
@@ -86,6 +87,102 @@ function ModalAgregarGasto({ visible, participantes, onCerrar, onGuardar }) {
   );
 }
 
+// ── Modal: Gestionar Subgrupos ────────────────────────────────────────────────
+function ModalSubgrupos({ visible, participantes, subgrupos = [], onCerrar, onGuardar }) {
+  const [nombre, setNombre] = useState('');
+  const [seleccionados, setSeleccionados] = useState([]);
+  const [guardando, setGuardando] = useState(false);
+
+  function toggleParticipante(nombreP) {
+    if (seleccionados.includes(nombreP)) {
+      setSeleccionados(seleccionados.filter(n => n !== nombreP));
+    } else {
+      setSeleccionados([...seleccionados, nombreP]);
+    }
+  }
+
+  async function handleGuardar() {
+    if (!nombre.trim() || seleccionados.length < 2) return;
+    setGuardando(true);
+    try {
+      await onGuardar({ nombre: nombre.trim(), integrantes: seleccionados });
+      setNombre('');
+      setSeleccionados([]);
+      onCerrar();
+    } catch (e) {
+      Alert.alert('Error', e.message);
+    } finally {
+      setGuardando(false);
+    }
+  }
+
+  return (
+    <Modal visible={visible} transparent animationType="slide">
+      <View style={mStyles.overlay}>
+        <View style={mStyles.sheet}>
+          <Text style={mStyles.titulo}>Gestión de Subgrupos</Text>
+
+          {subgrupos.length > 0 && (
+            <View style={{ marginBottom: 16 }}>
+              <Text style={mStyles.label}>SUBGRUPOS CREADOS</Text>
+              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 8 }}>
+                {subgrupos.map(sg => (
+                  <View key={sg.id} style={[mStyles.chip, { borderColor: colors.primary }]}>
+                    <Text style={[mStyles.chipNombre, { color: colors.primary }]}>
+                      {sg.nombre} ({sg.integrantes.length})
+                    </Text>
+                  </View>
+                ))}
+              </View>
+            </View>
+          )}
+
+          <Text style={mStyles.label}>NUEVO SUBGRUPO</Text>
+          <TextInput 
+            style={mStyles.input} 
+            placeholder="Ej: Familia López o Pareja Ana y Tomás"
+            placeholderTextColor={colors.accent} 
+            value={nombre} 
+            onChangeText={setNombre} 
+          />
+
+          <Text style={mStyles.label}>INTEGRANTES (Mínimo 2)</Text>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 16, marginTop: 8 }}>
+            {participantes.map((p) => {
+              const activo = seleccionados.includes(p.nombre);
+              return (
+                <TouchableOpacity
+                  key={p.id || p.nombre}
+                  style={[mStyles.chip, activo && mStyles.chipActivo]}
+                  onPress={() => toggleParticipante(p.nombre)}
+                >
+                  <Ionicons name={activo ? "checkbox" : "square-outline"} size={16} color={activo ? colors.primary : colors.textSecondary} />
+                  <Text style={[mStyles.chipNombre, activo && { color: colors.primary, fontWeight: 'bold' }]}>
+                    {p.nombre}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </ScrollView>
+
+          <View style={mStyles.botones}>
+            <TouchableOpacity style={mStyles.btnCancelar} onPress={onCerrar}>
+              <Text style={mStyles.btnCancelarTexto}>Cerrar</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[mStyles.btnGuardar, (guardando || seleccionados.length < 2 || !nombre.trim()) && { opacity: 0.6 }]}
+              onPress={handleGuardar} 
+              disabled={guardando || seleccionados.length < 2 || !nombre.trim()}
+            >
+              {guardando ? <ActivityIndicator color="white" /> : <Text style={mStyles.btnGuardarTexto}>Crear</Text>}
+            </TouchableOpacity>
+          </View>
+        </View>
+      </View>
+    </Modal>
+  );
+}
+
 // ── Pantalla principal ────────────────────────────────────────────────────────
 export default function JuntadaDetalleScreen({ route, navigation }) {
   const { juntadaId } = route.params;
@@ -93,7 +190,8 @@ export default function JuntadaDetalleScreen({ route, navigation }) {
   const [cargando, setCargando]         = useState(true);
   const [error, setError]               = useState(null);
   const [modalVisible, setModalVisible] = useState(false);
-
+  const [modalSubgruposVisible, setModalSubgruposVisible] = useState(false);
+  
   const cargarJuntada = useCallback(async () => {
     setCargando(true);
     setError(null);
@@ -131,6 +229,11 @@ export default function JuntadaDetalleScreen({ route, navigation }) {
   async function handleAgregarGasto(datosGasto) {
     await agregarGasto(juntadaId, datosGasto);
     cargarJuntada();
+  }
+
+  async function handleAgregarSubgrupo(datos) {
+    await agregarSubgrupo(juntadaId, datos);
+    cargarJuntada(); // Refresca la pantalla para que aparezca
   }
 
   if (cargando) {
@@ -185,6 +288,17 @@ export default function JuntadaDetalleScreen({ route, navigation }) {
           </View>
         </View>
 
+        {/* Botón para gestionar Subgrupos */}
+        <View style={{ flexDirection: 'row', marginBottom: 20 }}>
+          <TouchableOpacity 
+            onPress={() => setModalSubgruposVisible(true)} 
+            style={{ flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: colors.cardBg, padding: 12, borderRadius: 12, borderWidth: 1, borderColor: colors.primary + '33' }}
+          >
+            <Ionicons name="people" size={18} color={colors.primary} />
+            <Text style={{ fontWeight: '600', color: colors.primary, fontSize: 13 }}>Gestionar Subgrupos (Familias / Parejas)</Text>
+          </TouchableOpacity>
+        </View>
+
         {/* Gastos */}
         <View style={styles.gastosHeader}>
           <Text style={styles.gastosLabel}>GASTOS · {juntada.gastos.length}</Text>
@@ -233,6 +347,15 @@ export default function JuntadaDetalleScreen({ route, navigation }) {
         participantes={juntada.participantes}
         onCerrar={() => setModalVisible(false)}
         onGuardar={handleAgregarGasto}
+      />
+
+      {/* Modal gestionar subgrupos */}
+      <ModalSubgrupos
+      visible={modalSubgruposVisible}
+      participantes={juntada.participantes}
+      subgrupos={juntada.subgrupos || []}
+      onCerrar={() => setModalSubgruposVisible(false)}
+      onGuardar={handleAgregarSubgrupo}
       />
     </View>
   );
