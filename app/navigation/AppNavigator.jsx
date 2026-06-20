@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { NavigationContainer, useNavigation } from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
-import { View, TouchableOpacity, StyleSheet, Modal, Text } from 'react-native';
+import { View, TouchableOpacity, StyleSheet, Modal, Text, KeyboardAvoidingView, Platform } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { colors } from '../theme/colors';
 
@@ -12,6 +12,7 @@ import JuntadaDetalleScreen from '../screens/JuntadaDetalleScreen';
 import CrearJuntadaScreen from '../screens/CrearJuntadaScreen';
 import PerfilScreen from '../screens/PerfilScreen';
 import BalanceScreen from '../screens/BalanceScreen';
+import AgregarGastoScreen from '../screens/AgregarGastoScreen';
 
 const Tab = createBottomTabNavigator();
 const Stack = createNativeStackNavigator();
@@ -21,6 +22,7 @@ function JuntadasStack() {
     <Stack.Navigator screenOptions={{ headerShown: false }}>
       <Stack.Screen name="JuntadasList" component={JuntadasScreen} />
       <Stack.Screen name="JuntadaDetalle" component={JuntadaDetalleScreen} />
+      <Stack.Screen name="AgregarGasto" component={AgregarGastoScreen} />
       <Stack.Screen name="CrearJuntada" component={CrearJuntadaScreen} />
       <Stack.Screen name="Balance" component={BalanceScreen} />
     </Stack.Navigator>
@@ -92,6 +94,12 @@ function RootTabs() {
               <Ionicons name="people" size={size} color={color} />
             ),
           }}
+          listeners={({ navigation }) => ({
+            tabPress: (e) => {
+              e.preventDefault();
+              navigation.navigate('Juntadas', { screen: 'JuntadasList' });
+            },
+          })}
         />
         <Tab.Screen
           name="Agregar"
@@ -123,58 +131,64 @@ function RootTabs() {
         />
       </Tab.Navigator>
       <Modal visible={modalVisible} transparent animationType="fade">
-        <View style={mStyles.overlay}>
-          <TouchableOpacity style={StyleSheet.absoluteFill} onPress={() => setModalVisible(false)} />
-          
-          <View style={mStyles.sheet}>
-            <View style={mStyles.sheetHeader}>
-              <Text style={mStyles.sheetTitle}>¿Qué querés crear?</Text>
-              <TouchableOpacity style={mStyles.btnClose} onPress={() => setModalVisible(false)}>
-                <Ionicons name="close" size={20} color={colors.textSecondary} />
+        <KeyboardAvoidingView 
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          style={mStyles.overlay}
+          enabled={Platform.OS === 'ios'}
+        >
+          <View style={mStyles.overlay}>
+            <TouchableOpacity style={StyleSheet.absoluteFill} onPress={() => setModalVisible(false)} />
+            
+            <View style={mStyles.sheet}>
+              <View style={mStyles.sheetHeader}>
+                <Text style={mStyles.sheetTitle}>¿Qué querés crear?</Text>
+                <TouchableOpacity style={mStyles.btnClose} onPress={() => setModalVisible(false)}>
+                  <Ionicons name="close" size={20} color={colors.textSecondary} />
+                </TouchableOpacity>
+              </View>
+
+              {/* Nueva Juntada */}
+              <TouchableOpacity
+                style={mStyles.optionCard}
+                onPress={() => {
+                  setModalVisible(false);
+                  navigation.navigate('Juntadas', { screen: 'CrearJuntada' });
+                }}
+              >
+                <View style={[mStyles.optionIconBg, { backgroundColor: colors.secondary }]}>
+                  <Ionicons name="people-outline" size={24} color={colors.primary} />
+                </View>
+                <View>
+                  <Text style={mStyles.optionTitle}>Nueva juntada</Text>
+                  <Text style={mStyles.optionSubtitle}>Asado, cumple, salida...</Text>
+                </View>
               </TouchableOpacity>
-            </View>
 
-            {/* Nueva Juntada */}
-            <TouchableOpacity
-              style={mStyles.optionCard}
-              onPress={() => {
-                setModalVisible(false);
-                navigation.navigate('Juntadas', { screen: 'CrearJuntada' });
-              }}
-            >
-              <View style={[mStyles.optionIconBg, { backgroundColor: colors.secondary }]}>
-                <Ionicons name="people-outline" size={24} color={colors.primary} />
+              {/* Nuevo gasto de Vivienda */}
+              <View style={[mStyles.optionCard, mStyles.optionDisabled]}>
+                <View style={[mStyles.optionIconBg, { backgroundColor: '#F0F5F9' }]}>
+                  <Ionicons name="home-outline" size={24} color={colors.textSecondary} />
+                </View>
+                <View>
+                  <Text style={mStyles.optionTitle}>Nuevo gasto de vivienda</Text>
+                  <Text style={mStyles.optionTitle}>(Próximamente)</Text>
+                  <Text style={mStyles.optionSubtitle}>Super, internet, expensas...</Text>
+                </View>
               </View>
-              <View>
-                <Text style={mStyles.optionTitle}>Nueva juntada</Text>
-                <Text style={mStyles.optionSubtitle}>Asado, cumple, salida...</Text>
-              </View>
-            </TouchableOpacity>
 
-            {/* Nuevo gasto de Vivienda */}
-            <View style={[mStyles.optionCard, mStyles.optionDisabled]}>
-              <View style={[mStyles.optionIconBg, { backgroundColor: '#F0F5F9' }]}>
-                <Ionicons name="home-outline" size={24} color={colors.textSecondary} />
-              </View>
-              <View>
-                <Text style={mStyles.optionTitle}>Nuevo gasto de vivienda</Text>
-                <Text style={mStyles.optionTitle}>(Próximamente)</Text>
-                <Text style={mStyles.optionSubtitle}>Super, internet, expensas...</Text>
-              </View>
-            </View>
-
-            {/* Nuevo Viaje */}
-            <View style={[mStyles.optionCard, mStyles.optionDisabled]}>
-              <View style={[mStyles.optionIconBg, { backgroundColor: '#E9F7EF' }]}>
-                <Ionicons name="airplane-outline" size={24} color={colors.greenGlobal} />
-              </View>
-              <View>
-                <Text style={mStyles.optionTitle}>Nuevo viaje (Próximamente)</Text>
-                <Text style={mStyles.optionSubtitle}>Escapada, vacaciones...</Text>
+              {/* Nuevo Viaje */}
+              <View style={[mStyles.optionCard, mStyles.optionDisabled]}>
+                <View style={[mStyles.optionIconBg, { backgroundColor: '#E9F7EF' }]}>
+                  <Ionicons name="airplane-outline" size={24} color={colors.greenGlobal} />
+                </View>
+                <View>
+                  <Text style={mStyles.optionTitle}>Nuevo viaje (Próximamente)</Text>
+                  <Text style={mStyles.optionSubtitle}>Escapada, vacaciones...</Text>
+                </View>
               </View>
             </View>
           </View>
-        </View>
+        </KeyboardAvoidingView>
       </Modal>
     </>
   );

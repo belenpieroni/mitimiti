@@ -58,6 +58,25 @@
           "pagador": "Thiago",
           "monto": 12000,
           "creadoEn": "2026-05-20T19:12:31.590Z"
+        },
+        {
+          "id": "860c9633-d1b4-4978-af6e-e99002988b13",
+          "nombre": "Pizza 🍕",
+          "pagador": "Martín",
+          "splitMode": "equal",
+          "splitSubgroups": [],
+          "monto": 10000,
+          "creadoEn": "2026-06-20T18:39:49.456Z"
+        }
+      ],
+      "subgrupos": [
+        {
+          "id": "71506ab9-5845-4a6e-b3af-234cf64e8990",
+          "nombre": "Familia",
+          "integrantes": [
+            "Conrado",
+            "Ivo"
+          ]
         }
       ]
     },
@@ -123,40 +142,6 @@
           "creadoEn": "2026-06-20T08:41:05.170Z"
         }
       ]
-    },
-    {
-      "id": "3",
-      "nombre": "Cumple Lau",
-      "descripcion": "",
-      "fecha": "2026-04-10",
-      "creadaEn": "2026-04-10T09:00:00.000Z",
-      "participantes": [
-        {
-          "id": "p1",
-          "nombre": "Martín",
-          "iniciales": "MR",
-          "color": "#473472"
-        },
-        {
-          "id": "p3",
-          "nombre": "Sofía",
-          "iniciales": "SO",
-          "color": "#9DB2BF"
-        },
-        {
-          "id": "p5",
-          "nombre": "Laura",
-          "iniciales": "LU",
-          "color": "#c084fc"
-        },
-        {
-          "id": "p6",
-          "nombre": "Camila",
-          "iniciales": "CA",
-          "color": "#f97316"
-        }
-      ],
-      "gastos": []
     }
   ],
   "perfiles": {

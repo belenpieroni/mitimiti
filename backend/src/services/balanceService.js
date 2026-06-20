@@ -34,7 +34,7 @@ function redondear(n) {
  * @returns {Object} balance
  */
 function calcularBalance(juntada) {
-  const { participantes = [], gastos = [] } = juntada;
+  const { participantes = [], gastos = [], subgrupos = [] } = juntada;
   const n = participantes.length;
  
   const totalGastado = gastos.reduce((sum, g) => sum + g.monto, 0);
@@ -42,26 +42,54 @@ function calcularBalance(juntada) {
  
   // Cuánto pagó cada participante
   const pagadoPor = {};
+  const correspondePor = {};
+
   participantes.forEach((p) => {
     pagadoPor[p.nombre] = 0;
+    correspondePor[p.nombre] = 0;
   });
+
   gastos.forEach((g) => {
     if (pagadoPor[g.pagador] !== undefined) {
       pagadoPor[g.pagador] = redondear(pagadoPor[g.pagador] + g.monto);
     }
     // Si el pagador no está en la lista de participantes lo ignoramos (dato inconsistente)
+
+    if (g.splitMode === 'subgroups' && g.splitSubgroups && g.splitSubgroups.length > 0) {
+      const gruposSeleccionados = subgrupos.filter(s => g.splitSubgroups.includes(s.id));
+      
+      if (gruposSeleccionados.length > 0) {
+        const cuotaPorGrupo = g.monto / gruposSeleccionados.length;
+        
+        gruposSeleccionados.forEach(sg => {
+          const cuotaIndividual = cuotaPorGrupo / sg.integrantes.length;
+          sg.integrantes.forEach(nombreInt => {
+            if (correspondePor[nombreInt] !== undefined) {
+              correspondePor[nombreInt] += cuotaIndividual;
+            }
+          });
+        });
+      }
+    } else {
+      const cuotaIgual = g.monto / n;
+      participantes.forEach(p => {
+        correspondePor[p.nombre] += cuotaIgual;
+      });
+    }
   });
  
   // Saldo neto de cada participante
   const saldos = participantes.map((p) => {
     const pagado = pagadoPor[p.nombre] || 0;
-    const saldo = redondear(pagado - parteIgual);
+    const corresponde = redondear(correspondePor[p.nombre] || 0);
+    const saldo = redondear(pagado - corresponde);
+
     return {
       nombre: p.nombre,
       iniciales: p.iniciales,
       color: p.color,
       pagado,
-      corresponde: parteIgual,
+      corresponde,
       saldo, // positivo → acreedor, negativo → deudor
     };
   });
