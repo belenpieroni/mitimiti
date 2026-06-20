@@ -59,6 +59,17 @@
       "servicios": 0,
       "viajes": 0,
       "creadoEn": "2026-06-20T18:57:47.209Z"
+    },
+    {
+      "id": "252bd50a-1b48-4198-9c39-0b1eec29518d",
+      "name": "Ivo Balduzzi",
+      "email": "ivo@email.com",
+      "password": "$2a$10$PdrccBJPDQODhoTRAWBFCOJrvNd3uBuo3Te.B/QU4lnPWSwYknpNy",
+      "iniciales": "IB",
+      "juntadas": 0,
+      "servicios": 0,
+      "viajes": 0,
+      "creadoEn": "2026-06-20T20:35:13.636Z"
     }
   ]
 }
