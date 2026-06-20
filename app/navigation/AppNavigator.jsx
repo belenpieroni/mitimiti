@@ -1,20 +1,64 @@
-import { useState } from 'react';
+import { useReducer, useState, createContext, useContext, useEffect } from 'react';
 import { NavigationContainer, useNavigation } from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
-import { View, TouchableOpacity, StyleSheet, Modal, Text } from 'react-native';
+import { View, TouchableOpacity, StyleSheet, Modal, Text, ActivityIndicator } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { colors } from '../theme/colors';
+import api from '../services/api';
 
+// Pantallas
 import HomeScreen from '../screens/HomeScreen';
 import JuntadasScreen from '../screens/JuntadasScreen';
 import JuntadaDetalleScreen from '../screens/JuntadaDetalleScreen';
 import CrearJuntadaScreen from '../screens/CrearJuntadaScreen';
 import PerfilScreen from '../screens/PerfilScreen';
 import BalanceScreen from '../screens/BalanceScreen';
+import LoginScreen from '../screens/LoginScreen';
+
+// ── AuthContext ──────────────────────────────────────────────────────────────
+
+const AuthContext = createContext();
+export const useAuth = () => useContext(AuthContext);
 
 const Tab = createBottomTabNavigator();
 const Stack = createNativeStackNavigator();
+
+// ── Reducer de Autenticación ──────────────────────────────────────────────────
+
+function reducer(state, action) {
+  switch (action.type) {
+    case 'RESTORE_TOKEN':
+      return {
+        ...state,
+        isLoading: false,
+        isAuthenticated: action.payload ? true : false,
+        user: action.payload?.user || null,
+      };
+
+    case 'SIGN_IN':
+      return {
+        ...state,
+        isSignout: false,
+        isAuthenticated: true,
+        user: action.payload,
+      };
+
+    case 'SIGN_OUT':
+      return {
+        ...state,
+        isSignout: true,
+        isAuthenticated: false,
+        user: null,
+      };
+
+    default:
+      return state;
+  }
+}
+
+// ── Stacks ───────────────────────────────────────────────────────────────────
 
 function JuntadasStack() {
   return (
@@ -46,6 +90,8 @@ function BotonMas({ onPress }) {
     </View>
   );
 }
+
+// ── Root Tabs ────────────────────────────────────────────────────────────────
 
 function RootTabs() {
   const navigation = useNavigation();
@@ -113,14 +159,22 @@ function RootTabs() {
           }}
         />
       </Tab.Navigator>
+
+      {/* Modal para crear nuevos items */}
       <Modal visible={modalVisible} transparent animationType="fade">
         <View style={mStyles.overlay}>
-          <TouchableOpacity style={StyleSheet.absoluteFill} onPress={() => setModalVisible(false)} />
+          <TouchableOpacity 
+            style={StyleSheet.absoluteFill} 
+            onPress={() => setModalVisible(false)} 
+          />
           
           <View style={mStyles.sheet}>
             <View style={mStyles.sheetHeader}>
               <Text style={mStyles.sheetTitle}>¿Qué querés crear?</Text>
-              <TouchableOpacity style={mStyles.btnClose} onPress={() => setModalVisible(false)}>
+              <TouchableOpacity 
+                style={mStyles.btnClose} 
+                onPress={() => setModalVisible(false)}
+              >
                 <Ionicons name="close" size={20} color={colors.textSecondary} />
               </TouchableOpacity>
             </View>
@@ -171,15 +225,90 @@ function RootTabs() {
   );
 }
 
-export default function AppNavigator() {
+// ── Bootstrap Screen ─────────────────────────────────────────────────────────
+
+function BootstrapScreen() {
   return (
-    <NavigationContainer>
-      <RootTabs />
-    </NavigationContainer>
+    <View style={[styles.proximamenteContainer, { justifyContent: 'center' }]}>
+      <ActivityIndicator size="large" color={colors.primary} />
+      <Text style={[styles.proximamenteTexto, { marginTop: 16 }]}>
+        Restaurando sesión...
+      </Text>
+    </View>
   );
 }
 
-// ── Constants ─────────────────────────────────────────────────────────────────
+// ── AppNavigator ─────────────────────────────────────────────────────────────
+
+export default function AppNavigator() {
+  const [state, dispatch] = useReducer(reducer, {
+    isLoading: true,
+    isSignout: false,
+    isAuthenticated: false,
+    user: null,
+  });
+
+  useEffect(() => {
+    bootstrapAsync();
+  }, []);
+
+  const bootstrapAsync = async () => {
+    try {
+      const token = await AsyncStorage.getItem('auth_token');
+      const userData = await AsyncStorage.getItem('user_data');
+      
+      if (token && userData) {
+        dispatch({
+          type: 'RESTORE_TOKEN',
+          payload: { token, user: JSON.parse(userData) },
+        });
+      } else {
+        dispatch({ type: 'RESTORE_TOKEN', payload: null });
+      }
+    } catch (error) {
+      console.error('Failed to restore session:', error);
+      dispatch({ type: 'RESTORE_TOKEN', payload: null });
+    }
+  };
+
+  const authContext = {
+    user: state.user,
+    login: (userData) => {
+      console.log('SIGN_IN', userData);
+
+      dispatch({
+        type: 'SIGN_IN',
+        payload: userData,
+      });
+    },
+    logout: () => {
+      dispatch({ type: 'SIGN_OUT' });
+    },
+  };
+
+  console.log('AUTH STATE:', state);
+
+  return (
+    <AuthContext.Provider value={authContext}>
+      <NavigationContainer>
+        {state.isLoading ? (
+          <Stack.Navigator screenOptions={{ headerShown: false }}>
+            <Stack.Screen name="Bootstrap" component={BootstrapScreen} />
+          </Stack.Navigator>
+        ) : state.isAuthenticated ? (
+          <Stack.Navigator screenOptions={{ headerShown: false }}>
+            <Stack.Screen name="MainTabs" component={RootTabs} />
+            <Stack.Screen name="Perfil" component={PerfilScreen} />
+          </Stack.Navigator>
+        ) : (
+          <LoginScreen />
+        )}
+      </NavigationContainer>
+    </AuthContext.Provider>
+  );
+}
+
+// ── Estilos ──────────────────────────────────────────────────────────────────
 
 const styles = StyleSheet.create({
   botonMasContainer: {

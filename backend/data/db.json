@@ -151,5 +151,29 @@
       ],
       "gastos": []
     }
+  ],
+  "usuarios": [
+    {
+      "id": "6bf85a79-583d-4baf-a1db-4ee0a5563dc0",
+      "name": "Usuario Prueba",
+      "email": "prueba@email.com",
+      "password": "$2a$10$NhjeovLooeGtfH4F4qTYOuAWyFNS4IkqLWP0J9NKPvRPXq41zyy96",
+      "iniciales": "UP",
+      "juntadas": 0,
+      "servicios": 0,
+      "viajes": 0,
+      "creadoEn": "2026-06-20T18:43:26.343Z"
+    },
+    {
+      "id": "0ecd1224-18eb-467a-b01a-69ea079bf214",
+      "name": "Belen Pieroni",
+      "email": "belen@email.com",
+      "password": "$2a$10$yoW9uljztOksbsNFInyFHu1fGXIPlR9I3NDBV1Sl0cQuj1yTJD9Qq",
+      "iniciales": "BP",
+      "juntadas": 0,
+      "servicios": 0,
+      "viajes": 0,
+      "creadoEn": "2026-06-20T18:57:47.209Z"
+    }
   ]
 }
