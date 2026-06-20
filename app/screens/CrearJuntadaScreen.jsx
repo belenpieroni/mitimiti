@@ -1,25 +1,39 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity,
   ScrollView, StyleSheet, KeyboardAvoidingView, Platform, Alert
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import DateTimePicker from '@react-native-community/datetimepicker';
 import { colors } from '../theme/colors';
 import { getIniciales, coloresDisponibles } from './JuntadasScreen';
 import { crearJuntada as crearJuntadaService } from '../services/juntadasService';
-
-const usuarioActual = { nombre: 'Martín', iniciales: 'MR', color: colors.primary };
-
-function getFechaHoy() {
-  const hoy = new Date();
-  return hoy.toLocaleDateString('es-AR', { day: 'numeric', month: 'short', year: 'numeric' });
-}
+import { useAuth } from '../navigation/AppNavigator';
 
 export default function CrearJuntadaScreen({ navigation }) {
+  const { user } = useAuth();
+
+  // Definición dinámica del usuario actual basada en la sesión activa
+  const usuarioActual = {
+    nombre: user?.name || 'Usuario',
+    iniciales: user?.iniciales || 'US',
+    color: colors.primary,
+  };
+
   const [nombre, setNombre] = useState('');
   const [descripcion, setDescripcion] = useState('');
   const [inputPersona, setInputPersona] = useState('');
-  const [personas, setPersonas] = useState([usuarioActual]);
+  const [personas, setPersonas] = useState([]);
+  
+  // Estados para el manejo del DatePicker nativo
+  const [fecha, setFecha] = useState(new Date());
+  const [mostrarPicker, setMostrarPicker] = useState(false);
+
+  useEffect(() => {
+    if (user && personas.length === 0) {
+      setPersonas([usuarioActual]);
+    }
+  }, [user]);
 
   function agregarPersona() {
     const nombreLimpio = inputPersona.trim();
@@ -37,22 +51,22 @@ export default function CrearJuntadaScreen({ navigation }) {
   }
 
   function quitarPersona(nombre) {
-    if (nombre === usuarioActual.nombre) return; // no se puede quitar al usuario actual
+    // Cláusula de protección: Evita que el usuario actual se elimine a sí mismo
+    if (nombre === usuarioActual.nombre) return; 
     setPersonas(personas.filter(p => p.nombre !== nombre));
   }
 
   async function crearJuntada() {
     if (!nombre.trim()) return;
+    
+    // Payload limpio enviando únicamente campos requeridos de la fuente de verdad
     const nueva = {
-      id: Date.now().toString(),
       nombre: nombre.trim(),
       descripcion: descripcion.trim(),
-      fecha: getFechaHoy(),
+      fecha: fecha.toISOString().split('T')[0],
       participantes: personas,
-      gastos: [],
-      deuda: 0,
-      tipo: 'ninguna',
     };
+
     try {
       await crearJuntadaService(nueva);
       navigation.goBack();
@@ -62,7 +76,9 @@ export default function CrearJuntadaScreen({ navigation }) {
     }
   }
 
-  const puedeCrear = nombre.trim().length > 0;
+  const puedeCrear =
+  nombre.trim().length > 0 &&
+  personas.length > 0;
 
   return (
     <KeyboardAvoidingView
@@ -106,17 +122,32 @@ export default function CrearJuntadaScreen({ navigation }) {
 
           {/* Fecha */}
           <Text style={styles.label}>FECHA</Text>
-          <View style={styles.inputFecha}>
-            <Text style={styles.inputFechaTexto}>Hoy, {getFechaHoy()}</Text>
-          </View>
+          <TouchableOpacity
+            style={styles.inputFecha}
+            onPress={() => setMostrarPicker(true)}
+          >
+            <Text style={styles.inputFechaTexto}>
+              {fecha.toLocaleDateString('es-AR')}
+            </Text>
+          </TouchableOpacity>
+
+          {mostrarPicker && (
+            <DateTimePicker
+              value={fecha}
+              mode="date"
+              minimumDate={new Date()}
+              onChange={(event, selectedDate) => {
+                setMostrarPicker(false);
+                if (selectedDate) {
+                  setFecha(selectedDate);
+                }
+              }}
+            />
+          )}
 
           {/* Participantes */}
           <View style={styles.participantesHeader}>
             <Text style={styles.label}>PARTICIPANTES · {personas.length}</Text>
-            {/* <TouchableOpacity style={styles.btnNuevaPersona} onPress={agregarPersona}>
-              <Ionicons name="person-add-outline" size={14} color="white" />
-              <Text style={styles.btnNuevaPersonaTexto}>Nueva persona</Text>
-            </TouchableOpacity> */}
           </View>
 
           {/* Input agregar persona */}

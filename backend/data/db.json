@@ -1,155 +1,40 @@
 {
   "juntadas": [
     {
-      "id": "5ed6472e-1067-4a60-a37b-6372b45f4526",
-      "nombre": "Noche de Bowling 🎳",
-      "descripcion": "Festejamos la aprobación de la entrega 1",
-      "fecha": "2026-05-20",
-      "creadaEn": "2026-05-20T19:11:58.196Z",
+      "id": "c866a78a-8b38-4284-947a-90103969221b",
+      "nombre": "Día del padre",
+      "descripcion": "",
+      "fecha": "2026-06-20",
+      "creadaEn": "2026-06-20T19:43:18.942Z",
       "participantes": [
         {
-          "id": "9c2996a2-3924-4593-b521-02351946b9e8",
-          "nombre": "Martín",
-          "iniciales": "MR",
+          "id": "4446ff96-c17e-4b72-9616-1f8830235345",
+          "nombre": "Belen Pieroni",
+          "iniciales": "BP",
           "color": "#473472"
         },
         {
-          "id": "eb46bbcf-a297-4470-85ed-baac612850b4",
-          "nombre": "Thiago",
-          "iniciales": "TH",
-          "color": "#526D82"
-        },
-        {
-          "id": "7666c71a-e33b-4edb-b428-7275ea96627f",
-          "nombre": "Ori",
-          "iniciales": "OR",
-          "color": "#9DB2BF"
-        },
-        {
-          "id": "ba661444-9ddd-4c3f-9cfc-3e45bccb0b17",
-          "nombre": "Belen",
-          "iniciales": "BE",
-          "color": "#42b271"
-        },
-        {
-          "id": "04a3944c-b9f3-49ed-9a3e-1f940a9d5ed4",
+          "id": "27431122-79c5-4e8f-b163-ffcca62655b2",
           "nombre": "Ivo",
           "iniciales": "IV",
-          "color": "#c084fc"
-        },
-        {
-          "id": "c471a70d-55d9-440a-a853-c934bd2e167a",
-          "nombre": "Conrado",
-          "iniciales": "CO",
-          "color": "#f97316"
-        }
-      ],
-      "gastos": [
-        {
-          "id": "89feeb45-1c89-42e1-a01c-d9e6240afffd",
-          "nombre": "Pizza",
-          "pagador": "Belen",
-          "monto": 12500,
-          "creadoEn": "2026-05-20T19:12:22.149Z"
-        },
-        {
-          "id": "93e31a77-c80d-4232-8f05-a8812b9ae850",
-          "nombre": "Gaseosa",
-          "pagador": "Thiago",
-          "monto": 12000,
-          "creadoEn": "2026-05-20T19:12:31.590Z"
-        }
-      ]
-    },
-    {
-      "id": "1",
-      "nombre": "Asado del sábado",
-      "descripcion": "",
-      "fecha": "2026-04-28",
-      "creadaEn": "2026-04-28T10:00:00.000Z",
-      "participantes": [
-        {
-          "id": "p1",
-          "nombre": "Martín",
-          "iniciales": "MR",
-          "color": "#473472"
-        },
-        {
-          "id": "p2",
-          "nombre": "Jorge",
-          "iniciales": "JL",
           "color": "#526D82"
         },
         {
-          "id": "p3",
-          "nombre": "Sofía",
-          "iniciales": "SO",
+          "id": "c6dc339b-6321-4521-ab8c-715073b50ba6",
+          "nombre": "Thiago",
+          "iniciales": "TH",
           "color": "#9DB2BF"
-        },
-        {
-          "id": "p4",
-          "nombre": "Alan",
-          "iniciales": "AL",
-          "color": "#42b271"
         }
       ],
       "gastos": [
         {
-          "id": "g1",
-          "nombre": "Carne y verduras",
-          "pagador": "Martín",
-          "monto": 7200,
-          "creadoEn": "2026-04-28T12:00:00.000Z"
-        },
-        {
-          "id": "g2",
-          "nombre": "Bebidas",
-          "pagador": "Jorge",
-          "monto": 3400,
-          "creadoEn": "2026-04-28T12:01:00.000Z"
-        },
-        {
-          "id": "g3",
-          "nombre": "Carbón y leña",
-          "pagador": "Sofía",
-          "monto": 1900,
-          "creadoEn": "2026-04-28T12:02:00.000Z"
+          "id": "3f7a1f4c-3ad8-4a7e-aaf8-a13132b03859",
+          "nombre": "Chocolates",
+          "pagador": "Belen Pieroni",
+          "monto": 8000,
+          "creadoEn": "2026-06-20T19:43:41.351Z"
         }
       ]
-    },
-    {
-      "id": "3",
-      "nombre": "Cumple Lau",
-      "descripcion": "",
-      "fecha": "2026-04-10",
-      "creadaEn": "2026-04-10T09:00:00.000Z",
-      "participantes": [
-        {
-          "id": "p1",
-          "nombre": "Martín",
-          "iniciales": "MR",
-          "color": "#473472"
-        },
-        {
-          "id": "p3",
-          "nombre": "Sofía",
-          "iniciales": "SO",
-          "color": "#9DB2BF"
-        },
-        {
-          "id": "p5",
-          "nombre": "Laura",
-          "iniciales": "LU",
-          "color": "#c084fc"
-        },
-        {
-          "id": "p6",
-          "nombre": "Camila",
-          "iniciales": "CA",
-          "color": "#f97316"
-        }
-      ],
-      "gastos": []
     }
   ],
   "usuarios": [
