@@ -1,7 +1,6 @@
 import api from './api';
 
-// Juntadas
-export const listarJuntadas      = ()        => api.get('/juntadas');
+export const listarJuntadas      = (nombre)   => api.get(`/juntadas?usuario=${encodeURIComponent(nombre)}`);
 export const crearJuntada        = (datos)   => api.post('/juntadas', datos);
 export const obtenerJuntada      = (id)      => api.get(`/juntadas/${id}`);
 export const eliminarJuntada     = (id)      => api.delete(`/juntadas/${id}`);

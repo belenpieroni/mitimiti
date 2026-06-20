@@ -1,29 +1,3 @@
-/**
- * juntadasController.js
- * ──────────────────────
- * Controlador REST para el módulo Juntadas (MVP E1).
- *
- * Persistencia: archivo JSON (data/db.json).
- * No se requiere base de datos para el MVP — el archivo actúa como store
- * simple y es suficiente para el alcance de la Entrega 1.
- * En E2 se migrará a una DB real (SQLite o Firebase).
- *
- * Endpoints implementados:
- *   GET    /api/juntadas                            → listar todas
- *   POST   /api/juntadas                            → crear
- *   GET    /api/juntadas/:id                        → obtener una
- *   DELETE /api/juntadas/:id                        → eliminar
- *
- *   POST   /api/juntadas/:id/participantes          → agregar participante
- *   DELETE /api/juntadas/:id/participantes/:pid     → quitar participante
- *
- *   POST   /api/juntadas/:id/gastos                 → agregar gasto
- *   DELETE /api/juntadas/:id/gastos/:gid            → eliminar gasto
- *
- *   GET    /api/juntadas/:id/balance                → balance calculado
- *   GET    /api/balance/global/:nombre              → balance global por participante
- */
-
 const fs = require('fs');
 const path = require('path');
 const { randomUUID: uuidv4 } = require('crypto');
@@ -59,37 +33,49 @@ function getIniciales(nombre) {
 
 /**
  * GET /api/juntadas
- * Devuelve la lista de todas las juntadas con un resumen del balance.
+ * Devuelve la lista de juntadas filtradas por el parámetro ?usuario=Nombre
  */
 function listarJuntadas(req, res, next) {
   try {
     const db = leerDB();
+    const usuario = req.query.usuario;
 
-    const resultado = db.juntadas.map((j) => {
-      const balance = calcularBalance(j);
-      // Calculamos el saldo del "usuario actual" (Martín por defecto en MVP sin auth)
-      // En E2 esto vendrá del token de autenticación
-      const saldoUsuario = balance.saldos.find((s) => s.nombre === 'Martín');
-      return {
-        id: j.id,
-        nombre: j.nombre,
-        descripcion: j.descripcion,
-        fecha: j.fecha,
-        cantidadParticipantes: j.participantes.length,
-        cantidadGastos: j.gastos.length,
-        totalGastado: balance.totalGastado,
-        participantes: j.participantes,
-        // Info de deuda para el usuario actual
-        deuda: saldoUsuario ? Math.abs(saldoUsuario.saldo) : 0,
-        tipo: saldoUsuario
-          ? saldoUsuario.saldo > 0.01
-            ? 'cobrar'
-            : saldoUsuario.saldo < -0.01
-            ? 'pagar'
-            : 'ninguna'
-          : 'ninguna',
-      };
-    });
+    if (!usuario) {
+      return res.status(400).json({ 
+        ok: false, 
+        error: 'El parámetro "usuario" es requerido para listar las juntadas.' 
+      });
+    }
+
+    // Filtramos las juntadas donde el usuario actual es un participante activo
+    const resultado = db.juntadas
+      .filter((j) => j.participantes.some((p) => p.nombre.toLowerCase() === usuario.toLowerCase()))
+      .map((j) => {
+        const balance = calcularBalance(j);
+        
+        // CORREGIDO: Buscamos dinámicamente el saldo del usuario actual, chau 'Martín'
+        const saldoUsuario = balance.saldos.find((s) => s.nombre.toLowerCase() === usuario.toLowerCase());
+        console.log('Usuario recibido:', req.query.usuario);
+        return {
+          id: j.id,
+          nombre: j.nombre,
+          descripcion: j.descripcion,
+          fecha: j.fecha,
+          cantidadParticipantes: j.participantes.length,
+          cantidadGastos: j.gastos.length,
+          totalGastado: balance.totalGastado,
+          participantes: j.participantes,
+          // Info de deuda real para este usuario
+          deuda: saldoUsuario ? Math.abs(saldoUsuario.saldo) : 0,
+          tipo: saldoUsuario
+            ? saldoUsuario.saldo > 0.01
+              ? 'cobrar'
+              : saldoUsuario.saldo < -0.01
+              ? 'pagar'
+              : 'ninguna'
+            : 'ninguna',
+        };
+      });
 
     res.json({ ok: true, data: resultado });
   } catch (err) {
@@ -99,7 +85,6 @@ function listarJuntadas(req, res, next) {
 
 /**
  * POST /api/juntadas
- * Body: { nombre, descripcion?, participantes: [{ nombre, iniciales?, color? }] }
  */
 function crearJuntada(req, res, next) {
   try {
@@ -128,14 +113,14 @@ function crearJuntada(req, res, next) {
       id: uuidv4(),
       nombre: nombre.trim(),
       descripcion: descripcion.trim(),
-      fecha: new Date().toISOString().split('T')[0], // YYYY-MM-DD
+      fecha: new Date().toISOString().split('T')[0],
       creadaEn: new Date().toISOString(),
       participantes: nuevosParticipantes,
       gastos: [],
     };
 
     const db = leerDB();
-    db.juntadas.unshift(nueva); // más reciente primero
+    db.juntadas.unshift(nueva);
     escribirDB(db);
 
     res.status(201).json({ ok: true, data: nueva });
@@ -146,7 +131,6 @@ function crearJuntada(req, res, next) {
 
 /**
  * GET /api/juntadas/:id
- * Devuelve la juntada completa con el balance calculado incluido.
  */
 function obtenerJuntada(req, res, next) {
   try {
@@ -191,10 +175,6 @@ function eliminarJuntada(req, res, next) {
 
 // ── Participantes ─────────────────────────────────────────────────────────────
 
-/**
- * POST /api/juntadas/:id/participantes
- * Body: { nombre, iniciales?, color? }
- */
 function agregarParticipante(req, res, next) {
   try {
     const db = leerDB();
@@ -215,7 +195,6 @@ function agregarParticipante(req, res, next) {
 
     const nombreLimpio = nombre.trim();
 
-    // Validar duplicado
     const yaExiste = juntada.participantes.some(
       (p) => p.nombre.toLowerCase() === nombreLimpio.toLowerCase()
     );
@@ -244,9 +223,6 @@ function agregarParticipante(req, res, next) {
   }
 }
 
-/**
- * DELETE /api/juntadas/:id/participantes/:pid
- */
 function quitarParticipante(req, res, next) {
   try {
     const db = leerDB();
@@ -265,7 +241,6 @@ function quitarParticipante(req, res, next) {
       return next(err);
     }
 
-    // Regla de negocio: no se puede quitar si tiene gastos registrados a su nombre
     const participante = juntada.participantes[index];
     const tieneGastos = juntada.gastos.some((g) => g.pagador === participante.nombre);
     if (tieneGastos) {
@@ -287,10 +262,6 @@ function quitarParticipante(req, res, next) {
 
 // ── Gastos ────────────────────────────────────────────────────────────────────
 
-/**
- * POST /api/juntadas/:id/gastos
- * Body: { nombre, pagador, monto }
- */
 function agregarGasto(req, res, next) {
   try {
     const db = leerDB();
@@ -304,7 +275,6 @@ function agregarGasto(req, res, next) {
 
     const { nombre, pagador, monto } = req.body;
 
-    // Validaciones
     if (!nombre || nombre.trim() === '') {
       const err = new Error('El campo "nombre" del gasto es requerido.');
       err.status = 400;
@@ -321,7 +291,6 @@ function agregarGasto(req, res, next) {
       return next(err);
     }
 
-    // Validar que el pagador sea un participante de la juntada
     const esParticipante = juntada.participantes.some(
       (p) => p.nombre.toLowerCase() === pagador.trim().toLowerCase()
     );
@@ -337,7 +306,7 @@ function agregarGasto(req, res, next) {
       id: uuidv4(),
       nombre: nombre.trim(),
       pagador: pagador.trim(),
-      monto: Math.round(monto * 100) / 100, // redondear a 2 decimales
+      monto: Math.round(monto * 100) / 100,
       creadoEn: new Date().toISOString(),
     };
 
@@ -350,9 +319,6 @@ function agregarGasto(req, res, next) {
   }
 }
 
-/**
- * DELETE /api/juntadas/:id/gastos/:gid
- */
 function eliminarGasto(req, res, next) {
   try {
     const db = leerDB();
@@ -382,10 +348,6 @@ function eliminarGasto(req, res, next) {
 
 // ── Balance ───────────────────────────────────────────────────────────────────
 
-/**
- * GET /api/juntadas/:id/balance
- * Devuelve el balance calculado para una juntada específica.
- */
 function obtenerBalance(req, res, next) {
   try {
     const db = leerDB();
@@ -404,11 +366,6 @@ function obtenerBalance(req, res, next) {
   }
 }
 
-/**
- * GET /api/balance/global/:nombre
- * Devuelve el balance consolidado de un participante en TODAS sus juntadas.
- * Útil para el HomeScreen.
- */
 function obtenerBalanceGlobal(req, res, next) {
   try {
     const db = leerDB();

@@ -34,28 +34,40 @@ export default function HomeScreen({ navigation }) {
     porCobrar: 0,
     porPagar: 0
   });
-  const [juntadas, setJuntadas]         = useState([]);
-  const [cargando, setCargando]         = useState(true);
+  const [juntadas, setJuntadas] = useState([]);
+  const [cargando, setCargando] = useState(true);
 
   const cargarDatos = useCallback(async () => {
+    if (!user?.name) return;
     setCargando(true);
     try {
-      // Llamadas en paralelo
-      const [balGlobal, listaJuntadas] = await Promise.all([
+      const [resGlobal, resJuntadas] = await Promise.all([
         obtenerBalanceGlobal(nombre),
-        listarJuntadas(),
+        listarJuntadas(nombre),
       ]);
-      setBalance(balGlobal);
-      setJuntadas(listaJuntadas.slice(0, 5)); // solo las 5 más recientes en Home
-    } catch {
-      // Si falla la red, mostramos la pantalla sin datos (offline gracioso)
+
+      // Extrae la data de manera segura (maneja tanto axios directo como interceptores personalizados)
+      const dataBalance = resGlobal?.data?.data || resGlobal?.data || resGlobal;
+      const dataJuntadas = resJuntadas?.data?.data || resJuntadas?.data || resJuntadas;
+
+      if (dataBalance) {
+        setBalance(dataBalance);
+      }
+      
+      if (Array.isArray(dataJuntadas)) {
+        setJuntadas(dataJuntadas.slice(0, 5)); // Top 5 recientes
+      }
+    } catch (err) {
+      console.error("Error cargando la Home: ", err);
     } finally {
       setCargando(false);
     }
-  }, [nombre]);
+  }, [nombre, user?.name]);
 
   useFocusEffect(
-    useCallback(() => { cargarDatos(); }, [cargarDatos])
+    useCallback(() => { 
+      cargarDatos(); 
+    }, [cargarDatos])
   );
 
   return (

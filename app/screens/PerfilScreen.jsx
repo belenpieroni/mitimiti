@@ -10,19 +10,18 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { colors } from '../theme/colors';
 import { useAuth } from '../navigation/AppNavigator';
-import { obtenerBalanceGlobal } from '../services/juntadasService';
+import { obtenerBalanceGlobal, listarJuntadas } from '../services/juntadasService';
 
 export default function PerfilScreen({ navigation }) {
   const { user, logout } = useAuth();
+  const [cantidadJuntadas, setCantidadJuntadas] = useState(0);
 
   // Fallbacks consistentes con el estado global de auth
   const nombreUsuario = user?.name ?? 'Usuario';
   const emailUsuario = user?.email ?? '';
   const inicialesUsuario = user?.iniciales ?? 'US';
 
-  const juntadas = user?.juntadas ?? 0;
   const servicios = user?.servicios ?? 0;
-  const viajes = user?.viajes ?? 0;
 
   // Avatar dinámico seguro
   const coloresAvatar = [
@@ -38,7 +37,7 @@ export default function PerfilScreen({ navigation }) {
       (nombreUsuario?.charCodeAt?.(0) || 0) % coloresAvatar.length
     ];
 
-  // Estado del balance general
+  // Estado del balance general inicializado seguro
   const [balance, setBalance] = useState({
     total: 0,
     porCobrar: 0,
@@ -54,22 +53,44 @@ export default function PerfilScreen({ navigation }) {
       return;
     }
 
-    async function cargarBalance() {
+    async function cargarDatosPerfil() {
       try {
-        const response = await obtenerBalanceGlobal(user.name);
+        const [balanceResponse, juntadasResponse] = await Promise.all([
+          obtenerBalanceGlobal(user.name),
+          listarJuntadas(user.name),
+        ]);
 
-        if (response?.data?.data) {
-          setBalance(response.data.data);
-        }
+        // Ya no buscamos .data en los logs porque api.js ya lo limpió
+        console.log("Usuario:", user.name);
+        console.log("Balance:", balanceResponse);
+        console.log("Juntadas:", juntadasResponse);
+
+        // EXTRAEMOS LA DATA DE FORMA SEGURA (agregamos balanceResponse al final de la cadena)
+        const balanceData =
+          balanceResponse?.data?.data ||
+          balanceResponse?.data ||
+          balanceResponse || 
+          { total: 0, porCobrar: 0, porPagar: 0 }; // Fallback seguro con propiedades en 0
+
+        setBalance(balanceData);
+
+        const lista =
+          juntadasResponse?.data?.data ||
+          juntadasResponse?.data ||
+          juntadasResponse ||
+          [];
+
+        setCantidadJuntadas(lista.length);
+
       } catch (err) {
-        console.error('Error al cargar balance global:', err);
+        console.error('Error cargando perfil:', err);
       } finally {
         setCargandoBalance(false);
       }
     }
 
-    cargarBalance();
-  }, [user]);
+    cargarDatosPerfil();
+  }, [user?.name]);
 
   return (
     <ScrollView
@@ -106,7 +127,7 @@ export default function PerfilScreen({ navigation }) {
       {/* Módulos de Actividad */}
       <View style={styles.statsCard}>
         <View style={styles.statBox}>
-          <Text style={styles.statNumber}>{juntadas}</Text>
+          <Text style={styles.statNumber}>{cantidadJuntadas}</Text>
           <Text style={styles.statLabel}>Juntadas</Text>
         </View>
 
@@ -115,13 +136,6 @@ export default function PerfilScreen({ navigation }) {
         <View style={styles.statBox}>
           <Text style={styles.statNumber}>{servicios}</Text>
           <Text style={styles.statLabel}>Servicios</Text>
-        </View>
-
-        <View style={styles.verticalDivider} />
-
-        <View style={styles.statBox}>
-          <Text style={styles.statNumber}>{viajes}</Text>
-          <Text style={styles.statLabel}>Viajes</Text>
         </View>
       </View>
 
