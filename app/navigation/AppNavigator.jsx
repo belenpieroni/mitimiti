@@ -13,6 +13,10 @@ import CrearJuntadaScreen from '../screens/CrearJuntadaScreen';
 import PerfilScreen from '../screens/PerfilScreen';
 import BalanceScreen from '../screens/BalanceScreen';
 import AgregarGastoScreen from '../screens/AgregarGastoScreen';
+import ViviendaDashboard from '../screens/vivienda/ViviendaDashboard';
+import AgregarViviendaScreen from '../screens/vivienda/AgregarViviendaScreen';
+import SalidasPorCategoriaScreen from '../screens/vivienda/SalidasPorCategoriaScreen';
+import CategoriaDetalleScreen from '../screens/vivienda/CategoriaDetalleScreen';
 
 const Tab = createBottomTabNavigator();
 const Stack = createNativeStackNavigator();
@@ -34,6 +38,17 @@ function HomeStack() {
     <Stack.Navigator screenOptions={{ headerShown: false }}>
       <Stack.Screen name="HomeMain" component={HomeScreen} />
       <Stack.Screen name="Perfil" component={PerfilScreen} />
+    </Stack.Navigator>
+  );
+}
+
+function ViviendaStack() {
+  return (
+    <Stack.Navigator screenOptions={{ headerShown: false }}>
+      <Stack.Screen name="ViviendaDashboard" component={ViviendaDashboard} />
+      <Stack.Screen name="AgregarVivienda" component={AgregarViviendaScreen} />
+      <Stack.Screen name="SalidasPorCategoria" component={SalidasPorCategoriaScreen} />
+      <Stack.Screen name="CategoriaDetalle" component={CategoriaDetalleScreen} />
     </Stack.Navigator>
   );
 }
@@ -113,12 +128,18 @@ function RootTabs() {
         />
         <Tab.Screen
           name="Vivienda"
-          component={ProximamenteScreen}
+          component={ViviendaStack}
           options={{
             tabBarIcon: ({ color, size }) => (
               <Ionicons name="home-outline" size={size} color={color} />
             ),
           }}
+          listeners={({ navigation }) => ({
+            tabPress: (e) => {
+              e.preventDefault();
+              navigation.navigate('Vivienda', { screen: 'ViviendaDashboard' });
+            },
+          })}
         />
         <Tab.Screen
           name="Viajes"
@@ -165,16 +186,21 @@ function RootTabs() {
               </TouchableOpacity>
 
               {/* Nuevo gasto de Vivienda */}
-              <View style={[mStyles.optionCard, mStyles.optionDisabled]}>
-                <View style={[mStyles.optionIconBg, { backgroundColor: '#F0F5F9' }]}>
-                  <Ionicons name="home-outline" size={24} color={colors.textSecondary} />
+              <TouchableOpacity
+                style={mStyles.optionCard}
+                onPress={() => {
+                  setModalVisible(false);
+                  navigation.navigate('Vivienda', { screen: 'AgregarVivienda' });
+                }}
+              >
+                <View style={[mStyles.optionIconBg, { backgroundColor: '#E3F2FD' }]}>
+                  <Ionicons name="home-outline" size={24} color="#1E88E5" />
                 </View>
                 <View>
                   <Text style={mStyles.optionTitle}>Nuevo gasto de vivienda</Text>
-                  <Text style={mStyles.optionTitle}>(Próximamente)</Text>
                   <Text style={mStyles.optionSubtitle}>Super, internet, expensas...</Text>
                 </View>
-              </View>
+              </TouchableOpacity>
 
               {/* Nuevo Viaje */}
               <View style={[mStyles.optionCard, mStyles.optionDisabled]}>
