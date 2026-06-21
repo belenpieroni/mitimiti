@@ -3,8 +3,10 @@ const cors = require('cors');
 const path = require('path');
 const juntadasRouter = require('./routes/juntadas');
 const perfilesRouter = require('./routes/perfiles');
+const viviendaRouter = require('./routes/vivienda');
 const uploadsRouter = require('./routes/uploads');
 const { errorHandler, notFound } = require('./middleware/errorHandler');
+const { iniciarCron } = require('./services/cronService');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -21,6 +23,7 @@ app.get('/', (req, res) => {
 
 app.use('/api/juntadas', juntadasRouter);
 app.use('/api/perfiles', perfilesRouter);
+app.use('/api/vivienda', viviendaRouter);
 app.use('/api/uploads', uploadsRouter);
 
 // ── Manejo de errores ─────────────────────────────────────────────────────────
@@ -31,6 +34,7 @@ app.use(errorHandler);
 app.listen(PORT, () => {
   console.log(`✅  Miti Miti backend escuchando en http://localhost:${PORT}`);
   console.log(`    Docs de endpoints disponibles en /api/juntadas`);
+  iniciarCron();
 });
 
 module.exports = app;

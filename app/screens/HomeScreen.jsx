@@ -58,7 +58,7 @@ export default function HomeScreen({ navigation }) {
       <View style={styles.header}>
         <View>
           <Text style={styles.saludo}>{getSaludo()}</Text>
-          <Text style={styles.nombre}>Hola, {USUARIO.nombre}</Text>
+          <Text style={styles.nombre}>{USUARIO.nombre}</Text>
         </View>
         <View style={styles.headerIconos}>
           <TouchableOpacity style={styles.iconoBtn}>
@@ -106,17 +106,27 @@ export default function HomeScreen({ navigation }) {
       <Text style={styles.seccionTitulo}>Módulos</Text>
       <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.modulosScroll}>
         {modulos.map((mod) => (
-          <View key={mod.id} style={styles.moduloCard}>
+          <TouchableOpacity 
+            key={mod.id} 
+            style={styles.moduloCard}
+            onPress={() => {
+              if (mod.nombre === 'Vivienda') {
+                navigation.navigate('Vivienda', { screen: 'ViviendaDashboard' });
+              } else if (mod.nombre === 'Juntadas') {
+                navigation.navigate('Juntadas', { screen: 'JuntadasList' });
+              }
+            }}
+          >
             <Ionicons name={mod.icono} size={28} color={colors.primary} />
             <Text style={styles.moduloNombre}>{mod.nombre}</Text>
-          </View>
+          </TouchableOpacity>
         ))}
       </ScrollView>
 
       {/* Activos recientemente */}
       <View style={styles.seccionHeader}>
         <Text style={styles.seccionTitulo}>Activos recientemente</Text>
-        <TouchableOpacity onPress={() => navigation.navigate('Juntadas')}>
+        <TouchableOpacity onPress={() => navigation.navigate('Juntadas', { screen: 'JuntadasList' })}>
           <Text style={styles.verTodo}>Ver todo &gt;</Text>
         </TouchableOpacity>
       </View>
@@ -163,7 +173,7 @@ const styles = StyleSheet.create({
     alignItems: 'center', marginBottom: 24,
   },
   saludo: { fontSize: 13, color: colors.textSecondary },
-  nombre: { fontSize: 24, fontWeight: 'bold', color: colors.textPrimary },
+  nombre: { fontSize: 28, fontWeight: 'bold', color: colors.textPrimary },
   headerIconos: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   iconoBtn: {
     width: 40, height: 40, borderRadius: 20,

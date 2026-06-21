@@ -236,5 +236,153 @@
     "Jorge": {
       "alias": "3840200500000028844555"
     }
+  },
+  "vivienda": {
+    "serviciosPeriodicos": [
+      {
+        "id": "sv1",
+        "nombre": "Factura de Luz",
+        "monto": 45000,
+        "periodicidad": "mensual",
+        "proximoVencimiento": "2026-06-23T00:00:00.000Z",
+        "participantes": [
+          "Martín",
+          "Jorge",
+          "Sofía"
+        ]
+      },
+      {
+        "id": "sv2",
+        "nombre": "Internet / Fibra",
+        "monto": 17000,
+        "periodicidad": "anual",
+        "proximoVencimiento": "2026-07-02T00:00:00.000Z",
+        "participantes": [
+          "Martín",
+          "Jorge"
+        ]
+      },
+      {
+        "id": "sv3",
+        "nombre": "Netflix",
+        "monto": 8000,
+        "periodicidad": "bimestral",
+        "proximoVencimiento": "2026-06-25T00:00:00.000Z",
+        "participantes": [
+          "Martín",
+          "Jorge",
+          "Sofía",
+          "Alan"
+        ]
+      }
+    ],
+    "gastos": [
+      {
+        "id": "g1",
+        "nombre": "Super",
+        "monto": 17200,
+        "categoria": "Supermercado",
+        "fecha": "2026-06-15T12:00:00.000Z",
+        "pagador": "Martín",
+        "participantes": [
+          "Martín",
+          "Jorge",
+          "Sofía",
+          "Alan"
+        ]
+      },
+      {
+        "id": "g2",
+        "nombre": "Cena",
+        "monto": 37800,
+        "categoria": "Comidas y bebidas",
+        "fecha": "2026-06-10T21:00:00.000Z",
+        "pagador": "Belen",
+        "participantes": [
+          "Martín",
+          "Belen"
+        ]
+      },
+      {
+        "id": "g3",
+        "nombre": "Carga SUBE",
+        "monto": 4500,
+        "categoria": "Transporte",
+        "fecha": "2026-06-09T08:00:00.000Z",
+        "pagador": "Jorge",
+        "participantes": [
+          "Jorge"
+        ]
+      },
+      {
+        "id": "g4",
+        "nombre": "Coto",
+        "monto": 25000,
+        "categoria": "Supermercado",
+        "fecha": "2026-06-12T10:00:00.000Z",
+        "pagador": "Jorge",
+        "participantes": [
+          "Jorge",
+          "Martín"
+        ]
+      },
+      {
+        "id": "g5",
+        "nombre": "Jumbo",
+        "monto": 18500,
+        "categoria": "Supermercado",
+        "fecha": "2026-06-05T18:30:00.000Z",
+        "pagador": "Sofía",
+        "participantes": [
+          "Sofía",
+          "Alan"
+        ]
+      },
+      {
+        "id": "g6",
+        "nombre": "Almuerzo",
+        "monto": 15000,
+        "categoria": "Comidas y bebidas",
+        "fecha": "2026-06-11T13:00:00.000Z",
+        "pagador": "Martín",
+        "participantes": [
+          "Martín"
+        ]
+      },
+      {
+        "id": "g7",
+        "nombre": "Uber",
+        "monto": 6500,
+        "categoria": "Transporte",
+        "fecha": "2026-06-08T22:00:00.000Z",
+        "pagador": "Martín",
+        "participantes": [
+          "Martín",
+          "Jorge"
+        ]
+      },
+      {
+        "id": "1e7d2bee-b376-4032-b53c-841c7276a4b1",
+        "nombre": "Mayorista",
+        "monto": 30000,
+        "categoria": "Supermercado",
+        "fecha": "2026-06-21T08:22:52.978Z",
+        "pagador": "Martín",
+        "participantes": [
+          "Martín"
+        ]
+      },
+      {
+        "id": "889b8566-1720-429a-926f-d22b42a1aea7",
+        "nombre": "Shampoo y cremas ",
+        "monto": 25000,
+        "categoria": "Salud y cuidado personal",
+        "fecha": "2026-06-21T08:28:27.193Z",
+        "pagador": "Martín",
+        "participantes": [
+          "Martín"
+        ]
+      }
+    ]
   }
 }
