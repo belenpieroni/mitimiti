@@ -76,4 +76,5 @@ const api = {
   delete: (endpoint)       => request(endpoint, { method: 'DELETE' }),
 };
 
+export const API_URL = API_BASE.replace('/api', '');
 export default api;
