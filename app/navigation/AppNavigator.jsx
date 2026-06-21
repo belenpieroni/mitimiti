@@ -13,12 +13,7 @@ import JuntadaDetalleScreen from '../screens/JuntadaDetalleScreen';
 import CrearJuntadaScreen from '../screens/CrearJuntadaScreen';
 import PerfilScreen from '../screens/PerfilScreen';
 import BalanceScreen from '../screens/BalanceScreen';
-<<<<<<< HEAD
-// Arriba de todo, junto a tus otros imports
-
-=======
 import AgregarGastoScreen from '../screens/AgregarGastoScreen';
->>>>>>> entrega-2
 
 const Tab = createBottomTabNavigator();
 const Stack = createNativeStackNavigator();
