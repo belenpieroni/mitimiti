@@ -4,9 +4,7 @@ import { useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { colors } from '../theme/colors';
 import { listarJuntadas, obtenerBalanceGlobal } from '../services/juntadasService';
-
-// Usuario del MVP (sin auth en E1)
-const USUARIO = { nombre: 'Martín', iniciales: 'MR' };
+import { useAuth } from '../navigation/AppNavigator';
 
 const modulos = [
   { id: '1', nombre: 'Juntadas', icono: 'people-outline' },
@@ -26,6 +24,15 @@ function formatPesos(monto) {
 }
 
 export default function HomeScreen({ navigation }) {
+  const { user } = useAuth();
+  const nombreUsuario = user?.name || 'Usuario';
+  const inicialesUsuario = (nombreUsuario || 'US')
+    .split(' ')
+    .map((word) => word[0])
+    .join('')
+    .slice(0, 2)
+    .toUpperCase();
+
   const [balance, setBalance]           = useState({ total: 0, porCobrar: 0, porPagar: 0 });
   const [juntadas, setJuntadas]         = useState([]);
   const [cargando, setCargando]         = useState(true);
@@ -35,7 +42,7 @@ export default function HomeScreen({ navigation }) {
     try {
       // Llamadas en paralelo
       const [balGlobal, listaJuntadas] = await Promise.all([
-        obtenerBalanceGlobal(USUARIO.nombre),
+        obtenerBalanceGlobal(nombreUsuario),
         listarJuntadas(),
       ]);
       setBalance(balGlobal);
@@ -45,7 +52,7 @@ export default function HomeScreen({ navigation }) {
     } finally {
       setCargando(false);
     }
-  }, []);
+  }, [nombreUsuario]);
 
   useFocusEffect(
     useCallback(() => { cargarDatos(); }, [cargarDatos])
@@ -58,7 +65,7 @@ export default function HomeScreen({ navigation }) {
       <View style={styles.header}>
         <View>
           <Text style={styles.saludo}>{getSaludo()}</Text>
-          <Text style={styles.nombre}>{USUARIO.nombre}</Text>
+          <Text style={styles.nombre}>{nombreUsuario}</Text>
         </View>
         <View style={styles.headerIconos}>
           <TouchableOpacity style={styles.iconoBtn}>
@@ -68,7 +75,7 @@ export default function HomeScreen({ navigation }) {
             style={styles.avatar}
             onPress={() => navigation.navigate('Perfil')}
           >
-            <Text style={styles.avatarTexto}>{USUARIO.iniciales}</Text>
+            <Text style={styles.avatarTexto}>{inicialesUsuario}</Text>
           </TouchableOpacity>
         </View>
       </View>

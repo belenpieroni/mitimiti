@@ -6,7 +6,6 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { colors } from '../theme/colors';
 import { useAuth } from '../navigation/AppNavigator';
-import api from '../services/api';
 
 export default function LoginScreen() {
   const { login } = useAuth();
@@ -30,9 +29,8 @@ export default function LoginScreen() {
     setLoading(true);
     try {
       if (activeTab === 'register') {
-        // Registro
-        await api.register(name, email, password);
-        Alert.alert('¡Éxito!', 'Usuario registrado correctamente. Ya podés iniciar sesión.');
+        // Registro demo para MVP visual del flujo auth
+        Alert.alert('¡Éxito!', 'Cuenta creada. Ahora iniciá sesión.');
         
         // Limpiar formulario
         setActiveTab('login');
@@ -40,8 +38,12 @@ export default function LoginScreen() {
         setEmail('');        // ✅ CORREGIDO: Se limpia email
         setPassword('');
       } else {
-        // Login
-        const userData = await api.login(email, password);
+        // Login demo: habilita el flujo y deja visible el diseño tipo Figma
+        const baseName = name.trim() || email.split('@')[0] || 'Usuario';
+        const userData = {
+          name: baseName.charAt(0).toUpperCase() + baseName.slice(1),
+          email,
+        };
         login(userData);
       }
     } catch (error) {

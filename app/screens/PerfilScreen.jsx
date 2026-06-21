@@ -1,319 +1,180 @@
-import { useState, useCallback, useRef, useEffect } from 'react';
-import { View, Text, StyleSheet, TextInput, TouchableOpacity, ActivityIndicator, KeyboardAvoidingView, Platform, ScrollView, Animated } from 'react-native';
-import { useNavigation, useFocusEffect } from '@react-navigation/native';
+import { useMemo } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView } from 'react-native';
+import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { colors } from '../theme/colors';
-import { obtenerPerfil, actualizarPerfil, eliminarPerfil } from '../services/perfilService';
+import { useAuth } from '../navigation/AppNavigator';
 
-// Toast Component
-const Toast = ({ visible, message, type }) => {
-  const translateY = useRef(new Animated.Value(-100)).current;
+function getInitials(name) {
+  if (!name) return 'US';
+  return name
+    .split(' ')
+    .filter(Boolean)
+    .map((word) => word[0])
+    .join('')
+    .slice(0, 2)
+    .toUpperCase();
+}
 
-  useEffect(() => {
-    if (visible) {
-      Animated.spring(translateY, {
-        toValue: 50,
-        useNativeDriver: true,
-      }).start();
-    } else {
-      Animated.timing(translateY, {
-        toValue: -100,
-        duration: 250,
-        useNativeDriver: true,
-      }).start();
-    }
-  }, [visible]);
+function getAliasFromEmail(email) {
+  if (!email) return '@usuario';
+  return `@${email.split('@')[0]}`;
+}
 
-  const bgColor = type === 'error' ? colors.redGlobal : colors.greenGlobal;
-  const icon = type === 'error' ? 'alert-circle' : 'checkmark-circle';
-
-  return (
-    <Animated.View style={[styles.toastContainer, { transform: [{ translateY }], backgroundColor: bgColor }]}>
-      <Ionicons name={icon} size={20} color="white" />
-      <Text style={styles.toastText}>{message}</Text>
-    </Animated.View>
-  );
-};
+const profileItems = [
+  { id: 'notificaciones', label: 'Notificaciones', icon: 'notifications-outline', iconBg: '#ECE9F5', iconColor: colors.primary },
+  { id: 'preferencias', label: 'Preferencias', icon: 'settings-outline', iconBg: '#EEF2F6', iconColor: colors.textSecondary },
+  { id: 'privacidad', label: 'Privacidad', icon: 'shield-checkmark-outline', iconBg: '#EAF4EF', iconColor: '#2E7D5C' },
+  { id: 'ayuda', label: 'Ayuda y soporte', icon: 'help-circle-outline', iconBg: '#FBEAEA', iconColor: '#D64B3B' },
+  { id: 'alias', label: 'Alias y CBU', icon: 'card-outline', iconBg: '#EEE9FA', iconColor: colors.primary },
+];
 
 export default function PerfilScreen() {
   const navigation = useNavigation();
-  
-  // Para MVP asumimos el usuario "Martín"
-  const nombreUsuario = 'Martín';
-  
-  const [alias, setAlias] = useState('');
-  const [aliasGuardado, setAliasGuardado] = useState(false);
-  const [cargando, setCargando] = useState(true);
-  const [guardando, setGuardando] = useState(false);
-  const [eliminando, setEliminando] = useState(false);
-  
-  const [toast, setToast] = useState({ visible: false, message: '', type: 'success' });
+  const { user, logout } = useAuth();
 
-  const mostrarToast = (message, type = 'success') => {
-    setToast({ visible: true, message, type });
-    setTimeout(() => {
-      setToast(prev => ({ ...prev, visible: false }));
-    }, 3000);
-  };
-  
-  const cargarPerfil = useCallback(async () => {
-    setCargando(true);
-    try {
-      const perfil = await obtenerPerfil(nombreUsuario);
-      if (perfil && perfil.alias) {
-        setAlias(perfil.alias);
-        setAliasGuardado(true);
-      } else {
-        setAlias('');
-        setAliasGuardado(false);
-      }
-    } catch (error) {
-      mostrarToast(error.message, 'error');
-    } finally {
-      setCargando(false);
-    }
-  }, []);
+  const nombre = user?.name || 'Usuario';
+  const email = user?.email || 'usuario@mail.com';
+  const iniciales = useMemo(() => getInitials(nombre), [nombre]);
+  const miniAlias = useMemo(() => getAliasFromEmail(email), [email]);
 
-  useFocusEffect(
-    useCallback(() => { cargarPerfil(); }, [cargarPerfil])
-  );
+  const stats = [
+    { label: 'Juntadas', value: 3 },
+    { label: 'Servicios', value: 2 },
+    { label: 'Viajes', value: 1 },
+  ];
 
-  const handleGuardar = async () => {
-    if (!alias || alias.trim() === '') {
-      mostrarToast('No podés guardar un Alias/CBU vacío.', 'error');
-      return;
-    }
-    
-    const aliasLimpio = alias.trim().toLowerCase();
-    const aliasRegex = /^[a-z0-9.-]{6,22}$/;
-    
-    if (!aliasRegex.test(aliasLimpio)) {
-      mostrarToast('Debe tener entre 6 y 22 caracteres y usar letras, números, guiones y puntos.', 'error');
-      return;
-    }
-    
-    setGuardando(true);
-    try {
-      await actualizarPerfil(nombreUsuario, aliasLimpio);
-      setAlias(aliasLimpio);
-      setAliasGuardado(true);
-      mostrarToast('¡Tu Alias/CBU se guardó correctamente!', 'success');
-    } catch (error) {
-      mostrarToast(error.message, 'error');
-    } finally {
-      setGuardando(false);
+  const handleItemPress = (id) => {
+    if (id === 'alias') {
+      navigation.navigate('PerfilAlias');
     }
   };
-
-  const handleEliminar = async () => {
-    setEliminando(true);
-    try {
-      await eliminarPerfil(nombreUsuario);
-      setAlias('');
-      setAliasGuardado(false);
-      mostrarToast('Alias/CBU eliminado correctamente.', 'success');
-    } catch (error) {
-      mostrarToast(error.message, 'error');
-    } finally {
-      setEliminando(false);
-    }
-  };
-
-  if (cargando) {
-    return (
-      <View style={[styles.container, styles.centrado]}>
-        <ActivityIndicator size="large" color={colors.primary} />
-      </View>
-    );
-  }
 
   return (
-    <KeyboardAvoidingView 
-      style={styles.container} 
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-    >
-      <Toast visible={toast.visible} message={toast.message} type={toast.type} />
-      
-      <View style={styles.header}>
-        <View style={styles.headerTop}>
-          <TouchableOpacity style={styles.btnVolver} onPress={() => navigation.goBack()}>
-            <Ionicons name="chevron-back" size={24} color={colors.primary} />
-          </TouchableOpacity>
-          <View>
-            <Text style={styles.titulo}>Mi Perfil</Text>
-            <Text style={styles.subtitulo}>{nombreUsuario}</Text>
-          </View>
-        </View>
+    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+      <View style={styles.headerRow}>
+        <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
+          <Ionicons name="chevron-back" size={22} color={colors.textSecondary} />
+        </TouchableOpacity>
+        <Text style={styles.headerTitle}>Perfil</Text>
       </View>
 
-      <ScrollView contentContainerStyle={styles.content}>
-        <View style={styles.card}>
-          <View style={styles.cardHeader}>
-            <View style={styles.iconContainer}>
-              <Ionicons name="card-outline" size={24} color={colors.primary} />
-            </View>
-            <Text style={styles.cardTitle}>Datos para Cobros</Text>
-          </View>
-          
-          <Text style={styles.descripcion}>
-            Ingresá tu Alias o CBU para que el resto de los participantes sepa a dónde transferirte cuando te deban dinero.
-          </Text>
-
-          <Text style={styles.label}>ALIAS O CBU</Text>
-          <TextInput
-            style={styles.input}
-            placeholder="Ej: mi.alias.mp"
-            placeholderTextColor={colors.accent || '#9DB2BF'}
-            value={alias}
-            onChangeText={(text) => setAlias(text.toLowerCase())}
-            autoCapitalize="none"
-            autoCorrect={false}
-          />
-          
-          <View style={styles.infoContainer}>
-            <Ionicons name="information-circle-outline" size={16} color={colors.textSecondary} />
-            <Text style={styles.infoText}>Entre 6 y 22 caracteres. Letras, números, guiones o puntos.</Text>
-          </View>
-
-          <TouchableOpacity 
-            style={[styles.btnGuardar, guardando && styles.btnDisabled]} 
-            onPress={handleGuardar}
-            disabled={guardando || eliminando}
-          >
-            {guardando ? (
-              <ActivityIndicator color="white" />
-            ) : (
-              <Text style={styles.btnGuardarTexto}>Guardar cambios</Text>
-            )}
-          </TouchableOpacity>
-          
-          <TouchableOpacity 
-            style={[styles.btnEliminar, (!aliasGuardado || eliminando || guardando) && styles.btnDisabled]} 
-            onPress={handleEliminar}
-            disabled={!aliasGuardado || eliminando || guardando}
-          >
-            {eliminando ? (
-              <ActivityIndicator color={colors.textSecondary} />
-            ) : (
-              <Text style={[styles.btnEliminarTexto, !aliasGuardado && styles.btnEliminarTextoDisabled]}>
-                Eliminar Alias/CBU
-              </Text>
-            )}
-          </TouchableOpacity>
+      <View style={styles.profileTop}>
+        <View style={styles.avatar}>
+          <Text style={styles.avatarText}>{iniciales}</Text>
         </View>
-      </ScrollView>
-    </KeyboardAvoidingView>
+        <Text style={styles.name}>{nombre}</Text>
+        <Text style={styles.email}>{miniAlias}</Text>
+      </View>
+
+      <View style={styles.statsCard}>
+        {stats.map((item, index) => (
+          <View key={item.label} style={styles.statCol}>
+            <Text style={styles.statValue}>{item.value}</Text>
+            <Text style={styles.statLabel}>{item.label}</Text>
+            {index < stats.length - 1 ? <View style={styles.divider} /> : null}
+          </View>
+        ))}
+      </View>
+
+      <View style={styles.itemsWrap}>
+        {profileItems.map((item) => (
+          <TouchableOpacity key={item.id} style={styles.itemCard} onPress={() => handleItemPress(item.id)}>
+            <View style={styles.itemLeft}>
+              <View style={[styles.itemIconWrap, { backgroundColor: item.iconBg }]}>
+                <Ionicons name={item.icon} size={20} color={item.iconColor} />
+              </View>
+              <Text style={styles.itemLabel}>{item.label}</Text>
+            </View>
+            <Ionicons name="chevron-forward" size={20} color="#A3B1BE" />
+          </TouchableOpacity>
+        ))}
+      </View>
+
+      <TouchableOpacity style={styles.logoutBtn} onPress={logout}>
+        <Ionicons name="log-out-outline" size={20} color="#D64B3B" />
+        <Text style={styles.logoutText}>Cerrar sesion</Text>
+      </TouchableOpacity>
+    </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background },
-  centrado: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  toastContainer: {
-    position: 'absolute',
-    top: 0,
-    left: 20,
-    right: 20,
-    zIndex: 1000,
-    flexDirection: 'row',
+  content: { paddingHorizontal: 20, paddingTop: 52, paddingBottom: 34 },
+  headerRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 26 },
+  backBtn: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    backgroundColor: '#F2F4F6',
+    justifyContent: 'center',
     alignItems: 'center',
-    padding: 16,
-    borderRadius: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 5,
-    gap: 8,
+    marginRight: 14,
   },
-  toastText: { color: 'white', fontWeight: 'bold', fontSize: 14, flex: 1 },
-  
-  header: {
-    paddingHorizontal: 20, paddingTop: 52, paddingBottom: 20,
-    backgroundColor: colors.cardBg,
-    borderBottomWidth: 1, borderBottomColor: '#eee',
+  headerTitle: { fontSize: 36 / 2, fontWeight: '700', color: colors.textPrimary },
+  profileTop: { alignItems: 'center', marginBottom: 24 },
+  avatar: {
+    width: 110,
+    height: 110,
+    borderRadius: 55,
+    backgroundColor: colors.primary,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 14,
   },
-  headerTop: {
-    flexDirection: 'row', alignItems: 'center', gap: 12,
+  avatarText: { color: 'white', fontSize: 46 / 2, fontWeight: '700' },
+  name: { fontSize: 22 / 2, fontWeight: '700', color: colors.textPrimary, marginBottom: 4 },
+  email: { fontSize: 14 / 1.7, color: '#446380', fontWeight: '500' },
+  statsCard: {
+    backgroundColor: '#F5F6F8',
+    borderRadius: 20,
+    paddingVertical: 18,
+    paddingHorizontal: 12,
+    flexDirection: 'row',
+    marginBottom: 16,
   },
-  btnVolver: {
-    width: 40, height: 40, borderRadius: 20,
-    backgroundColor: colors.background, justifyContent: 'center', alignItems: 'center',
+  statCol: { flex: 1, alignItems: 'center', position: 'relative' },
+  statValue: { fontSize: 19, fontWeight: '700', color: colors.primary, marginBottom: 6 },
+  statLabel: { fontSize: 13, color: '#4E6782' },
+  divider: {
+    position: 'absolute',
+    right: 0,
+    top: 4,
+    bottom: 4,
+    width: 1,
+    backgroundColor: '#DFE3E8',
   },
-  titulo: { fontSize: 24, fontWeight: 'bold', color: colors.textPrimary, marginBottom: 2 },
-  subtitulo: { fontSize: 16, color: colors.textSecondary, fontWeight: '500' },
-  content: { padding: 20 },
-  
-  card: {
+  itemsWrap: { gap: 12 },
+  itemCard: {
     backgroundColor: colors.cardBg,
     borderRadius: 20,
-    padding: 24,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.05,
-    shadowRadius: 10,
-    elevation: 3,
-  },
-  cardHeader: {
+    paddingHorizontal: 16,
+    paddingVertical: 17,
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 16,
-    gap: 12,
+    justifyContent: 'space-between',
   },
-  iconContainer: {
-    width: 44, height: 44, borderRadius: 22,
-    backgroundColor: colors.primary + '15',
-    justifyContent: 'center', alignItems: 'center'
-  },
-  cardTitle: { fontSize: 18, fontWeight: 'bold', color: colors.textPrimary },
-  descripcion: {
-    fontSize: 14, color: colors.textSecondary, lineHeight: 22,
-    marginBottom: 24,
-  },
-  
-  label: {
-    fontSize: 12, fontWeight: 'bold', color: colors.textSecondary,
-    letterSpacing: 0.8, marginBottom: 10, marginLeft: 4,
-  },
-  input: {
-    backgroundColor: colors.background,
-    borderWidth: 1, borderColor: '#eee',
+  itemLeft: { flexDirection: 'row', alignItems: 'center', gap: 14 },
+  itemIconWrap: {
+    width: 40,
+    height: 40,
     borderRadius: 14,
-    padding: 16,
-    fontSize: 16,
-    color: colors.textPrimary,
-    marginBottom: 12,
-  },
-  infoContainer: {
-    flexDirection: 'row', alignItems: 'flex-start',
-    gap: 6, marginBottom: 24, marginLeft: 4, paddingRight: 10,
-  },
-  infoText: { fontSize: 12, color: colors.textSecondary, flex: 1, lineHeight: 18 },
-  
-  btnGuardar: {
-    backgroundColor: colors.primary,
-    borderRadius: 16,
-    padding: 18,
+    justifyContent: 'center',
     alignItems: 'center',
-    shadowColor: colors.primary,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.2,
-    shadowRadius: 8,
-    elevation: 4,
-    marginBottom: 12,
   },
-  btnGuardarTexto: { color: 'white', fontSize: 16, fontWeight: 'bold' },
-  
-  btnEliminar: {
-    backgroundColor: colors.background,
-    borderRadius: 16,
-    padding: 18,
-    alignItems: 'center',
+  itemLabel: { color: colors.textPrimary, fontSize: 16 / 1.2, fontWeight: '600' },
+  logoutBtn: {
+    marginTop: 22,
+    borderRadius: 20,
     borderWidth: 1,
-    borderColor: '#eee',
+    borderColor: '#F0B8B2',
+    backgroundColor: '#FCEEEE',
+    paddingVertical: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 10,
   },
-  btnEliminarTexto: { color: colors.redGlobal, fontSize: 15, fontWeight: 'bold' },
-  btnEliminarTextoDisabled: { color: colors.textSecondary },
-  
-  btnDisabled: { opacity: 0.6, shadowOpacity: 0 },
+  logoutText: { color: '#D64B3B', fontSize: 16 / 1.1, fontWeight: '700' },
 });
