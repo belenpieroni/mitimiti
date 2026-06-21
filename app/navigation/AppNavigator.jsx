@@ -6,12 +6,15 @@ import { View, TouchableOpacity, StyleSheet, Modal, Text } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { colors } from '../theme/colors';
 
+import DeudasScreen from '../screens/DeudasScreen';
 import HomeScreen from '../screens/HomeScreen';
 import JuntadasScreen from '../screens/JuntadasScreen';
 import JuntadaDetalleScreen from '../screens/JuntadaDetalleScreen';
 import CrearJuntadaScreen from '../screens/CrearJuntadaScreen';
 import PerfilScreen from '../screens/PerfilScreen';
 import BalanceScreen from '../screens/BalanceScreen';
+// Arriba de todo, junto a tus otros imports
+
 
 const Tab = createBottomTabNavigator();
 const Stack = createNativeStackNavigator();
@@ -112,13 +115,14 @@ function RootTabs() {
             ),
           }}
         />
-        <Tab.Screen
-          name="Viajes"
-          component={ProximamenteScreen}
-          options={{
-            tabBarIcon: ({ color, size }) => (
-              <Ionicons name="airplane-outline" size={size} color={color} />
-            ),
+        <Tab.Screen 
+            name="Deudas" 
+            component={DeudasScreen} // <--- CAMBIALO POR ESTE
+            options={{
+              tabBarLabel: 'Deudas',
+              tabBarIcon: ({ color, size }) => (
+                 <Ionicons name="wallet-outline" color={color} size={size} /> // O el icono que prefieras
+              ),
           }}
         />
       </Tab.Navigator>

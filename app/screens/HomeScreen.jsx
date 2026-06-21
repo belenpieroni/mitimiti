@@ -11,7 +11,6 @@ const USUARIO = { nombre: 'Martín', iniciales: 'MR' };
 const modulos = [
   { id: '1', nombre: 'Juntadas', icono: 'people-outline' },
   { id: '2', nombre: 'Vivienda', icono: 'home-outline' },
-  { id: '3', nombre: 'Viajes',   icono: 'airplane-outline' },
 ];
 
 function getSaludo() {
@@ -39,7 +38,7 @@ export default function HomeScreen({ navigation }) {
         listarJuntadas(),
       ]);
       setBalance(balGlobal);
-      setJuntadas(listaJuntadas.slice(0, 5)); // solo las 5 más recientes en Home
+      setJuntadas(listaJuntadas.slice(0, 5)); 
     } catch {
       // Si falla la red, mostramos la pantalla sin datos (offline gracioso)
     } finally {
@@ -73,7 +72,7 @@ export default function HomeScreen({ navigation }) {
         </View>
       </View>
 
-      {/* Card Balance */}
+    {/* Card Balance */}
       <View style={styles.cardBalance}>
         <Text style={styles.balanceLabel}>Balance total</Text>
         {cargando ? (
@@ -84,20 +83,34 @@ export default function HomeScreen({ navigation }) {
               {balance.total < 0 ? '– ' : balance.total > 0 ? '+ ' : ''}
               {formatPesos(balance.total)}
             </Text>
+            
             <View style={styles.balanceFila}>
-              <View style={styles.balanceItem}>
+              <View style={[styles.balanceItem, { position: 'relative' }]}>
                 <Text style={styles.balanceSubLabel}>Por cobrar</Text>
                 <Text style={[styles.balanceValor, { color: colors.greenGlobal }]}>
                   {formatPesos(balance.porCobrar)}
                 </Text>
+                {/* Icono tendencia arriba */}
+                <Ionicons name="trending-up" size={14} color={colors.greenGlobal} style={{ position: 'absolute', top: 12, right: 12 }} />
               </View>
-              <View style={styles.balanceItem}>
+              
+              <View style={[styles.balanceItem, { position: 'relative' }]}>
                 <Text style={styles.balanceSubLabel}>Por pagar</Text>
                 <Text style={[styles.balanceValor, { color: '#ec6c6a' }]}>
                   {formatPesos(balance.porPagar)}
                 </Text>
+                {/* Icono tendencia abajo */}
+                <Ionicons name="trending-down" size={14} color="#ec6c6a" style={{ position: 'absolute', top: 12, right: 12 }} />
               </View>
             </View>
+
+            {/* Botón Ver deudas */}
+            <TouchableOpacity 
+              style={styles.btnVerDeudas} 
+              onPress={() => navigation.navigate('Deudas')}
+            >
+              <Text style={styles.btnVerDeudasTexto}>Ver deudas</Text>
+            </TouchableOpacity>
           </>
         )}
       </View>
@@ -211,4 +224,17 @@ const styles = StyleSheet.create({
   sinDeuda: { color: colors.textSecondary, fontSize: 13 },
   vacioCentrado: { alignItems: 'center', paddingVertical: 24 },
   vacioTexto: { color: colors.textSecondary, fontSize: 13 },
+  btnVerDeudas: { 
+    backgroundColor: '#d6c1eb', 
+    paddingVertical: 12, 
+    borderRadius: 14, 
+    marginTop: 10, 
+    alignItems: 'center' 
+  },
+  btnVerDeudasTexto: { 
+    color: colors.primary, 
+    fontWeight: '700', 
+    fontSize: 14 
+  },
+  
 });
