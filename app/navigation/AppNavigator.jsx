@@ -1,72 +1,54 @@
-import { useReducer, useState, createContext, useContext, useEffect } from 'react';
+import { useState } from 'react';
 import { NavigationContainer, useNavigation } from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
-import { View, TouchableOpacity, StyleSheet, Modal, Text, ActivityIndicator } from 'react-native';
+import { View, TouchableOpacity, StyleSheet, Modal, Text, KeyboardAvoidingView, Platform } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { colors } from '../theme/colors';
-import api from '../services/api';
 
-// Pantallas
 import HomeScreen from '../screens/HomeScreen';
 import JuntadasScreen from '../screens/JuntadasScreen';
 import JuntadaDetalleScreen from '../screens/JuntadaDetalleScreen';
 import CrearJuntadaScreen from '../screens/CrearJuntadaScreen';
 import PerfilScreen from '../screens/PerfilScreen';
 import BalanceScreen from '../screens/BalanceScreen';
-import LoginScreen from '../screens/LoginScreen';
-
-// ── AuthContext ──────────────────────────────────────────────────────────────
-
-const AuthContext = createContext();
-export const useAuth = () => useContext(AuthContext);
+import AgregarGastoScreen from '../screens/AgregarGastoScreen';
+import ViviendaDashboard from '../screens/vivienda/ViviendaDashboard';
+import AgregarViviendaScreen from '../screens/vivienda/AgregarViviendaScreen';
+import SalidasPorCategoriaScreen from '../screens/vivienda/SalidasPorCategoriaScreen';
+import CategoriaDetalleScreen from '../screens/vivienda/CategoriaDetalleScreen';
 
 const Tab = createBottomTabNavigator();
 const Stack = createNativeStackNavigator();
-
-// ── Reducer de Autenticación ──────────────────────────────────────────────────
-
-function reducer(state, action) {
-  switch (action.type) {
-    case 'RESTORE_TOKEN':
-      return {
-        ...state,
-        isLoading: false,
-        isAuthenticated: action.payload ? true : false,
-        user: action.payload?.user || null,
-      };
-
-    case 'SIGN_IN':
-      return {
-        ...state,
-        isSignout: false,
-        isAuthenticated: true,
-        user: action.payload,
-      };
-
-    case 'SIGN_OUT':
-      return {
-        ...state,
-        isSignout: true,
-        isAuthenticated: false,
-        user: null,
-      };
-
-    default:
-      return state;
-  }
-}
-
-// ── Stacks ───────────────────────────────────────────────────────────────────
 
 function JuntadasStack() {
   return (
     <Stack.Navigator screenOptions={{ headerShown: false }}>
       <Stack.Screen name="JuntadasList" component={JuntadasScreen} />
       <Stack.Screen name="JuntadaDetalle" component={JuntadaDetalleScreen} />
+      <Stack.Screen name="AgregarGasto" component={AgregarGastoScreen} />
       <Stack.Screen name="CrearJuntada" component={CrearJuntadaScreen} />
       <Stack.Screen name="Balance" component={BalanceScreen} />
+    </Stack.Navigator>
+  );
+}
+
+function HomeStack() {
+  return (
+    <Stack.Navigator screenOptions={{ headerShown: false }}>
+      <Stack.Screen name="HomeMain" component={HomeScreen} />
+      <Stack.Screen name="Perfil" component={PerfilScreen} />
+    </Stack.Navigator>
+  );
+}
+
+function ViviendaStack() {
+  return (
+    <Stack.Navigator screenOptions={{ headerShown: false }}>
+      <Stack.Screen name="ViviendaDashboard" component={ViviendaDashboard} />
+      <Stack.Screen name="AgregarVivienda" component={AgregarViviendaScreen} />
+      <Stack.Screen name="SalidasPorCategoria" component={SalidasPorCategoriaScreen} />
+      <Stack.Screen name="CategoriaDetalle" component={CategoriaDetalleScreen} />
     </Stack.Navigator>
   );
 }
@@ -91,8 +73,6 @@ function BotonMas({ onPress }) {
   );
 }
 
-// ── Root Tabs ────────────────────────────────────────────────────────────────
-
 function RootTabs() {
   const navigation = useNavigation();
   const [modalVisible, setModalVisible] = useState(false);
@@ -114,7 +94,7 @@ function RootTabs() {
       >
         <Tab.Screen
           name="Inicio"
-          component={HomeScreen}
+          component={HomeStack}
           options={{
             tabBarIcon: ({ color, size }) => (
               <Ionicons name="home" size={size} color={color} />
@@ -129,6 +109,12 @@ function RootTabs() {
               <Ionicons name="people" size={size} color={color} />
             ),
           }}
+          listeners={({ navigation }) => ({
+            tabPress: (e) => {
+              e.preventDefault();
+              navigation.navigate('Juntadas', { screen: 'JuntadasList' });
+            },
+          })}
         />
         <Tab.Screen
           name="Agregar"
@@ -142,12 +128,18 @@ function RootTabs() {
         />
         <Tab.Screen
           name="Vivienda"
-          component={ProximamenteScreen}
+          component={ViviendaStack}
           options={{
             tabBarIcon: ({ color, size }) => (
               <Ionicons name="home-outline" size={size} color={color} />
             ),
           }}
+          listeners={({ navigation }) => ({
+            tabPress: (e) => {
+              e.preventDefault();
+              navigation.navigate('Vivienda', { screen: 'ViviendaDashboard' });
+            },
+          })}
         />
         <Tab.Screen
           name="Viajes"
@@ -159,156 +151,84 @@ function RootTabs() {
           }}
         />
       </Tab.Navigator>
-
-      {/* Modal para crear nuevos items */}
       <Modal visible={modalVisible} transparent animationType="fade">
-        <View style={mStyles.overlay}>
-          <TouchableOpacity 
-            style={StyleSheet.absoluteFill} 
-            onPress={() => setModalVisible(false)} 
-          />
-          
-          <View style={mStyles.sheet}>
-            <View style={mStyles.sheetHeader}>
-              <Text style={mStyles.sheetTitle}>¿Qué querés crear?</Text>
-              <TouchableOpacity 
-                style={mStyles.btnClose} 
-                onPress={() => setModalVisible(false)}
+        <KeyboardAvoidingView 
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          style={mStyles.overlay}
+          enabled={Platform.OS === 'ios'}
+        >
+          <View style={mStyles.overlay}>
+            <TouchableOpacity style={StyleSheet.absoluteFill} onPress={() => setModalVisible(false)} />
+            
+            <View style={mStyles.sheet}>
+              <View style={mStyles.sheetHeader}>
+                <Text style={mStyles.sheetTitle}>¿Qué querés crear?</Text>
+                <TouchableOpacity style={mStyles.btnClose} onPress={() => setModalVisible(false)}>
+                  <Ionicons name="close" size={20} color={colors.textSecondary} />
+                </TouchableOpacity>
+              </View>
+
+              {/* Nueva Juntada */}
+              <TouchableOpacity
+                style={mStyles.optionCard}
+                onPress={() => {
+                  setModalVisible(false);
+                  navigation.navigate('Juntadas', { screen: 'CrearJuntada' });
+                }}
               >
-                <Ionicons name="close" size={20} color={colors.textSecondary} />
+                <View style={[mStyles.optionIconBg, { backgroundColor: colors.secondary }]}>
+                  <Ionicons name="people-outline" size={24} color={colors.primary} />
+                </View>
+                <View>
+                  <Text style={mStyles.optionTitle}>Nueva juntada</Text>
+                  <Text style={mStyles.optionSubtitle}>Asado, cumple, salida...</Text>
+                </View>
               </TouchableOpacity>
-            </View>
 
-            {/* Nueva Juntada */}
-            <TouchableOpacity
-              style={mStyles.optionCard}
-              onPress={() => {
-                setModalVisible(false);
-                navigation.navigate('Juntadas', { screen: 'CrearJuntada' });
-              }}
-            >
-              <View style={[mStyles.optionIconBg, { backgroundColor: colors.secondary }]}>
-                <Ionicons name="people-outline" size={24} color={colors.primary} />
-              </View>
-              <View>
-                <Text style={mStyles.optionTitle}>Nueva juntada</Text>
-                <Text style={mStyles.optionSubtitle}>Asado, cumple, salida...</Text>
-              </View>
-            </TouchableOpacity>
+              {/* Nuevo gasto de Vivienda */}
+              <TouchableOpacity
+                style={mStyles.optionCard}
+                onPress={() => {
+                  setModalVisible(false);
+                  navigation.navigate('Vivienda', { screen: 'AgregarVivienda' });
+                }}
+              >
+                <View style={[mStyles.optionIconBg, { backgroundColor: '#E3F2FD' }]}>
+                  <Ionicons name="home-outline" size={24} color="#1E88E5" />
+                </View>
+                <View>
+                  <Text style={mStyles.optionTitle}>Nuevo gasto de vivienda</Text>
+                  <Text style={mStyles.optionSubtitle}>Super, internet, expensas...</Text>
+                </View>
+              </TouchableOpacity>
 
-            {/* Nuevo gasto de Vivienda */}
-            <View style={[mStyles.optionCard, mStyles.optionDisabled]}>
-              <View style={[mStyles.optionIconBg, { backgroundColor: '#F0F5F9' }]}>
-                <Ionicons name="home-outline" size={24} color={colors.textSecondary} />
-              </View>
-              <View>
-                <Text style={mStyles.optionTitle}>Nuevo gasto de vivienda</Text>
-                <Text style={mStyles.optionTitle}>(Próximamente)</Text>
-                <Text style={mStyles.optionSubtitle}>Super, internet, expensas...</Text>
-              </View>
-            </View>
-
-            {/* Nuevo Viaje */}
-            <View style={[mStyles.optionCard, mStyles.optionDisabled]}>
-              <View style={[mStyles.optionIconBg, { backgroundColor: '#E9F7EF' }]}>
-                <Ionicons name="airplane-outline" size={24} color={colors.greenGlobal} />
-              </View>
-              <View>
-                <Text style={mStyles.optionTitle}>Nuevo viaje (Próximamente)</Text>
-                <Text style={mStyles.optionSubtitle}>Escapada, vacaciones...</Text>
+              {/* Nuevo Viaje */}
+              <View style={[mStyles.optionCard, mStyles.optionDisabled]}>
+                <View style={[mStyles.optionIconBg, { backgroundColor: '#E9F7EF' }]}>
+                  <Ionicons name="airplane-outline" size={24} color={colors.greenGlobal} />
+                </View>
+                <View>
+                  <Text style={mStyles.optionTitle}>Nuevo viaje (Próximamente)</Text>
+                  <Text style={mStyles.optionSubtitle}>Escapada, vacaciones...</Text>
+                </View>
               </View>
             </View>
           </View>
-        </View>
+        </KeyboardAvoidingView>
       </Modal>
     </>
   );
 }
 
-// ── Bootstrap Screen ─────────────────────────────────────────────────────────
-
-function BootstrapScreen() {
-  return (
-    <View style={[styles.proximamenteContainer, { justifyContent: 'center' }]}>
-      <ActivityIndicator size="large" color={colors.primary} />
-      <Text style={[styles.proximamenteTexto, { marginTop: 16 }]}>
-        Restaurando sesión...
-      </Text>
-    </View>
-  );
-}
-
-// ── AppNavigator ─────────────────────────────────────────────────────────────
-
 export default function AppNavigator() {
-  const [state, dispatch] = useReducer(reducer, {
-    isLoading: true,
-    isSignout: false,
-    isAuthenticated: false,
-    user: null,
-  });
-
-  useEffect(() => {
-    bootstrapAsync();
-  }, []);
-
-  const bootstrapAsync = async () => {
-    try {
-      const token = await AsyncStorage.getItem('auth_token');
-      const userData = await AsyncStorage.getItem('user_data');
-      
-      if (token && userData) {
-        dispatch({
-          type: 'RESTORE_TOKEN',
-          payload: { token, user: JSON.parse(userData) },
-        });
-      } else {
-        dispatch({ type: 'RESTORE_TOKEN', payload: null });
-      }
-    } catch (error) {
-      console.error('Failed to restore session:', error);
-      dispatch({ type: 'RESTORE_TOKEN', payload: null });
-    }
-  };
-
-  const authContext = {
-    user: state.user,
-    login: (userData) => {
-      console.log('SIGN_IN', userData);
-
-      dispatch({
-        type: 'SIGN_IN',
-        payload: userData,
-      });
-    },
-    logout: () => {
-      dispatch({ type: 'SIGN_OUT' });
-    },
-  };
-
-  console.log('AUTH STATE:', state);
-
   return (
-    <AuthContext.Provider value={authContext}>
-      <NavigationContainer>
-        {state.isLoading ? (
-          <Stack.Navigator screenOptions={{ headerShown: false }}>
-            <Stack.Screen name="Bootstrap" component={BootstrapScreen} />
-          </Stack.Navigator>
-        ) : state.isAuthenticated ? (
-          <Stack.Navigator screenOptions={{ headerShown: false }}>
-            <Stack.Screen name="MainTabs" component={RootTabs} />
-            <Stack.Screen name="Perfil" component={PerfilScreen} />
-          </Stack.Navigator>
-        ) : (
-          <LoginScreen />
-        )}
-      </NavigationContainer>
-    </AuthContext.Provider>
+    <NavigationContainer>
+      <RootTabs />
+    </NavigationContainer>
   );
 }
 
-// ── Estilos ──────────────────────────────────────────────────────────────────
+// ── Constants ─────────────────────────────────────────────────────────────────
 
 const styles = StyleSheet.create({
   botonMasContainer: {

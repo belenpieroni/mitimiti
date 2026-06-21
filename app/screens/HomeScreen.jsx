@@ -4,12 +4,14 @@ import { useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { colors } from '../theme/colors';
 import { listarJuntadas, obtenerBalanceGlobal } from '../services/juntadasService';
-import { useAuth } from '../navigation/AppNavigator';
+
+// Usuario del MVP (sin auth en E1)
+const USUARIO = { nombre: 'Martín', iniciales: 'MR' };
 
 const modulos = [
   { id: '1', nombre: 'Juntadas', icono: 'people-outline' },
   { id: '2', nombre: 'Vivienda', icono: 'home-outline' },
-  { id: '3', nombre: 'Viajes', icono: 'airplane-outline' },
+  { id: '3', nombre: 'Viajes',   icono: 'airplane-outline' },
 ];
 
 function getSaludo() {
@@ -24,16 +26,7 @@ function formatPesos(monto) {
 }
 
 export default function HomeScreen({ navigation }) {
-  const { user } = useAuth();
-
-  const nombre = user?.name || 'Usuario';
-  const iniciales = user?.iniciales || 'US';
-
-  const [balance, setBalance] = useState({
-    total: 0,
-    porCobrar: 0,
-    porPagar: 0
-  });
+  const [balance, setBalance]           = useState({ total: 0, porCobrar: 0, porPagar: 0 });
   const [juntadas, setJuntadas]         = useState([]);
   const [cargando, setCargando]         = useState(true);
 
@@ -42,7 +35,7 @@ export default function HomeScreen({ navigation }) {
     try {
       // Llamadas en paralelo
       const [balGlobal, listaJuntadas] = await Promise.all([
-        obtenerBalanceGlobal(nombre),
+        obtenerBalanceGlobal(USUARIO.nombre),
         listarJuntadas(),
       ]);
       setBalance(balGlobal);
@@ -52,7 +45,7 @@ export default function HomeScreen({ navigation }) {
     } finally {
       setCargando(false);
     }
-  }, [nombre]);
+  }, []);
 
   useFocusEffect(
     useCallback(() => { cargarDatos(); }, [cargarDatos])
@@ -65,7 +58,7 @@ export default function HomeScreen({ navigation }) {
       <View style={styles.header}>
         <View>
           <Text style={styles.saludo}>{getSaludo()}</Text>
-          <Text style={styles.nombre}>Hola, {nombre}</Text>
+          <Text style={styles.nombre}>{USUARIO.nombre}</Text>
         </View>
         <View style={styles.headerIconos}>
           <TouchableOpacity style={styles.iconoBtn}>
@@ -75,7 +68,7 @@ export default function HomeScreen({ navigation }) {
             style={styles.avatar}
             onPress={() => navigation.navigate('Perfil')}
           >
-            <Text style={styles.avatarTexto}>{iniciales}</Text>
+            <Text style={styles.avatarTexto}>{USUARIO.iniciales}</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -113,17 +106,27 @@ export default function HomeScreen({ navigation }) {
       <Text style={styles.seccionTitulo}>Módulos</Text>
       <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.modulosScroll}>
         {modulos.map((mod) => (
-          <View key={mod.id} style={styles.moduloCard}>
+          <TouchableOpacity 
+            key={mod.id} 
+            style={styles.moduloCard}
+            onPress={() => {
+              if (mod.nombre === 'Vivienda') {
+                navigation.navigate('Vivienda', { screen: 'ViviendaDashboard' });
+              } else if (mod.nombre === 'Juntadas') {
+                navigation.navigate('Juntadas', { screen: 'JuntadasList' });
+              }
+            }}
+          >
             <Ionicons name={mod.icono} size={28} color={colors.primary} />
             <Text style={styles.moduloNombre}>{mod.nombre}</Text>
-          </View>
+          </TouchableOpacity>
         ))}
       </ScrollView>
 
       {/* Activos recientemente */}
       <View style={styles.seccionHeader}>
         <Text style={styles.seccionTitulo}>Activos recientemente</Text>
-        <TouchableOpacity onPress={() => navigation.navigate('Juntadas')}>
+        <TouchableOpacity onPress={() => navigation.navigate('Juntadas', { screen: 'JuntadasList' })}>
           <Text style={styles.verTodo}>Ver todo &gt;</Text>
         </TouchableOpacity>
       </View>
@@ -170,7 +173,7 @@ const styles = StyleSheet.create({
     alignItems: 'center', marginBottom: 24,
   },
   saludo: { fontSize: 13, color: colors.textSecondary },
-  nombre: { fontSize: 24, fontWeight: 'bold', color: colors.textPrimary },
+  nombre: { fontSize: 28, fontWeight: 'bold', color: colors.textPrimary },
   headerIconos: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   iconoBtn: {
     width: 40, height: 40, borderRadius: 20,

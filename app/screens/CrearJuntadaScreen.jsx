@@ -1,39 +1,27 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity,
   ScrollView, StyleSheet, KeyboardAvoidingView, Platform, Alert
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import DateTimePicker from '@react-native-community/datetimepicker';
 import { colors } from '../theme/colors';
 import { getIniciales, coloresDisponibles } from './JuntadasScreen';
-import { crearJuntada as crearJuntadaService } from '../services/juntadasService';
-import { useAuth } from '../navigation/AppNavigator';
+import { crearJuntada as crearJuntadaService, editarJuntada as editarJuntadaService } from '../services/juntadasService';
 
-export default function CrearJuntadaScreen({ navigation }) {
-  const { user } = useAuth();
+const usuarioActual = { nombre: 'Martín', iniciales: 'MR', color: colors.primary };
 
-  // Definición dinámica del usuario actual basada en la sesión activa
-  const usuarioActual = {
-    nombre: user?.name || 'Usuario',
-    iniciales: user?.iniciales || 'US',
-    color: colors.primary,
-  };
+function getFechaHoy() {
+  const hoy = new Date();
+  return hoy.toLocaleDateString('es-AR', { day: 'numeric', month: 'short', year: 'numeric' });
+}
 
-  const [nombre, setNombre] = useState('');
-  const [descripcion, setDescripcion] = useState('');
+export default function CrearJuntadaScreen({ navigation, route }) {
+  const editando = route.params?.juntadaId ? route.params : null;
+
+  const [nombre, setNombre] = useState(editando?.nombre || '');
+  const [descripcion, setDescripcion] = useState(editando?.descripcion || '');
   const [inputPersona, setInputPersona] = useState('');
-  const [personas, setPersonas] = useState([]);
-  
-  // Estados para el manejo del DatePicker nativo
-  const [fecha, setFecha] = useState(new Date());
-  const [mostrarPicker, setMostrarPicker] = useState(false);
-
-  useEffect(() => {
-    if (user && personas.length === 0) {
-      setPersonas([usuarioActual]);
-    }
-  }, [user]);
+  const [personas, setPersonas] = useState(editando?.participantes || [usuarioActual]);
 
   function agregarPersona() {
     const nombreLimpio = inputPersona.trim();
@@ -51,34 +39,35 @@ export default function CrearJuntadaScreen({ navigation }) {
   }
 
   function quitarPersona(nombre) {
-    // Cláusula de protección: Evita que el usuario actual se elimine a sí mismo
-    if (nombre === usuarioActual.nombre) return; 
+    if (nombre === usuarioActual.nombre) return; // no se puede quitar al usuario actual
     setPersonas(personas.filter(p => p.nombre !== nombre));
   }
 
   async function crearJuntada() {
     if (!nombre.trim()) return;
-    
-    // Payload limpio enviando únicamente campos requeridos de la fuente de verdad
-    const nueva = {
-      nombre: nombre.trim(),
-      descripcion: descripcion.trim(),
-      fecha: fecha.toISOString().split('T')[0],
-      participantes: personas,
-    };
-
     try {
-      await crearJuntadaService(nueva);
+      if (editando) {
+        await editarJuntadaService(editando.juntadaId, { nombre: nombre.trim(), descripcion: descripcion.trim() });
+      } else {
+        const nueva = {
+          id: Date.now().toString(),
+          nombre: nombre.trim(),
+          descripcion: descripcion.trim(),
+          fecha: getFechaHoy(),
+          participantes: personas,
+          gastos: [],
+          deuda: 0,
+          tipo: 'ninguna',
+        };
+        await crearJuntadaService(nueva);
+      }
       navigation.goBack();
     } catch (e) {
-      console.error('Error creando juntada', e);
-      Alert.alert('Error', 'No se pudo crear la juntada. Revisá la conexión.');
+      Alert.alert('Error', 'No se pudo guardar la juntada. Revisá la conexión.');
     }
   }
 
-  const puedeCrear =
-  nombre.trim().length > 0 &&
-  personas.length > 0;
+  const puedeCrear = nombre.trim().length > 0;
 
   return (
     <KeyboardAvoidingView
@@ -93,8 +82,8 @@ export default function CrearJuntadaScreen({ navigation }) {
             <Ionicons name="chevron-back" size={22} color={colors.textPrimary} />
           </TouchableOpacity>
           <View>
-            <Text style={styles.titulo}>Nueva juntada</Text>
-            <Text style={styles.subtitulo}>Creá un evento para dividir gastos</Text>
+            <Text style={styles.titulo}>{editando ? 'Editar juntada' : 'Nueva juntada'}</Text>
+            <Text style={styles.subtitulo}>{editando ? 'Modificar nombre y descripción' : 'Creá un evento para dividir gastos'}</Text>
           </View>
         </View>
 
@@ -122,32 +111,17 @@ export default function CrearJuntadaScreen({ navigation }) {
 
           {/* Fecha */}
           <Text style={styles.label}>FECHA</Text>
-          <TouchableOpacity
-            style={styles.inputFecha}
-            onPress={() => setMostrarPicker(true)}
-          >
-            <Text style={styles.inputFechaTexto}>
-              {fecha.toLocaleDateString('es-AR')}
-            </Text>
-          </TouchableOpacity>
-
-          {mostrarPicker && (
-            <DateTimePicker
-              value={fecha}
-              mode="date"
-              minimumDate={new Date()}
-              onChange={(event, selectedDate) => {
-                setMostrarPicker(false);
-                if (selectedDate) {
-                  setFecha(selectedDate);
-                }
-              }}
-            />
-          )}
+          <View style={styles.inputFecha}>
+            <Text style={styles.inputFechaTexto}>Hoy, {getFechaHoy()}</Text>
+          </View>
 
           {/* Participantes */}
           <View style={styles.participantesHeader}>
             <Text style={styles.label}>PARTICIPANTES · {personas.length}</Text>
+            {/* <TouchableOpacity style={styles.btnNuevaPersona} onPress={agregarPersona}>
+              <Ionicons name="person-add-outline" size={14} color="white" />
+              <Text style={styles.btnNuevaPersonaTexto}>Nueva persona</Text>
+            </TouchableOpacity> */}
           </View>
 
           {/* Input agregar persona */}
@@ -194,7 +168,7 @@ export default function CrearJuntadaScreen({ navigation }) {
             onPress={crearJuntada}
             disabled={!puedeCrear}
           >
-            <Text style={styles.btnCrearTexto}>Crear juntada</Text>
+            <Text style={styles.btnCrearTexto}>{editando ? 'Guardar cambios' : 'Crear juntada'}</Text>
           </TouchableOpacity>
         </View>
 

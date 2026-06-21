@@ -132,6 +132,7 @@ function crearJuntada(req, res, next) {
       creadaEn: new Date().toISOString(),
       participantes: nuevosParticipantes,
       gastos: [],
+      subgrupos: [],
     };
 
     const db = leerDB();
@@ -160,6 +161,14 @@ function obtenerJuntada(req, res, next) {
     }
 
     const balance = calcularBalance(juntada);
+    
+    if (db.perfiles) {
+      balance.transferencias = balance.transferencias.map(t => ({
+        ...t,
+        aliasDestino: db.perfiles[t.para] ? db.perfiles[t.para].alias : null
+      }));
+    }
+
     res.json({ ok: true, data: { ...juntada, balance } });
   } catch (err) {
     next(err);
@@ -169,6 +178,25 @@ function obtenerJuntada(req, res, next) {
 /**
  * DELETE /api/juntadas/:id
  */
+function editarJuntada(req, res, next) {
+  try {
+    const db = leerDB();
+    const juntada = db.juntadas.find((j) => j.id === req.params.id);
+    if (!juntada) {
+      const err = new Error(`Juntada con id "${req.params.id}" no encontrada.`);
+      err.status = 404;
+      return next(err);
+    }
+    const { nombre, descripcion } = req.body;
+    if (nombre !== undefined) juntada.nombre = nombre.trim();
+    if (descripcion !== undefined) juntada.descripcion = descripcion.trim();
+    escribirDB(db);
+    res.json({ ok: true, data: juntada });
+  } catch (err) {
+    next(err);
+  }
+}
+
 function eliminarJuntada(req, res, next) {
   try {
     const db = leerDB();
@@ -302,7 +330,7 @@ function agregarGasto(req, res, next) {
       return next(err);
     }
 
-    const { nombre, pagador, monto } = req.body;
+    const { nombre, pagador, monto, splitMode = 'equal', splitSubgroups = [], ticketPhoto = null } = req.body;
 
     // Validaciones
     if (!nombre || nombre.trim() === '') {
@@ -337,7 +365,10 @@ function agregarGasto(req, res, next) {
       id: uuidv4(),
       nombre: nombre.trim(),
       pagador: pagador.trim(),
+      splitMode,     
+      splitSubgroups, 
       monto: Math.round(monto * 100) / 100, // redondear a 2 decimales
+      ticketPhoto,   // URL de la foto del ticket (null si se cargó manual)
       creadoEn: new Date().toISOString(),
     };
 
@@ -398,6 +429,14 @@ function obtenerBalance(req, res, next) {
     }
 
     const balance = calcularBalance(juntada);
+    
+    if (db.perfiles) {
+      balance.transferencias = balance.transferencias.map(t => ({
+        ...t,
+        aliasDestino: db.perfiles[t.para] ? db.perfiles[t.para].alias : null
+      }));
+    }
+
     res.json({ ok: true, data: balance });
   } catch (err) {
     next(err);
@@ -420,9 +459,91 @@ function obtenerBalanceGlobal(req, res, next) {
   }
 }
 
+const agregarSubgrupo = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { nombre, integrantes } = req.body;
+
+    // Validación del CA1: Mínimo 2 participantes
+    if (!nombre || !integrantes || integrantes.length < 2) {
+      return res.status(400).json({ error: 'El subgrupo debe tener un nombre y al menos 2 integrantes.' });
+    }
+
+    const data = leerDB();
+    const juntada = data.juntadas.find(j => j.id === id);
+
+    if (!juntada) return res.status(404).json({ error: 'Juntada no encontrada' });
+
+    // Si por ser una juntada vieja no tiene el array, se lo creamos
+    if (!juntada.subgrupos) juntada.subgrupos = [];
+
+    const nuevoSubgrupo = {
+      id: uuidv4(),
+      nombre: nombre.trim(),
+      integrantes
+    };
+
+    juntada.subgrupos.push(nuevoSubgrupo);
+    escribirDB(data);
+
+    res.status(201).json({ ok: true, data: nuevoSubgrupo });
+  } catch (error) {
+    res.status(500).json({ error: 'Error al crear el subgrupo' });
+  }
+};
+
+const editarSubgrupo = async (req, res) => {
+  try {
+    const { id, sgid } = req.params;
+    const { nombre, integrantes } = req.body;
+
+    if (!nombre || !integrantes || integrantes.length < 2) {
+      return res.status(400).json({ error: 'El subgrupo debe tener un nombre y al menos 2 integrantes.' });
+    }
+
+    const data = leerDB();
+    const juntada = data.juntadas.find(j => j.id === id);
+    if (!juntada) return res.status(404).json({ error: 'Juntada no encontrada' });
+
+    const sg = (juntada.subgrupos || []).find(s => s.id === sgid);
+    if (!sg) return res.status(404).json({ error: 'Subgrupo no encontrado' });
+
+    sg.nombre = nombre.trim();
+    sg.integrantes = integrantes;
+    escribirDB(data);
+
+    res.json({ ok: true, data: sg });
+  } catch (error) {
+    res.status(500).json({ error: 'Error al editar el subgrupo' });
+  }
+};
+
+const eliminarSubgrupo = async (req, res) => {
+  try {
+    const { id, sgid } = req.params;
+
+    const data = leerDB();
+    const juntada = data.juntadas.find(j => j.id === id);
+
+    if (!juntada) return res.status(404).json({ error: 'Juntada no encontrada' });
+    if (!juntada.subgrupos) juntada.subgrupos = [];
+
+    const indiceSg = juntada.subgrupos.findIndex(sg => sg.id === sgid);
+    if (indiceSg === -1) return res.status(404).json({ error: 'Subgrupo no encontrado' });
+
+    juntada.subgrupos.splice(indiceSg, 1);
+    escribirDB(data);
+
+    res.status(200).json({ ok: true, mensaje: 'Subgrupo eliminado' });
+  } catch (error) {
+    res.status(500).json({ error: 'Error al eliminar el subgrupo' });
+  }
+};
+
 module.exports = {
   listarJuntadas,
   crearJuntada,
+  editarJuntada,
   obtenerJuntada,
   eliminarJuntada,
   agregarParticipante,
@@ -431,4 +552,7 @@ module.exports = {
   eliminarGasto,
   obtenerBalance,
   obtenerBalanceGlobal,
+  agregarSubgrupo,
+  editarSubgrupo,
+  eliminarSubgrupo,
 };
