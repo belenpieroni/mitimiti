@@ -6,6 +6,10 @@ services:
       - "3000:3000"
     environment:
       NODE_ENV: development
+      # OCR en la nube (opcional pero recomendado). Conseguí una key gratis en
+      # https://ocr.space/ocrapi y ponela en un archivo .env como OCR_SPACE_API_KEY=...
+      # Si queda vacía, el backend usa Tesseract local automáticamente.
+      OCR_SPACE_API_KEY: ${OCR_SPACE_API_KEY:-}
     volumes:
       - ./backend/src:/app/src
       - ./backend/data:/app/data

@@ -3,8 +3,7 @@ FROM node:20-alpine
 WORKDIR /app
 
 COPY package*.json ./
-RUN npm install
-RUN npx expo install
+RUN npm install --legacy-peer-deps
 
 EXPOSE 8081 19000 19001 19002
 

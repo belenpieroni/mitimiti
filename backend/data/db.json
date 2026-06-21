@@ -1,6 +1,75 @@
 {
   "juntadas": [
     {
+      "id": "8992f22b-7123-4430-b415-27aa664507d8",
+      "nombre": "Noche de Tacos",
+      "descripcion": "Alta noches de tacos",
+      "fecha": "2026-06-21",
+      "creadaEn": "2026-06-21T00:59:01.065Z",
+      "participantes": [
+        {
+          "id": "065eec4f-14a6-4ed0-a1ce-54e500555be1",
+          "nombre": "Martín",
+          "iniciales": "MR",
+          "color": "#473472"
+        },
+        {
+          "id": "d8e49ccb-7e69-4ef3-8bd3-47128af7c6fd",
+          "nombre": "Thiago",
+          "iniciales": "TH",
+          "color": "#526D82"
+        },
+        {
+          "id": "6f1b5fea-4018-4e39-818f-38a479dc422c",
+          "nombre": "Belu",
+          "iniciales": "BE",
+          "color": "#9DB2BF"
+        },
+        {
+          "id": "eb190779-b369-4892-ba5f-b1f3af0882af",
+          "nombre": "Conra",
+          "iniciales": "CO",
+          "color": "#42b271"
+        },
+        {
+          "id": "5d366827-a23f-4149-b40e-ec79680cb01a",
+          "nombre": "Ori",
+          "iniciales": "OR",
+          "color": "#c084fc"
+        },
+        {
+          "id": "274d7290-abaf-4f58-a681-b2d759f24681",
+          "nombre": "Ivo",
+          "iniciales": "IV",
+          "color": "#f97316"
+        }
+      ],
+      "gastos": [
+        {
+          "id": "05c7ec9b-7615-404b-8ce5-4b209eaaa569",
+          "nombre": "Compras del súper",
+          "pagador": "Martín",
+          "splitMode": "subgroups",
+          "splitSubgroups": [
+            "0690d1ee-4cd9-482c-a7c4-e1b85b9154f4"
+          ],
+          "monto": 118700,
+          "ticketPhoto": "/uploads/ticket-1782003608827-82282510.jpg",
+          "creadoEn": "2026-06-21T01:00:25.209Z"
+        }
+      ],
+      "subgrupos": [
+        {
+          "id": "0690d1ee-4cd9-482c-a7c4-e1b85b9154f4",
+          "nombre": "Pareja 🫶🏻",
+          "integrantes": [
+            "Ivo",
+            "Belu"
+          ]
+        }
+      ]
+    },
+    {
       "id": "5ed6472e-1067-4a60-a37b-6372b45f4526",
       "nombre": "Noche de Bowling 🎳",
       "descripcion": "Festejamos la aprobación de la entrega 1",
@@ -67,6 +136,16 @@
           "splitSubgroups": [],
           "monto": 10000,
           "creadoEn": "2026-06-20T18:39:49.456Z"
+        },
+        {
+          "id": "047cb93e-d2dd-411c-b2b5-e6db3cd64894",
+          "nombre": "Restaurante",
+          "pagador": "Thiago",
+          "splitMode": "equal",
+          "splitSubgroups": [],
+          "monto": 2628,
+          "ticketPhoto": "/uploads/ticket-1781992868028-407866012.jpg",
+          "creadoEn": "2026-06-20T22:01:27.290Z"
         }
       ],
       "subgrupos": [
