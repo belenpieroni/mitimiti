@@ -6,6 +6,7 @@ import { View, TouchableOpacity, StyleSheet, Modal, Text, KeyboardAvoidingView, 
 import { Ionicons } from '@expo/vector-icons';
 import { colors } from '../theme/colors';
 
+import DeudasScreen from '../screens/DeudasScreen';
 import HomeScreen from '../screens/HomeScreen';
 import JuntadasScreen from '../screens/JuntadasScreen';
 import JuntadaDetalleScreen from '../screens/JuntadaDetalleScreen';
@@ -147,13 +148,14 @@ function RootTabs() {
             },
           })}
         />
-        <Tab.Screen
-          name="Viajes"
-          component={ProximamenteScreen}
-          options={{
-            tabBarIcon: ({ color, size }) => (
-              <Ionicons name="airplane-outline" size={size} color={color} />
-            ),
+        <Tab.Screen 
+            name="Deudas" 
+            component={DeudasScreen} // <--- CAMBIALO POR ESTE
+            options={{
+              tabBarLabel: 'Deudas',
+              tabBarIcon: ({ color, size }) => (
+                 <Ionicons name="wallet-outline" color={color} size={size} /> // O el icono que prefieras
+              ),
           }}
         />
       </Tab.Navigator>
@@ -208,16 +210,6 @@ function RootTabs() {
                 </View>
               </TouchableOpacity>
 
-              {/* Nuevo Viaje */}
-              <View style={[mStyles.optionCard, mStyles.optionDisabled]}>
-                <View style={[mStyles.optionIconBg, { backgroundColor: '#E9F7EF' }]}>
-                  <Ionicons name="airplane-outline" size={24} color={colors.greenGlobal} />
-                </View>
-                <View>
-                  <Text style={mStyles.optionTitle}>Nuevo viaje (Próximamente)</Text>
-                  <Text style={mStyles.optionSubtitle}>Escapada, vacaciones...</Text>
-                </View>
-              </View>
             </View>
           </View>
         </KeyboardAvoidingView>

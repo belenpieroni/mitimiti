@@ -1,6 +1,36 @@
 {
   "juntadas": [
     {
+      "id": "cfaff7d9-f5a6-4671-a365-5fdd5337734d",
+      "nombre": "asadu",
+      "descripcion": "sas",
+      "fecha": "2026-06-20",
+      "creadaEn": "2026-06-20T22:54:06.149Z",
+      "participantes": [
+        {
+          "id": "f2889525-639f-429e-92e0-d5fdba056370",
+          "nombre": "Martín",
+          "iniciales": "MR",
+          "color": "#473472"
+        },
+        {
+          "id": "3c879aae-7371-45cb-84c6-7e27c9b7ef4c",
+          "nombre": "Martin",
+          "iniciales": "MA",
+          "color": "#526D82"
+        }
+      ],
+      "gastos": [
+        {
+          "id": "410c8917-9008-428d-b558-fbd52176ee44",
+          "nombre": "asado",
+          "pagador": "Martin",
+          "monto": 19999,
+          "creadoEn": "2026-06-20T22:55:30.916Z"
+        }
+      ]
+    },
+    {
       "id": "8992f22b-7123-4430-b415-27aa664507d8",
       "nombre": "Noche de Tacos",
       "descripcion": "Alta noches de tacos",
@@ -225,7 +255,7 @@
   ],
   "perfiles": {
     "Martín": {
-      "alias": ""
+      "alias": "ggggggg"
     },
     "Thiago": {
       "alias": "thiago.pago.mp"
