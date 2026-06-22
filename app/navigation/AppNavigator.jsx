@@ -14,6 +14,7 @@ import JuntadasScreen from '../screens/JuntadasScreen';
 import JuntadaDetalleScreen from '../screens/JuntadaDetalleScreen';
 import CrearJuntadaScreen from '../screens/CrearJuntadaScreen';
 import PerfilScreen from '../screens/PerfilScreen';
+import PerfilAliasScreen from '../screens/PerfilAliasScreen';
 import BalanceScreen from '../screens/BalanceScreen';
 import LoginScreen from '../screens/LoginScreen';
 
@@ -149,15 +150,6 @@ function RootTabs() {
             ),
           }}
         />
-        <Tab.Screen
-          name="Viajes"
-          component={ProximamenteScreen}
-          options={{
-            tabBarIcon: ({ color, size }) => (
-              <Ionicons name="airplane-outline" size={size} color={color} />
-            ),
-          }}
-        />
       </Tab.Navigator>
 
       {/* Modal para crear nuevos items */}
@@ -205,17 +197,6 @@ function RootTabs() {
                 <Text style={mStyles.optionTitle}>Nuevo gasto de vivienda</Text>
                 <Text style={mStyles.optionTitle}>(Próximamente)</Text>
                 <Text style={mStyles.optionSubtitle}>Super, internet, expensas...</Text>
-              </View>
-            </View>
-
-            {/* Nuevo Viaje */}
-            <View style={[mStyles.optionCard, mStyles.optionDisabled]}>
-              <View style={[mStyles.optionIconBg, { backgroundColor: '#E9F7EF' }]}>
-                <Ionicons name="airplane-outline" size={24} color={colors.greenGlobal} />
-              </View>
-              <View>
-                <Text style={mStyles.optionTitle}>Nuevo viaje (Próximamente)</Text>
-                <Text style={mStyles.optionSubtitle}>Escapada, vacaciones...</Text>
               </View>
             </View>
           </View>
@@ -299,6 +280,7 @@ export default function AppNavigator() {
           <Stack.Navigator screenOptions={{ headerShown: false }}>
             <Stack.Screen name="MainTabs" component={RootTabs} />
             <Stack.Screen name="Perfil" component={PerfilScreen} />
+            <Stack.Screen name="PerfilAlias" component={PerfilAliasScreen} />
           </Stack.Navigator>
         ) : (
           <LoginScreen />

@@ -1,356 +1,180 @@
-import { useState, useEffect } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  TouchableOpacity,
-  ScrollView,
-  Platform,
-} from 'react-native';
+import { useMemo } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView } from 'react-native';
+import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { colors } from '../theme/colors';
 import { useAuth } from '../navigation/AppNavigator';
-import { obtenerBalanceGlobal, listarJuntadas } from '../services/juntadasService';
 
-export default function PerfilScreen({ navigation }) {
+function getInitials(name) {
+  if (!name) return 'US';
+  return name
+    .split(' ')
+    .filter(Boolean)
+    .map((word) => word[0])
+    .join('')
+    .slice(0, 2)
+    .toUpperCase();
+}
+
+function getAliasFromEmail(email) {
+  if (!email) return '@usuario';
+  return `@${email.split('@')[0]}`;
+}
+
+const profileItems = [
+  { id: 'notificaciones', label: 'Notificaciones', icon: 'notifications-outline', iconBg: '#ECE9F5', iconColor: colors.primary },
+  { id: 'preferencias', label: 'Preferencias', icon: 'settings-outline', iconBg: '#EEF2F6', iconColor: colors.textSecondary },
+  { id: 'privacidad', label: 'Privacidad', icon: 'shield-checkmark-outline', iconBg: '#EAF4EF', iconColor: '#2E7D5C' },
+  { id: 'ayuda', label: 'Ayuda y soporte', icon: 'help-circle-outline', iconBg: '#FBEAEA', iconColor: '#D64B3B' },
+  { id: 'alias', label: 'Alias y CBU', icon: 'card-outline', iconBg: '#EEE9FA', iconColor: colors.primary },
+];
+
+export default function PerfilScreen() {
+  const navigation = useNavigation();
   const { user, logout } = useAuth();
-  const [cantidadJuntadas, setCantidadJuntadas] = useState(0);
 
-  // Fallbacks consistentes con el estado global de auth
-  const nombreUsuario = user?.name ?? 'Usuario';
-  const emailUsuario = user?.email ?? '';
-  const inicialesUsuario = user?.iniciales ?? 'US';
+  const nombre = user?.name || 'Usuario';
+  const email = user?.email || 'usuario@mail.com';
+  const iniciales = useMemo(() => getInitials(nombre), [nombre]);
+  const miniAlias = useMemo(() => getAliasFromEmail(email), [email]);
 
-  const servicios = user?.servicios ?? 0;
-
-  // Avatar dinámico seguro
-  const coloresAvatar = [
-    '#473472',
-    '#526D82',
-    '#42b271',
-    '#c084fc',
-    '#f97316',
+  const stats = [
+    { label: 'Juntadas', value: 3 },
+    { label: 'Servicios', value: 2 },
+    { label: 'Viajes', value: 1 },
   ];
 
-  const avatarColor =
-    coloresAvatar[
-      (nombreUsuario?.charCodeAt?.(0) || 0) % coloresAvatar.length
-    ];
-
-  // Estado del balance general inicializado seguro
-  const [balance, setBalance] = useState({
-    total: 0,
-    porCobrar: 0,
-    porPagar: 0,
-  });
-
-  const [cargandoBalance, setCargandoBalance] = useState(true);
-
-  // Hook de sincronización seguro contra nulos
-  useEffect(() => {
-    if (!user?.name) {
-      setCargandoBalance(false);
-      return;
+  const handleItemPress = (id) => {
+    if (id === 'alias') {
+      navigation.navigate('PerfilAlias'); // Navega a la pantalla del formulario
     }
-
-    async function cargarDatosPerfil() {
-      try {
-        const [balanceResponse, juntadasResponse] = await Promise.all([
-          obtenerBalanceGlobal(user.name),
-          listarJuntadas(user.name),
-        ]);
-
-        // Ya no buscamos .data en los logs porque api.js ya lo limpió
-        console.log("Usuario:", user.name);
-        console.log("Balance:", balanceResponse);
-        console.log("Juntadas:", juntadasResponse);
-
-        // EXTRAEMOS LA DATA DE FORMA SEGURA (agregamos balanceResponse al final de la cadena)
-        const balanceData =
-          balanceResponse?.data?.data ||
-          balanceResponse?.data ||
-          balanceResponse || 
-          { total: 0, porCobrar: 0, porPagar: 0 }; // Fallback seguro con propiedades en 0
-
-        setBalance(balanceData);
-
-        const lista =
-          juntadasResponse?.data?.data ||
-          juntadasResponse?.data ||
-          juntadasResponse ||
-          [];
-
-        setCantidadJuntadas(lista.length);
-
-      } catch (err) {
-        console.error('Error cargando perfil:', err);
-      } finally {
-        setCargandoBalance(false);
-      }
-    }
-
-    cargarDatosPerfil();
-  }, [user?.name]);
+  };
 
   return (
-    <ScrollView
-      style={styles.container}
-      contentContainerStyle={styles.content}
-      showsVerticalScrollIndicator={false}
-    >
-      {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity
-          style={styles.btnVolver}
-          onPress={() => navigation.goBack()}
-        >
-          <Ionicons
-            name="chevron-back"
-            size={22}
-            color={colors.textPrimary}
-          />
+    <ScrollView style={styles.container} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+      <View style={styles.headerRow}>
+        <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
+          <Ionicons name="chevron-back" size={22} color={colors.textSecondary} />
         </TouchableOpacity>
-
-        <Text style={styles.tituloHeader}>Perfil</Text>
+        <Text style={styles.headerTitle}>Perfil</Text>
       </View>
 
-      {/* Info de Usuario */}
-      <View style={styles.profileSection}>
-        <View style={[styles.avatar, { backgroundColor: avatarColor }]}>
-          <Text style={styles.avatarTexto}>{inicialesUsuario}</Text>
+      <View style={styles.profileTop}>
+        <View style={styles.avatar}>
+          <Text style={styles.avatarText}>{iniciales}</Text>
         </View>
-
-        <Text style={styles.userName}>{nombreUsuario}</Text>
-        {emailUsuario ? <Text style={styles.userEmail}>{emailUsuario}</Text> : null}
+        <Text style={styles.name}>{nombre}</Text>
+        <Text style={styles.email}>{miniAlias}</Text>
       </View>
 
-      {/* Módulos de Actividad */}
       <View style={styles.statsCard}>
-        <View style={styles.statBox}>
-          <Text style={styles.statNumber}>{cantidadJuntadas}</Text>
-          <Text style={styles.statLabel}>Juntadas</Text>
-        </View>
-
-        <View style={styles.verticalDivider} />
-
-        <View style={styles.statBox}>
-          <Text style={styles.statNumber}>{servicios}</Text>
-          <Text style={styles.statLabel}>Servicios</Text>
-        </View>
+        {stats.map((item, index) => (
+          <View key={item.label} style={styles.statCol}>
+            <Text style={styles.statValue}>{item.value}</Text>
+            <Text style={styles.statLabel}>{item.label}</Text>
+            {index < stats.length - 1 ? <View style={styles.divider} /> : null}
+          </View>
+        ))}
       </View>
 
-      {/* Tarjeta de Balance General con Loader */}
-      <View style={styles.balanceCard}>
-        <Text style={styles.balanceTitulo}>Balance General</Text>
-
-        {cargandoBalance ? (
-          <Text style={styles.balanceLoading}>Cargando balance...</Text>
-        ) : (
-          <>
-            <Text
-              style={[
-                styles.balanceResultado,
-                {
-                  color:
-                    balance.total >= 0
-                      ? colors.greenGlobal
-                      : colors.redGlobal,
-                },
-              ]}
-            >
-              {balance.total >= 0 ? '+' : '-'}$
-              {Math.abs(balance.total).toLocaleString('es-AR')}
-            </Text>
-
-            <View style={styles.balanceDetalleFila}>
-              <View>
-                <Text style={styles.balanceLabel}>Te deben</Text>
-                <Text
-                  style={[
-                    styles.balanceValor,
-                    { color: colors.greenGlobal },
-                  ]}
-                >
-                  ${balance.porCobrar.toLocaleString('es-AR')}
-                </Text>
+      <View style={styles.itemsWrap}>
+        {profileItems.map((item) => (
+          <TouchableOpacity key={item.id} style={styles.itemCard} onPress={() => handleItemPress(item.id)}>
+            <View style={styles.itemLeft}>
+              <View style={[styles.itemIconWrap, { backgroundColor: item.iconBg }]}>
+                <Ionicons name={item.icon} size={20} color={item.iconColor} />
               </View>
-
-              <View>
-                <Text style={styles.balanceLabel}>Debés</Text>
-                <Text
-                  style={[
-                    styles.balanceValor,
-                    { color: colors.redGlobal },
-                  ]}
-                >
-                  ${balance.porPagar.toLocaleString('es-AR')}
-                </Text>
-              </View>
+              <Text style={styles.itemLabel}>{item.label}</Text>
             </View>
-          </>
-        )}
+            <Ionicons name="chevron-forward" size={20} color="#A3B1BE" />
+          </TouchableOpacity>
+        ))}
       </View>
 
-      {/* Footer y Logout */}
-      <View style={styles.footer}>
-        <Text style={styles.appNombre}>Miti-Miti</Text>
-        <Text style={styles.appVersion}>v0.2.0</Text>
-
-        <TouchableOpacity style={styles.btnLogout} onPress={logout}>
-          <Ionicons
-            name="log-out-outline"
-            size={18}
-            color={colors.redGlobal}
-          />
-          <Text style={styles.btnLogoutText}>Cerrar sesión</Text>
-        </TouchableOpacity>
-      </View>
+      <TouchableOpacity style={styles.logoutBtn} onPress={logout}>
+        <Ionicons name="log-out-outline" size={20} color="#D64B3B" />
+        <Text style={styles.logoutText}>Cerrar sesión</Text>
+      </TouchableOpacity>
     </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: colors.background,
-  },
-  content: {
-    paddingHorizontal: 20,
-    paddingTop: Platform.OS === 'ios' ? 60 : 52,
-    paddingBottom: 40,
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 16,
-    marginBottom: 24,
-  },
-  btnVolver: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: colors.cardBg,
+  container: { flex: 1, backgroundColor: colors.background },
+  content: { paddingHorizontal: 20, paddingTop: 52, paddingBottom: 34 },
+  headerRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 26 },
+  backBtn: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    backgroundColor: '#F2F4F6',
     justifyContent: 'center',
     alignItems: 'center',
+    marginRight: 14,
   },
-  tituloHeader: {
-    fontSize: 20,
-    fontWeight: '700',
-    color: colors.textPrimary,
-  },
-  profileSection: {
-    alignItems: 'center',
-    marginBottom: 24,
-  },
+  headerTitle: { fontSize: 18, fontWeight: '700', color: colors.textPrimary },
+  profileTop: { alignItems: 'center', marginBottom: 24 },
   avatar: {
-    width: 96,
-    height: 96,
-    borderRadius: 48,
+    width: 110,
+    height: 110,
+    borderRadius: 55,
+    backgroundColor: colors.primary,
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 12,
+    marginBottom: 14,
   },
-  avatarTexto: {
-    color: '#fff',
-    fontSize: 28,
-    fontWeight: 'bold',
-  },
-  userName: {
-    fontSize: 22,
-    fontWeight: '700',
-    color: colors.textPrimary,
-  },
-  userEmail: {
-    marginTop: 4,
-    fontSize: 14,
-    color: colors.textSecondary,
-  },
+  avatarText: { color: 'white', fontSize: 23, fontWeight: '700' },
+  name: { fontSize: 11, fontWeight: '700', color: colors.textPrimary, marginBottom: 4 },
+  email: { fontSize: 8.2, color: '#446380', fontWeight: '500' },
   statsCard: {
+    backgroundColor: '#F5F6F8',
+    borderRadius: 20,
+    paddingVertical: 18,
+    paddingHorizontal: 12,
     flexDirection: 'row',
-    backgroundColor: colors.cardBg,
-    borderRadius: 16,
-    paddingVertical: 16,
-    alignItems: 'center',
-    marginBottom: 20,
-  },
-  statBox: {
-    flex: 1,
-    alignItems: 'center',
-  },
-  statNumber: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: colors.primary,
-  },
-  statLabel: {
-    fontSize: 12,
-    color: colors.textSecondary,
-    marginTop: 4,
-  },
-  verticalDivider: {
-    width: 1,
-    height: 30,
-    backgroundColor: '#E5E5E5',
-  },
-  balanceCard: {
-    backgroundColor: colors.cardBg,
-    borderRadius: 16,
-    padding: 16,
-    marginBottom: 24,
-  },
-  balanceTitulo: {
-    fontSize: 14,
-    color: colors.textSecondary,
-    marginBottom: 8,
-  },
-  balanceResultado: {
-    fontSize: 28,
-    fontWeight: 'bold',
     marginBottom: 16,
   },
-  balanceDetalleFila: {
+  statCol: { flex: 1, alignItems: 'center', position: 'relative' },
+  statValue: { fontSize: 19, fontWeight: '700', color: colors.primary, marginBottom: 6 },
+  statLabel: { fontSize: 13, color: '#4E6782' },
+  divider: {
+    position: 'absolute',
+    right: 0,
+    top: 4,
+    bottom: 4,
+    width: 1,
+    backgroundColor: '#DFE3E8',
+  },
+  itemsWrap: { gap: 12 },
+  itemCard: {
+    backgroundColor: colors.cardBg,
+    borderRadius: 20,
+    paddingHorizontal: 16,
+    paddingVertical: 17,
     flexDirection: 'row',
+    alignItems: 'center',
     justifyContent: 'space-between',
   },
-  balanceLoading: {
-    fontSize: 14,
-    color: colors.textSecondary,
-    paddingVertical: 8,
-  },
-  balanceLabel: {
-    fontSize: 12,
-    color: colors.textSecondary,
-  },
-  balanceValor: {
-    fontSize: 16,
-    fontWeight: '700',
-    marginTop: 4,
-  },
-  footer: {
+  itemLeft: { flexDirection: 'row', alignItems: 'center', gap: 14 },
+  itemIconWrap: {
+    width: 40,
+    height: 40,
+    borderRadius: 14,
+    justifyContent: 'center',
     alignItems: 'center',
-    marginTop: 20,
   },
-  appNombre: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: colors.textPrimary,
-  },
-  appVersion: {
-    fontSize: 13,
-    color: colors.textSecondary,
-    marginBottom: 20,
-  },
-  btnLogout: {
+  itemLabel: { color: colors.textPrimary, fontSize: 13.3, fontWeight: '600' },
+  logoutBtn: {
+    marginTop: 22,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: '#F0B8B2',
+    backgroundColor: '#FCEEEE',
+    paddingVertical: 16,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
-    backgroundColor: colors.cardBg,
-    paddingHorizontal: 20,
-    paddingVertical: 12,
-    borderRadius: 12,
+    justifyContent: 'center',
+    gap: 10,
   },
-  btnLogoutText: {
-    color: colors.redGlobal,
-    fontWeight: '600',
-  },
+  logoutText: { color: '#D64B3B', fontSize: 14.5, fontWeight: '700' },
 });
