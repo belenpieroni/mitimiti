@@ -1,3 +1,5 @@
+require('dotenv').config();
+const perfilesRoutes = require('./routes/perfiles');
 const express = require('express');
 const cors = require('cors');
 const path = require('path');
@@ -28,6 +30,8 @@ app.use('/api/deudas', deudasRoutes);
 app.use('/api/vivienda', viviendaRouter);
 app.use('/api/deudas', deudasRoutes);
 app.use('/api/uploads', uploadsRouter);
+app.use('/api/auth', authRouter);
+app.use('/api/perfiles', perfilesRoutes);
 
 // ── Manejo de errores ─────────────────────────────────────────────────────────
 app.use(notFound);

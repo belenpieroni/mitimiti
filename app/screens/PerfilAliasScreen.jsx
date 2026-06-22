@@ -73,12 +73,14 @@ export default function PerfilAliasScreen() {
   }, [nombreUsuario]);
 
   useFocusEffect(
-    useCallback(() => { cargarPerfil(); }, [cargarPerfil])
+    useCallback(() => {
+      cargarPerfil();
+    }, [cargarPerfil])
   );
 
   const handleGuardar = async () => {
     if (!alias || alias.trim() === '') {
-      mostrarToast('No podes guardar un Alias/CBU vacio.', 'error');
+      mostrarToast('No podés guardar un Alias/CBU vacío.', 'error');
       return;
     }
 
@@ -86,7 +88,7 @@ export default function PerfilAliasScreen() {
     const aliasRegex = /^[a-z0-9.-]{6,22}$/;
 
     if (!aliasRegex.test(aliasLimpio)) {
-      mostrarToast('Debe tener entre 6 y 22 caracteres y usar letras, numeros, guiones y puntos.', 'error');
+      mostrarToast('Debe tener entre 6 y 22 caracteres y usar letras, números, guiones y puntos.', 'error');
       return;
     }
 
@@ -95,7 +97,7 @@ export default function PerfilAliasScreen() {
       await actualizarPerfil(nombreUsuario, aliasLimpio);
       setAlias(aliasLimpio);
       setAliasGuardado(true);
-      mostrarToast('Tu Alias/CBU se guardo correctamente.', 'success');
+      mostrarToast('Tu Alias/CBU se guardó correctamente.', 'success');
     } catch (error) {
       mostrarToast(error.message, 'error');
     } finally {
@@ -130,76 +132,78 @@ export default function PerfilAliasScreen() {
       style={styles.container}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
-      <Toast visible={toast.visible} message={toast.message} type={toast.type} />
+      <View style={styles.container}>
+        <Toast visible={toast.visible} message={toast.message} type={toast.type} />
 
-      <View style={styles.header}>
-        <View style={styles.headerTop}>
-          <TouchableOpacity style={styles.btnVolver} onPress={() => navigation.goBack()}>
-            <Ionicons name="chevron-back" size={24} color={colors.primary} />
-          </TouchableOpacity>
-          <View>
-            <Text style={styles.titulo}>Alias y CBU</Text>
-            <Text style={styles.subtitulo}>{nombreUsuario}</Text>
-          </View>
-        </View>
-      </View>
-
-      <ScrollView contentContainerStyle={styles.content}>
-        <View style={styles.card}>
-          <View style={styles.cardHeader}>
-            <View style={styles.iconContainer}>
-              <Ionicons name="card-outline" size={24} color={colors.primary} />
+        <View style={styles.header}>
+          <View style={styles.headerTop}>
+            <TouchableOpacity style={styles.btnVolver} onPress={() => navigation.goBack()}>
+              <Ionicons name="chevron-back" size={24} color={colors.primary} />
+            </TouchableOpacity>
+            <View>
+              <Text style={styles.titulo}>Alias y CBU</Text>
+              <Text style={styles.subtitulo}>{nombreUsuario}</Text>
             </View>
-            <Text style={styles.cardTitle}>Configurar CBU/Alias</Text>
           </View>
-
-          <Text style={styles.descripcion}>
-            Ingresa tu Alias o CBU para que los demas participantes sepan donde transferirte cuando te deban dinero.
-          </Text>
-
-          <Text style={styles.label}>ALIAS O CBU</Text>
-          <TextInput
-            style={styles.input}
-            placeholder="Ej: mi.alias.mp"
-            placeholderTextColor={colors.accent || '#9DB2BF'}
-            value={alias}
-            onChangeText={(text) => setAlias(text.toLowerCase())}
-            autoCapitalize="none"
-            autoCorrect={false}
-          />
-
-          <View style={styles.infoContainer}>
-            <Ionicons name="information-circle-outline" size={16} color={colors.textSecondary} />
-            <Text style={styles.infoText}>Entre 6 y 22 caracteres. Letras, numeros, guiones o puntos.</Text>
-          </View>
-
-          <TouchableOpacity
-            style={[styles.btnGuardar, guardando && styles.btnDisabled]}
-            onPress={handleGuardar}
-            disabled={guardando || eliminando}
-          >
-            {guardando ? (
-              <ActivityIndicator color="white" />
-            ) : (
-              <Text style={styles.btnGuardarTexto}>Guardar cambios</Text>
-            )}
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={[styles.btnEliminar, (!aliasGuardado || eliminando || guardando) && styles.btnDisabled]}
-            onPress={handleEliminar}
-            disabled={!aliasGuardado || eliminando || guardando}
-          >
-            {eliminando ? (
-              <ActivityIndicator color={colors.textSecondary} />
-            ) : (
-              <Text style={[styles.btnEliminarTexto, !aliasGuardado && styles.btnEliminarTextoDisabled]}>
-                Eliminar Alias/CBU
-              </Text>
-            )}
-          </TouchableOpacity>
         </View>
-      </ScrollView>
+
+        <ScrollView contentContainerStyle={styles.content}>
+          <View style={styles.card}>
+            <View style={styles.cardHeader}>
+              <View style={styles.iconContainer}>
+                <Ionicons name="card-outline" size={24} color={colors.primary} />
+              </View>
+              <Text style={styles.cardTitle}>Configurar CBU/Alias</Text>
+            </View>
+
+            <Text style={styles.descripcion}>
+              Ingresá tu Alias o CBU para que los demás participantes sepan dónde transferirte cuando te deban dinero.
+            </Text>
+
+            <Text style={styles.label}>ALIAS O CBU</Text>
+            <TextInput
+              style={styles.input}
+              placeholder="Ej: mi.alias.mp"
+              placeholderTextColor={colors.accent || '#9DB2BF'}
+              value={alias}
+              onChangeText={(text) => setAlias(text.toLowerCase())}
+              autoCapitalize="none"
+              autoCorrect={false}
+            />
+
+            <View style={styles.infoContainer}>
+              <Ionicons name="information-circle-outline" size={16} color={colors.textSecondary} />
+              <Text style={styles.infoText}>Entre 6 y 22 caracteres. Letras, números, guiones o puntos.</Text>
+            </View>
+
+            <TouchableOpacity
+              style={[styles.btnGuardar, guardando && styles.btnDisabled]}
+              onPress={handleGuardar}
+              disabled={guardando || eliminando}
+            >
+              {guardando ? (
+                <ActivityIndicator color="white" />
+              ) : (
+                <Text style={styles.btnGuardarTexto}>Guardar cambios</Text>
+              )}
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[styles.btnEliminar, (!aliasGuardado || eliminando || guardando) && styles.btnDisabled]}
+              onPress={handleEliminar}
+              disabled={!aliasGuardado || eliminando || guardando}
+            >
+              {eliminando ? (
+                <ActivityIndicator color={colors.textSecondary} />
+              ) : (
+                <Text style={[styles.btnEliminarTexto, !aliasGuardado && styles.btnEliminarTextoDisabled]}>
+                  Eliminar Alias/CBU
+                </Text>
+              )}
+            </TouchableOpacity>
+          </View>
+        </ScrollView>
+      </View>
     </KeyboardAvoidingView>
   );
 }

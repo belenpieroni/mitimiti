@@ -51,7 +51,7 @@ export default function PerfilScreen() {
   };
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+    <ScrollView style={styles.container} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
       <View style={styles.headerRow}>
         <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
           <Ionicons name="chevron-back" size={22} color={colors.textSecondary} />
@@ -93,7 +93,7 @@ export default function PerfilScreen() {
 
       <TouchableOpacity style={styles.logoutBtn} onPress={logout}>
         <Ionicons name="log-out-outline" size={20} color="#D64B3B" />
-        <Text style={styles.logoutText}>Cerrar sesion</Text>
+        <Text style={styles.logoutText}>Cerrar sesión</Text>
       </TouchableOpacity>
     </ScrollView>
   );
@@ -112,7 +112,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginRight: 14,
   },
-  headerTitle: { fontSize: 36 / 2, fontWeight: '700', color: colors.textPrimary },
+  headerTitle: { fontSize: 18, fontWeight: '700', color: colors.textPrimary },
   profileTop: { alignItems: 'center', marginBottom: 24 },
   avatar: {
     width: 110,
@@ -123,9 +123,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 14,
   },
-  avatarText: { color: 'white', fontSize: 46 / 2, fontWeight: '700' },
-  name: { fontSize: 22 / 2, fontWeight: '700', color: colors.textPrimary, marginBottom: 4 },
-  email: { fontSize: 14 / 1.7, color: '#446380', fontWeight: '500' },
+  avatarText: { color: 'white', fontSize: 23, fontWeight: '700' },
+  name: { fontSize: 11, fontWeight: '700', color: colors.textPrimary, marginBottom: 4 },
+  email: { fontSize: 8.2, color: '#446380', fontWeight: '500' },
   statsCard: {
     backgroundColor: '#F5F6F8',
     borderRadius: 20,
@@ -163,7 +163,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  itemLabel: { color: colors.textPrimary, fontSize: 16 / 1.2, fontWeight: '600' },
+  itemLabel: { color: colors.textPrimary, fontSize: 13.3, fontWeight: '600' },
   logoutBtn: {
     marginTop: 22,
     borderRadius: 20,
@@ -176,5 +176,5 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: 10,
   },
-  logoutText: { color: '#D64B3B', fontSize: 16 / 1.1, fontWeight: '700' },
+  logoutText: { color: '#D64B3B', fontSize: 14.5, fontWeight: '700' },
 });

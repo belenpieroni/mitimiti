@@ -210,6 +210,17 @@ function RootTabs() {
                 </View>
               </TouchableOpacity>
 
+              {/* Nuevo gasto de Vivienda */}
+              <View style={[mStyles.optionCard, mStyles.optionDisabled]}>
+                <View style={[mStyles.optionIconBg, { backgroundColor: '#F0F5F9' }]}>
+                  <Ionicons name="home-outline" size={24} color={colors.textSecondary} />
+                </View>
+                <View>
+                  <Text style={mStyles.optionTitle}>Nuevo gasto de vivienda</Text>
+                  <Text style={mStyles.optionTitle}>(Próximamente)</Text>
+                  <Text style={mStyles.optionSubtitle}>Super, internet, expensas...</Text>
+                </View>
+              </View>
             </View>
           </View>
         </KeyboardAvoidingView>
@@ -238,6 +249,19 @@ export default function AppNavigator() {
             <Stack.Screen name="Login" component={LoginScreen} />
           )}
         </Stack.Navigator>
+        {state.isLoading ? (
+          <Stack.Navigator screenOptions={{ headerShown: false }}>
+            <Stack.Screen name="Bootstrap" component={BootstrapScreen} />
+          </Stack.Navigator>
+        ) : state.isAuthenticated ? (
+          <Stack.Navigator screenOptions={{ headerShown: false }}>
+            <Stack.Screen name="MainTabs" component={RootTabs} />
+            <Stack.Screen name="Perfil" component={PerfilScreen} />
+            <Stack.Screen name="PerfilAlias" component={PerfilAliasScreen} />
+          </Stack.Navigator>
+        ) : (
+          <LoginScreen />
+        )}
       </NavigationContainer>
     </AuthContext.Provider>
   );
