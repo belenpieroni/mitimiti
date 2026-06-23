@@ -4,24 +4,49 @@ import {
   ScrollView, StyleSheet, KeyboardAvoidingView, Platform, Alert
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import DateTimePicker from '@react-native-community/datetimepicker';
 import { colors } from '../theme/colors';
 import { getIniciales, coloresDisponibles } from './JuntadasScreen';
 import { crearJuntada as crearJuntadaService, editarJuntada as editarJuntadaService } from '../services/juntadasService';
+import { useAuth } from '../navigation/AppNavigator';
 
-const usuarioActual = { nombre: 'Martín', iniciales: 'MR', color: colors.primary };
-
-function getFechaHoy() {
-  const hoy = new Date();
-  return hoy.toLocaleDateString('es-AR', { day: 'numeric', month: 'short', year: 'numeric' });
+function formatFecha(date) {
+  return date.toLocaleDateString('es-AR', { day: 'numeric', month: 'short', year: 'numeric' });
 }
 
 export default function CrearJuntadaScreen({ navigation, route }) {
+  const { user } = useAuth();
+  const nombreUsuarioLogueado = user?.name || user?.nombre || 'Yo';
+  const usuarioActual = { 
+    nombre: nombreUsuarioLogueado, 
+    iniciales: getIniciales(nombreUsuarioLogueado), 
+    color: colors.primary 
+  };
+
   const editando = route.params?.juntadaId ? route.params : null;
 
   const [nombre, setNombre] = useState(editando?.nombre || '');
   const [descripcion, setDescripcion] = useState(editando?.descripcion || '');
   const [inputPersona, setInputPersona] = useState('');
   const [personas, setPersonas] = useState(editando?.participantes || [usuarioActual]);
+
+  const [fecha, setFecha] = useState(() => {
+    if (editando?.fecha) {
+      const parsed = Date.parse(editando.fecha);
+      if (!isNaN(parsed)) return new Date(parsed);
+    }
+    return new Date();
+  });
+  const [showPicker, setShowPicker] = useState(false);
+
+  const onChangeFecha = (event, selectedDate) => {
+    if (Platform.OS === 'android') {
+      setShowPicker(false);
+    }
+    if (selectedDate) {
+      setFecha(selectedDate);
+    }
+  };
 
   function agregarPersona() {
     const nombreLimpio = inputPersona.trim();
@@ -38,22 +63,26 @@ export default function CrearJuntadaScreen({ navigation, route }) {
     setInputPersona('');
   }
 
-  function quitarPersona(nombre) {
-    if (nombre === usuarioActual.nombre) return; // no se puede quitar al usuario actual
-    setPersonas(personas.filter(p => p.nombre !== nombre));
+  function quitarPersona(nombreAQuitar) {
+    if (nombreAQuitar === usuarioActual.nombre) return;
+    setPersonas(personas.filter(p => p.nombre !== nombreAQuitar));
   }
 
   async function crearJuntada() {
     if (!nombre.trim()) return;
     try {
       if (editando) {
-        await editarJuntadaService(editando.juntadaId, { nombre: nombre.trim(), descripcion: descripcion.trim() });
+        await editarJuntadaService(editando.juntadaId, { 
+          nombre: nombre.trim(), 
+          descripcion: descripcion.trim(),
+          fecha: formatFecha(fecha)
+        });
       } else {
         const nueva = {
           id: Date.now().toString(),
           nombre: nombre.trim(),
           descripcion: descripcion.trim(),
-          fecha: getFechaHoy(),
+          fecha: formatFecha(fecha),
           participantes: personas,
           gastos: [],
           deuda: 0,
@@ -111,17 +140,25 @@ export default function CrearJuntadaScreen({ navigation, route }) {
 
           {/* Fecha */}
           <Text style={styles.label}>FECHA</Text>
-          <View style={styles.inputFecha}>
-            <Text style={styles.inputFechaTexto}>Hoy, {getFechaHoy()}</Text>
-          </View>
+          <TouchableOpacity style={styles.inputFecha} onPress={() => setShowPicker(true)}>
+            <Text style={styles.inputFechaTexto}>{formatFecha(fecha)}</Text>
+            <Ionicons name="calendar-outline" size={20} color={colors.textSecondary} />
+          </TouchableOpacity>
+
+          {/* DATETIMEPICKER */}
+          {showPicker && (
+            <DateTimePicker
+              value={fecha}
+              mode="date"
+              display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+              minimumDate={new Date()}
+              onChange={onChangeFecha}
+            />
+          )}
 
           {/* Participantes */}
           <View style={styles.participantesHeader}>
             <Text style={styles.label}>PARTICIPANTES · {personas.length}</Text>
-            {/* <TouchableOpacity style={styles.btnNuevaPersona} onPress={agregarPersona}>
-              <Ionicons name="person-add-outline" size={14} color="white" />
-              <Text style={styles.btnNuevaPersonaTexto}>Nueva persona</Text>
-            </TouchableOpacity> */}
           </View>
 
           {/* Input agregar persona */}
@@ -200,18 +237,13 @@ const styles = StyleSheet.create({
   },
   inputFecha: {
     backgroundColor: colors.cardBg, borderRadius: 12, padding: 14,
+    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center'
   },
   inputFechaTexto: { fontSize: 15, color: colors.textPrimary },
   participantesHeader: {
     flexDirection: 'row', justifyContent: 'space-between',
     alignItems: 'center', marginTop: 16, marginBottom: 8,
   },
-  btnNuevaPersona: {
-    flexDirection: 'row', alignItems: 'center', gap: 4,
-    backgroundColor: colors.primary, paddingHorizontal: 12,
-    paddingVertical: 6, borderRadius: 20,
-  },
-  btnNuevaPersonaTexto: { color: 'white', fontSize: 12, fontWeight: '600' },
   inputPersonaFila: { flexDirection: 'row', gap: 8, marginBottom: 12 },
   btnAgregar: {
     width: 48, height: 48, borderRadius: 12,
