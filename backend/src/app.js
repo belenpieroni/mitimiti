@@ -10,6 +10,7 @@ const viviendaRouter = require('./routes/vivienda');
 const uploadsRouter = require('./routes/uploads');
 const { errorHandler, notFound } = require('./middleware/errorHandler');
 const { iniciarCron } = require('./services/cronService');
+const authRouter = require('./routes/auth');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -37,14 +38,13 @@ app.use('/api/perfiles', perfilesRoutes);
 app.use(notFound);
 app.use(errorHandler);
 
-// Justo antes de app.listen
 app._router.stack.forEach(r => {
   if (r.name === 'router') console.log('Router registrado:', r.regexp);
 });
 
 // ── Arranque ──────────────────────────────────────────────────────────────────
 app.listen(PORT, () => {
-  console.log(`✅  Miti Miti backend escuchando en http://localhost:${PORT}`);
+  console.log(`    Miti Miti backend escuchando en http://localhost:${PORT}`);
   console.log(`    Docs de endpoints disponibles en /api/juntadas`);
   iniciarCron();
 });
