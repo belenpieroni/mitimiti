@@ -1,4 +1,4 @@
-import React, { useState, useRef, useCallback } from 'react';
+import React, { useState, useCallback } from 'react';
 import {
   View,
   Text,
@@ -14,6 +14,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { colors } from '../theme/colors';
 import { useFocusEffect } from '@react-navigation/native';
+import { useAuth } from '../navigation/AppNavigator';
 
 const API_BASE = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3000/api';
 
@@ -24,10 +25,10 @@ if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental
 const getIcono = (tipo) => (tipo === 'Vivienda' ? "home-outline" : "balloon-outline");
 
 export default function DeudasScreen() {
+  const { user } = useAuth();
   const [expandedId, setExpandedId] = useState(null);
   const [confirmingId, setConfirmingId] = useState(null);
   const [loading, setLoading] = useState(true);
-  const didLoadRef = useRef(false);
   
   // Estados inicializados vacíos para consumir del backend
   const [pendientes, setPendientes] = useState([]);
@@ -35,10 +36,16 @@ export default function DeudasScreen() {
 
   // Función para obtener datos del backend
   const cargarDeudas = async () => {
+    const nombreUsuario = user?.name || user?.nombre;
+    if (!nombreUsuario) {
+      setPendientes([]);
+      setLoading(false);
+      return;
+    }
+
     try {
       setLoading(true);
-      const nombre = 'Martín';
-      const url = `${API_BASE}/deudas/consolidado/${encodeURIComponent(nombre)}`;
+      const url = `${API_BASE}/deudas/consolidado/${encodeURIComponent(nombreUsuario)}`;
       const response = await fetch(url);
       const data = await response.json();
 
@@ -57,11 +64,8 @@ export default function DeudasScreen() {
 
   useFocusEffect(
     useCallback(() => {
-      if (!didLoadRef.current) {
-        didLoadRef.current = true;
-        cargarDeudas();
-      }
-    }, [])
+      cargarDeudas();
+    }, [user])
   );
 
   const totalAPagar = pendientes.reduce((acc, a) => acc + a.totalAcreedor, 0);
@@ -69,7 +73,7 @@ export default function DeudasScreen() {
 
   const handleConfirmarPago = async (acreedor, concepto) => {
     try {
-      const response = await fetch(`${API_BASE}/deudas/pagar/${concepto.id}`, {
+      const response = await fetch(`${API_BASE}/deudas/pagar/${encodeURIComponent(concepto.id)}`, {
         method: 'PATCH'
       });
       const data = await response.json();
@@ -102,13 +106,15 @@ export default function DeudasScreen() {
 
   const handlePagarTodo = async (acreedor) => {
     try {
-      const response = await fetch(`${API_BASE}/deudas/pagar/${acreedor.id}`, {
-        method: 'PATCH'
-      });
-      const data = await response.json();
+      for (const concepto of acreedor.conceptos) {
+        const response = await fetch(`${API_BASE}/deudas/pagar/${encodeURIComponent(concepto.id)}`, {
+          method: 'PATCH'
+        });
+        const data = await response.json();
 
-      if (!response.ok || !data.ok) {
-        throw new Error(data?.error || 'No se pudo pagar todo');
+        if (!response.ok || !data.ok) {
+          throw new Error(data?.error || 'No se pudo pagar todo');
+        }
       }
 
       LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);

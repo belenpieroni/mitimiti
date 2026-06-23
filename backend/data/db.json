@@ -1,6 +1,56 @@
 {
   "juntadas": [
     {
+      "id": "5ecae5c0-fe1b-4fb3-afce-f406a392321e",
+      "nombre": "Cumpleaños",
+      "descripcion": "Random",
+      "fecha": "2026-06-23",
+      "creadaEn": "2026-06-23T21:33:22.620Z",
+      "participantes": [
+        {
+          "id": "f7667c8a-56bf-4b09-b7c7-d442e8574c23",
+          "nombre": "Thiago",
+          "iniciales": "TH",
+          "color": "#473472"
+        },
+        {
+          "id": "413b438e-27d4-40e7-9dd6-7c9138d4ab60",
+          "nombre": "Ivo",
+          "iniciales": "IV",
+          "color": "#526D82"
+        },
+        {
+          "id": "ce5b18bc-a98e-4544-a998-214feafce48a",
+          "nombre": "Belen",
+          "iniciales": "BE",
+          "color": "#9DB2BF"
+        }
+      ],
+      "gastos": [
+        {
+          "id": "14035dce-bbb8-4427-86c8-1af981983f7f",
+          "nombre": "Asado",
+          "pagador": "Ivo",
+          "splitMode": "equal",
+          "splitSubgroups": [],
+          "beneficiarios": [],
+          "monto": 15000,
+          "ticketPhoto": null,
+          "creadoEn": "2026-06-23T21:33:39.790Z"
+        }
+      ],
+      "subgrupos": [],
+      "pagosDeudas": [
+        {
+          "id": "26750fbf-2607-4c51-a5ac-2aeaef7faab5",
+          "de": "Thiago",
+          "para": "Ivo",
+          "monto": 5000,
+          "creadoEn": "2026-06-23T21:41:09.909Z"
+        }
+      ]
+    },
+    {
       "id": "cfaff7d9-f5a6-4671-a365-5fdd5337734d",
       "nombre": "asadu",
       "descripcion": "sas",

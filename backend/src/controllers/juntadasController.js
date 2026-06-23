@@ -55,6 +55,9 @@ function listarJuntadas(req, res, next) {
         
         // CORREGIDO: Buscamos dinámicamente el saldo del usuario actual, chau 'Martín'
         const saldoUsuario = balance.saldos.find((s) => s.nombre.toLowerCase() === usuario.toLowerCase());
+        const saldoNetoUsuario = saldoUsuario
+          ? (typeof saldoUsuario.saldoPendiente === 'number' ? saldoUsuario.saldoPendiente : saldoUsuario.saldo)
+          : 0;
         console.log('Usuario recibido:', req.query.usuario);
         return {
           id: j.id,
@@ -66,11 +69,11 @@ function listarJuntadas(req, res, next) {
           totalGastado: balance.totalGastado,
           participantes: j.participantes,
           // Info de deuda real para este usuario
-          deuda: saldoUsuario ? Math.abs(saldoUsuario.saldo) : 0,
+          deuda: Math.abs(saldoNetoUsuario),
           tipo: saldoUsuario
-            ? saldoUsuario.saldo > 0.01
+            ? saldoNetoUsuario > 0.01
               ? 'cobrar'
-              : saldoUsuario.saldo < -0.01
+              : saldoNetoUsuario < -0.01
               ? 'pagar'
               : 'ninguna'
             : 'ninguna',
@@ -171,9 +174,38 @@ function editarJuntada(req, res, next) {
       err.status = 404;
       return next(err);
     }
-    const { nombre, descripcion } = req.body;
+    const { nombre, descripcion, participantes } = req.body;
     if (nombre !== undefined) juntada.nombre = nombre.trim();
     if (descripcion !== undefined) juntada.descripcion = descripcion.trim();
+
+    // Si vienen participantes, solo agregamos los nuevos por nombre (no eliminamos existentes)
+    // para evitar inconsistencias con gastos ya cargados.
+    if (Array.isArray(participantes)) {
+      const nombresActuales = new Set(
+        juntada.participantes.map((p) => p.nombre.toLowerCase())
+      );
+
+      const baseIndex = juntada.participantes.length;
+      const nuevos = participantes
+        .filter((p) => p?.nombre && p.nombre.trim() !== '')
+        .filter((p) => !nombresActuales.has(p.nombre.trim().toLowerCase()))
+        .map((p, idx) => {
+          const nombreLimpio = p.nombre.trim();
+          return {
+            id: p.id || uuidv4(),
+            nombre: nombreLimpio,
+            iniciales: p.iniciales || getIniciales(nombreLimpio),
+            color:
+              p.color ||
+              COLORES_DISPONIBLES[
+                (baseIndex + idx) % COLORES_DISPONIBLES.length
+              ],
+          };
+        });
+
+      juntada.participantes.push(...nuevos);
+    }
+
     escribirDB(db);
     res.json({ ok: true, data: juntada });
   } catch (err) {
