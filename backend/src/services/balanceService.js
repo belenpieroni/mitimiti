@@ -1,21 +1,11 @@
 /**
  * balanceService.js
  * ─────────────────
- * Lógica de negocio central de Miti Miti:
- *
- *  1. calcularBalance(juntada)
- *     → División equitativa: total gastado / cantidad de participantes.
- *     → Devuelve cuánto pagó cada uno vs. lo que le correspondía pagar.
- *
- *  2. calcularLiquidacion(saldos)
- *     → Algoritmo greedy de liquidación eficiente:
- *        minimiza la cantidad de transferencias necesarias para saldar todas las deudas.
- *     → Devuelve un array de { de, para, monto }.
+ * Lógica de negocio central de Miti Miti (Versión Familiar por Consumo)
  */
  
 /**
  * Redondea a 2 decimales para evitar errores de punto flotante.
- * Ej: 1666.6666666667 → 1666.67
  */
 function redondear(n) {
   return Math.round(n * 100) / 100;
@@ -55,25 +45,18 @@ function aplicarPagosATransferencias(transferencias, pagosDeudas = []) {
 }
  
 /**
- * Dado un objeto juntada (con participantes y gastos), calcula:
- *  - totalGastado
- *  - parteIgualPorPersona (cuánto le toca a cada uno)
- *  - saldos: array con { nombre, pagado, corresponde, saldo }
- *      saldo > 0 → le deben (acreedor)
- *      saldo < 0 → debe (deudor)
- *  - transferencias: lista mínima de pagos para saldar todo
- *
- * @param {Object} juntada
- * @returns {Object} balance
+ * Dado un objeto juntada (con participantes, gastos y subgrupos), calcula:
+ * - totalGastado
+ * - saldos: array con deudas consolidadas por grupo familiar (sin deudas internas)
+ * - transferencias: lista mínima de pagos entre familias/unidades
  */
 function calcularBalance(juntada) {
   const { participantes = [], gastos = [], subgrupos = [], pagosDeudas = [] } = juntada;
   const n = participantes.length;
  
   const totalGastado = gastos.reduce((sum, g) => sum + g.monto, 0);
-  const parteIgual = n > 0 ? redondear(totalGastado / n) : 0;
  
-  // Cuánto pagó cada participante
+  // Trackers individuales iniciales de consumo y pago real
   const pagadoPor = {};
   const correspondePor = {};
 
@@ -82,39 +65,76 @@ function calcularBalance(juntada) {
     correspondePor[p.nombre] = 0;
   });
 
+  // 1. PROCESAR CADA GASTO SEGÚN CONSUMO REAL (Checklist de beneficiarios)
   gastos.forEach((g) => {
+    // Acreditar el pago a la persona física que puso la plata
     if (pagadoPor[g.pagador] !== undefined) {
       pagadoPor[g.pagador] = redondear(pagadoPor[g.pagador] + g.monto);
     }
-    // Si el pagador no está en la lista de participantes lo ignoramos (dato inconsistente)
 
-    if (g.splitMode === 'subgroups' && g.splitSubgroups && g.splitSubgroups.length > 0) {
-      const gruposSeleccionados = subgrupos.filter(s => g.splitSubgroups.includes(s.id));
+    // Sistema de Checklist: si viene el array 'beneficiarios' con gente tildada, se usa.
+    // Si no viene (gastos viejos o división total), cae en el fallback de dividir entre todos.
+    const consumidores = g.beneficiarios && g.beneficiarios.length > 0 
+      ? g.beneficiarios 
+      : participantes.map(p => p.nombre);
       
-      if (gruposSeleccionados.length > 0) {
-        const cuotaPorGrupo = g.monto / gruposSeleccionados.length;
-        
-        gruposSeleccionados.forEach(sg => {
-          const cuotaIndividual = cuotaPorGrupo / sg.integrantes.length;
-          sg.integrantes.forEach(nombreInt => {
-            if (correspondePor[nombreInt] !== undefined) {
-              correspondePor[nombreInt] += cuotaIndividual;
-            }
-          });
-        });
-      }
-    } else {
-      const cuotaIgual = g.monto / n;
-      participantes.forEach(p => {
-        correspondePor[p.nombre] += cuotaIgual;
+    if (consumidores.length > 0) {
+      // Costo por cabeza real que consumió este ítem específico
+      const cuotaPorCabeza = g.monto / consumidores.length;
+      
+      consumidores.forEach(nombreConsumidor => {
+        if (correspondePor[nombreConsumidor] !== undefined) {
+          correspondePor[nombreConsumidor] += cuotaPorCabeza;
+        }
       });
     }
   });
+
+  // 2. CONSOLIDACIÓN FAMILIAR (El truco mágico)
+  // Para evitar deudas internas, sumamos todo lo pagado y consumido del núcleo 
+  // y se lo asignamos a un "Representante" (el que más pagó). Los demás miembros quedan en 0.
+  const pagadoConsolidado = { ...pagadoPor };
+  const correspondeConsolidado = { ...correspondePor };
+
+  subgrupos.forEach(sg => {
+    const integrantes = sg.integrantes || [];
+    if (integrantes.length <= 1) return; // Si es un colado solo, no hay nada que consolidar
+
+    // Elegimos al representante de la familia: el que haya puesto más plata físicamente.
+    // Si nadie puso un peso todavía, elegimos al primero de la lista por defecto.
+    let representante = integrantes[0];
+    let maxPagado = -1;
+    integrantes.forEach(nombre => {
+      if (pagadoPor[nombre] > maxPagado) {
+        maxPagado = pagadoPor[nombre];
+        representante = nombre;
+      }
+    });
+
+    let grupoTotalPagado = 0;
+    let grupoTotalCorresponde = 0;
+
+    // Sumamos los totales del núcleo familiar
+    integrantes.forEach(nombre => {
+      grupoTotalPagado += pagadoPor[nombre] || 0;
+      grupoTotalCorresponde += correspondePor[nombre] || 0;
+      
+      // Limpiamos la cuenta de los demás integrantes para que no figuren con deudas
+      if (nombre !== representante) {
+        pagadoConsolidado[nombre] = 0;
+        correspondeConsolidado[nombre] = 0;
+      }
+    });
+
+    // El representante absorbe la economía entera de su familia para la liquidación
+    pagadoConsolidado[representante] = grupoTotalPagado;
+    correspondeConsolidado[representante] = grupoTotalCorresponde;
+  });
  
-  // Saldo neto de cada participante
+  // 3. GENERAR SALDOS FINALES LIMPIOS
   const saldos = participantes.map((p) => {
-    const pagado = pagadoPor[p.nombre] || 0;
-    const corresponde = redondear(correspondePor[p.nombre] || 0);
+    const pagado = redondear(pagadoConsolidado[p.nombre] || 0);
+    const corresponde = redondear(correspondeConsolidado[p.nombre] || 0);
     const saldo = redondear(pagado - corresponde);
 
     return {
@@ -123,7 +143,7 @@ function calcularBalance(juntada) {
       color: p.color,
       pagado,
       corresponde,
-      saldo, // positivo → acreedor, negativo → deudor
+      saldo, // positivo -> acreedor, negativo -> deudor, cero -> al día con su familia
     };
   });
  
@@ -149,9 +169,11 @@ function calcularBalance(juntada) {
     saldoPendiente: redondear(saldoPendientePor[s.nombre] || 0),
   }));
  
+  const parteIgual = n > 0 ? redondear(totalGastado / n) : 0;
+
   return {
     totalGastado,
-    parteIgualPorPersona: parteIgual,
+    parteIgualPorPersona: parteIgual, // Queda como dato informativo general
     cantidadParticipantes: n,
     saldos: saldosConPendiente,
     transferenciasOriginales,
@@ -160,38 +182,23 @@ function calcularBalance(juntada) {
 }
  
 /**
- * Algoritmo greedy de liquidación eficiente.
- *
- * Estrategia:
- *  - Ordenar de menor a mayor saldo.
- *  - El primer elemento (más negativo) es el mayor deudor.
- *  - El último elemento (más positivo) es el mayor acreedor.
- *  - Se crea una transferencia por min(|deuda|, crédito).
- *  - Se ajustan los saldos y se repite hasta que todos sean ~0.
- *
- * Esto produce la cantidad mínima de transacciones posibles.
- *
- * @param {Array} saldos - Array de { nombre, saldo }
- * @returns {Array} transferencias - Array de { de, para, monto }
+ * Algoritmo greedy de liquidación eficiente (Se mantiene intacto y funcional)
  */
 function calcularLiquidacion(saldos) {
-  // Trabajamos con una copia profunda para no mutar el array original
   const balances = saldos.map((s) => ({
     nombre: s.nombre,
     saldo: s.saldo,
   }));
  
   const transferencias = [];
-  const EPSILON = 0.01; // tolerancia para evitar micro-deudas por punto flotante
+  const EPSILON = 0.01;
  
   for (let i = 0; i < 1000; i++) {
-    // Ordenar: menor (deudor) primero, mayor (acreedor) último
     balances.sort((a, b) => a.saldo - b.saldo);
  
     const deudor = balances[0];
     const acreedor = balances[balances.length - 1];
  
-    // Condición de parada: nadie debe ni se le debe nada relevante
     if (acreedor.saldo < EPSILON || deudor.saldo > -EPSILON) break;
  
     const monto = redondear(Math.min(Math.abs(deudor.saldo), acreedor.saldo));
@@ -202,7 +209,6 @@ function calcularLiquidacion(saldos) {
       monto,
     });
  
-    // Ajustar saldos
     deudor.saldo = redondear(deudor.saldo + monto);
     acreedor.saldo = redondear(acreedor.saldo - monto);
   }
@@ -211,12 +217,8 @@ function calcularLiquidacion(saldos) {
 }
  
 /**
- * Calcula el saldo global de un participante (por nombre) a través
- * de TODAS sus juntadas. Útil para el HomeScreen / BalanceScreen global.
- *
- * @param {string} nombreParticipante
- * @param {Array}  juntadas
- * @returns {{ porCobrar: number, porPagar: number, total: number }}
+ * Calcula el saldo global de un participante. Al usar la misma función consolidada,
+ * mantiene el historial impecable sin falsas deudas globales en el Home.
  */
 function calcularBalanceGlobal(nombreParticipante, juntadas) {
   let porCobrar = 0;
