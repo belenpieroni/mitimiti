@@ -20,6 +20,39 @@
 function redondear(n) {
   return Math.round(n * 100) / 100;
 }
+
+function clavePar(de, para) {
+  return `${de}__${para}`;
+}
+
+function aplicarPagosATransferencias(transferencias, pagosDeudas = []) {
+  const pagosRestantes = new Map();
+
+  pagosDeudas.forEach((p) => {
+    if (!p?.de || !p?.para || typeof p.monto !== 'number' || p.monto <= 0) return;
+    const key = clavePar(p.de, p.para);
+    const actual = pagosRestantes.get(key) || 0;
+    pagosRestantes.set(key, redondear(actual + p.monto));
+  });
+
+  const pendientes = [];
+  transferencias.forEach((t) => {
+    const key = clavePar(t.de, t.para);
+    const pagoDisponible = pagosRestantes.get(key) || 0;
+    const usado = redondear(Math.min(pagoDisponible, t.monto));
+    const pendiente = redondear(t.monto - usado);
+
+    if (usado > 0) {
+      pagosRestantes.set(key, redondear(pagoDisponible - usado));
+    }
+
+    if (pendiente > 0.01) {
+      pendientes.push({ ...t, monto: pendiente });
+    }
+  });
+
+  return pendientes;
+}
  
 /**
  * Dado un objeto juntada (con participantes y gastos), calcula:
@@ -34,7 +67,7 @@ function redondear(n) {
  * @returns {Object} balance
  */
 function calcularBalance(juntada) {
-  const { participantes = [], gastos = [], subgrupos = [] } = juntada;
+  const { participantes = [], gastos = [], subgrupos = [], pagosDeudas = [] } = juntada;
   const n = participantes.length;
  
   const totalGastado = gastos.reduce((sum, g) => sum + g.monto, 0);
@@ -94,13 +127,34 @@ function calcularBalance(juntada) {
     };
   });
  
-  const transferencias = calcularLiquidacion(saldos);
+  const transferenciasOriginales = calcularLiquidacion(saldos);
+  const transferencias = aplicarPagosATransferencias(transferenciasOriginales, pagosDeudas);
+
+  const saldoPendientePor = {};
+  participantes.forEach((p) => {
+    saldoPendientePor[p.nombre] = 0;
+  });
+
+  transferencias.forEach((t) => {
+    if (saldoPendientePor[t.de] !== undefined) {
+      saldoPendientePor[t.de] = redondear(saldoPendientePor[t.de] - t.monto);
+    }
+    if (saldoPendientePor[t.para] !== undefined) {
+      saldoPendientePor[t.para] = redondear(saldoPendientePor[t.para] + t.monto);
+    }
+  });
+
+  const saldosConPendiente = saldos.map((s) => ({
+    ...s,
+    saldoPendiente: redondear(saldoPendientePor[s.nombre] || 0),
+  }));
  
   return {
     totalGastado,
     parteIgualPorPersona: parteIgual,
     cantidadParticipantes: n,
-    saldos,
+    saldos: saldosConPendiente,
+    transferenciasOriginales,
     transferencias,
   };
 }
@@ -172,9 +226,11 @@ function calcularBalanceGlobal(nombreParticipante, juntadas) {
     const balance = calcularBalance(juntada);
     const saldo = balance.saldos.find((s) => s.nombre === nombreParticipante);
     if (!saldo) return;
+
+    const saldoNeto = typeof saldo.saldoPendiente === 'number' ? saldo.saldoPendiente : saldo.saldo;
  
-    if (saldo.saldo > 0) porCobrar = redondear(porCobrar + saldo.saldo);
-    if (saldo.saldo < 0) porPagar = redondear(porPagar + Math.abs(saldo.saldo));
+    if (saldoNeto > 0) porCobrar = redondear(porCobrar + saldoNeto);
+    if (saldoNeto < 0) porPagar = redondear(porPagar + Math.abs(saldoNeto));
   });
  
   return {
