@@ -453,35 +453,15 @@
         ]
       },
       {
-        "id": "sv2",
-        "nombre": "Factura de Agua",
-        "monto": 30000,
-        "periodicidad": "mensual",
-        "proximoVencimiento": "2026-07-15T00:00:00.000Z",
-        "participantes": [
-          "Martín",
-          "Jorge",
-          "Sofía"
-        ]
-      },
-      {
         "id": "de161cb8-28e1-4627-bf37-1490bb667284",
         "nombre": "Internet / Fibra",
         "monto": 200,
         "periodicidad": "mensual",
-        "proximoVencimiento": "2026-06-23T21:48:08.297Z",
+        "proximoVencimiento": "2026-07-23T21:48:08.297Z",
         "participantes": [
           "Valentina Ortiz",
           "Martín Alves"
         ]
-      },
-      {
-        "id": "e7ed77ce-d633-49d4-b272-a7c2965139b6",
-        "nombre": "agua",
-        "monto": 100000,
-        "periodicidad": "mensual",
-        "proximoVencimiento": "2026-08-23T22:06:20.000Z",
-        "participantes": []
       }
     ],
     "acuerdosReparto": {
@@ -525,6 +505,18 @@
         "fecha": "2026-06-23",
         "pagador": "Thiago",
         "participantes": []
+      },
+      {
+        "id": "2365b1ea-46c7-4c65-b5fe-a64fd422e809",
+        "nombre": "Internet / Fibra",
+        "monto": 200,
+        "categoria": "Hogar",
+        "fecha": "2026-06-23T22:26:06.588Z",
+        "pagador": "Martín",
+        "participantes": [
+          "Valentina Ortiz",
+          "Martín Alves"
+        ]
       }
     ]
   }

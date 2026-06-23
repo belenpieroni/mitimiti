@@ -180,7 +180,18 @@ function eliminarServicio(req, res, next) {
     asegurarEstructuraVivienda(db);
     const { id } = req.params;
 
-    const idx = db.vivienda.serviciosPeriodicos.findIndex(s => s.id === id);
+    const normalizar = (txt = '') =>
+      String(txt)
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .toLowerCase()
+        .replace(/[^a-z0-9]/g, '_');
+
+    const idx = db.vivienda.serviciosPeriodicos.findIndex((s) => {
+      if (String(s.id) === String(id)) return true;
+      // Fallback: permitir eliminar por nombre normalizado para datos legacy.
+      return normalizar(s.nombre) === normalizar(id);
+    });
     if (idx === -1) {
       const err = new Error('Servicio no encontrado');
       err.status = 404;

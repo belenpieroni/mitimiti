@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import {
   View, Text, StyleSheet, TextInput, TouchableOpacity,
-  ScrollView, Alert, Modal, Platform,
+  ScrollView, Alert, Modal, Platform, KeyboardAvoidingView,
 } from 'react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { Ionicons } from '@expo/vector-icons';
@@ -236,6 +236,10 @@ export default function AgregarViviendaScreen({ route, navigation }) {
   const [modalServicioVisible, setModalServicioVisible] = useState(false);
   const [regla, setRegla] = useState(null);
   const [pagador, setPagador] = useState('');
+  const [participantesServicio, setParticipantesServicio] = useState([]);
+  const [nuevoParticipanteServicio, setNuevoParticipanteServicio] = useState('');
+  const [participantesGasto, setParticipantesGasto] = useState([]);
+  const [nuevoParticipanteGasto, setNuevoParticipanteGasto] = useState('');
 
   // ── FECHA DE VENCIMIENTO: estado propio, separado de new Date() ───────────
   // El bug original usaba siempre new Date() al guardar en lugar del valor
@@ -259,6 +263,10 @@ const [fechaVencimiento, setFechaVencimiento] = useState(new Date());
       if (data.categoria) setCategoria(data.categoria);
       // Al editar, pre-cargamos la fecha existente del registro
       if (data.proximoVencimiento) setFechaVencimiento(new Date(data.proximoVencimiento));
+      if (Array.isArray(data.participantes)) {
+        setParticipantesServicio(data.participantes);
+        setParticipantesGasto(data.participantes);
+      }
     }
   }, [editMode, data]);
 
@@ -277,8 +285,41 @@ const [fechaVencimiento, setFechaVencimiento] = useState(new Date());
       r => r.nombre.toLowerCase().trim() === nombreSeleccionado.toLowerCase().trim()
     );
     setRegla(encontrada ?? null);
+    const participantesRegla = (encontrada?.participantes ?? []).map((p) => p.nombre).filter(Boolean);
+    setParticipantesServicio(participantesRegla);
+    setParticipantesGasto(participantesRegla);
     setModalServicioVisible(false);
   }, [reglas]);
+
+  const agregarParticipanteServicio = () => {
+    const nombreLimpio = nuevoParticipanteServicio.trim();
+    if (!nombreLimpio) return;
+    const yaExiste = participantesServicio.some(
+      (p) => p.toLowerCase() === nombreLimpio.toLowerCase()
+    );
+    if (yaExiste) return;
+    setParticipantesServicio((prev) => [...prev, nombreLimpio]);
+    setNuevoParticipanteServicio('');
+  };
+
+  const quitarParticipanteServicio = (nombreAQuitar) => {
+    setParticipantesServicio((prev) => prev.filter((p) => p !== nombreAQuitar));
+  };
+
+  const agregarParticipanteGasto = () => {
+    const nombreLimpio = nuevoParticipanteGasto.trim();
+    if (!nombreLimpio) return;
+    const yaExiste = participantesGasto.some(
+      (p) => p.toLowerCase() === nombreLimpio.toLowerCase()
+    );
+    if (yaExiste) return;
+    setParticipantesGasto((prev) => [...prev, nombreLimpio]);
+    setNuevoParticipanteGasto('');
+  };
+
+  const quitarParticipanteGasto = (nombreAQuitar) => {
+    setParticipantesGasto((prev) => prev.filter((p) => p !== nombreAQuitar));
+  };
 
   const handleMontoChange = (text) => {
     const raw = text.replace(/^\$\s*/, '').replace(/\D/g, '');
@@ -296,6 +337,8 @@ const [fechaVencimiento, setFechaVencimiento] = useState(new Date());
     if (montoNumerico <= 0) { Alert.alert('Error', 'El monto debe ser mayor a 0'); return; }
     // Validamos que el usuario haya elegido una fecha real en el picker
     if (esServicio && !fechaVencimiento) { Alert.alert('Error', 'Seleccioná la fecha de vencimiento'); return; }
+    if (esServicio && participantesServicio.length === 0) { Alert.alert('Error', 'Agregá al menos un participante al servicio'); return; }
+    if (!esServicio && participantesGasto.length === 0) { Alert.alert('Error', 'Agregá al menos un participante involucrado en el gasto'); return; }
     if (!esServicio && !pagador) { Alert.alert('Error', 'Debes seleccionar quién pagó'); return; }
 
     console.log("Iniciando guardado...");
@@ -312,7 +355,7 @@ const [fechaVencimiento, setFechaVencimiento] = useState(new Date());
           periodicidad: frecuencia.toLowerCase(),
           // ✅ FIX: usa la fecha elegida por el usuario, no new Date()
           proximoVencimiento: fechaVencimiento.toISOString(),
-          participantes: regla?.participantes?.map(p => p.nombre) ?? [],
+          participantes: participantesServicio,
         };
         console.log("Enviando Servicio:", JSON.stringify(dataServicio, null, 2));
         response = await crearServicioVivienda(dataServicio);
@@ -323,7 +366,7 @@ const [fechaVencimiento, setFechaVencimiento] = useState(new Date());
           categoria,
           fecha: new Date().toISOString().split('T')[0],
           pagador,
-          participantes: regla?.participantes?.map(p => p.nombre) ?? [],
+          participantes: participantesGasto,
         };
         console.log("Enviando Gasto:", JSON.stringify(dataGasto, null, 2));
         response = await guardarGastoVivienda(dataGasto);
@@ -345,6 +388,11 @@ const [fechaVencimiento, setFechaVencimiento] = useState(new Date());
 
   // ─── Render ───────────────────────────────────────────────────────────────
   return (
+    <KeyboardAvoidingView
+      style={{ flex: 1 }}
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      keyboardVerticalOffset={Platform.OS === 'ios' ? 24 : 0}
+    >
     <View style={styles.container}>
 
       <View style={styles.header}>
@@ -356,7 +404,7 @@ const [fechaVencimiento, setFechaVencimiento] = useState(new Date());
         </Text>
       </View>
 
-      <ScrollView contentContainerStyle={styles.scroll}>
+      <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
 
         {/* Tabs */}
         <View style={styles.tabsRow}>
@@ -505,6 +553,34 @@ const [fechaVencimiento, setFechaVencimiento] = useState(new Date());
         {/* Frecuencia (solo Servicios) */}
         {esServicio && (
           <>
+            <Text style={styles.label}>PARTICIPANTES</Text>
+            <View style={styles.participantesWrap}>
+              {participantesServicio.map((nombreParticipante) => (
+                <TouchableOpacity
+                  key={nombreParticipante}
+                  style={styles.participanteChip}
+                  onPress={() => quitarParticipanteServicio(nombreParticipante)}
+                >
+                  <Text style={styles.participanteChipText}>{nombreParticipante}</Text>
+                  <Ionicons name="close" size={14} color={colors.textSecondary} />
+                </TouchableOpacity>
+              ))}
+            </View>
+
+            <View style={styles.participanteInputRow}>
+              <TextInput
+                style={[styles.input, { flex: 1 }]}
+                placeholder="Agregar participante"
+                value={nuevoParticipanteServicio}
+                onChangeText={setNuevoParticipanteServicio}
+                onSubmitEditing={agregarParticipanteServicio}
+                returnKeyType="done"
+              />
+              <TouchableOpacity style={styles.btnAddParticipante} onPress={agregarParticipanteServicio}>
+                <Ionicons name="add" size={18} color="#fff" />
+              </TouchableOpacity>
+            </View>
+
             <Text style={styles.label}>FRECUENCIA</Text>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.frecuenciaScroll}>
               {FRECUENCIAS.map((f) => (
@@ -562,6 +638,34 @@ const [fechaVencimiento, setFechaVencimiento] = useState(new Date());
         {/* Pagador (solo Gastos) */}
         {!esServicio && (
           <>
+            <Text style={styles.label}>PARTICIPANTES INVOLUCRADOS</Text>
+            <View style={styles.participantesWrap}>
+              {participantesGasto.map((nombreParticipante) => (
+                <TouchableOpacity
+                  key={nombreParticipante}
+                  style={styles.participanteChip}
+                  onPress={() => quitarParticipanteGasto(nombreParticipante)}
+                >
+                  <Text style={styles.participanteChipText}>{nombreParticipante}</Text>
+                  <Ionicons name="close" size={14} color={colors.textSecondary} />
+                </TouchableOpacity>
+              ))}
+            </View>
+
+            <View style={styles.participanteInputRow}>
+              <TextInput
+                style={[styles.input, { flex: 1 }]}
+                placeholder="Agregar participante involucrado"
+                value={nuevoParticipanteGasto}
+                onChangeText={setNuevoParticipanteGasto}
+                onSubmitEditing={agregarParticipanteGasto}
+                returnKeyType="done"
+              />
+              <TouchableOpacity style={styles.btnAddParticipante} onPress={agregarParticipanteGasto}>
+                <Ionicons name="add" size={18} color="#fff" />
+              </TouchableOpacity>
+            </View>
+
             <Text style={styles.label}>¿QUIÉN PAGÓ?</Text>
             {regla?.participantes?.length > 0 ? (
               <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
@@ -598,6 +702,7 @@ const [fechaVencimiento, setFechaVencimiento] = useState(new Date());
 
       </ScrollView>
     </View>
+    </KeyboardAvoidingView>
   );
 }
 
@@ -608,7 +713,7 @@ const styles = StyleSheet.create({
   header:           { flexDirection: 'row', alignItems: 'center', paddingTop: 60, paddingHorizontal: 20, marginBottom: 20 },
   btnBack:          { width: 40, height: 40, backgroundColor: '#fff', borderRadius: 20, justifyContent: 'center', alignItems: 'center', marginRight: 12 },
   headerTitle:      { fontSize: 20, fontWeight: 'bold', color: colors.textPrimary },
-  scroll:           { padding: 20, paddingBottom: 60 },
+  scroll:           { padding: 20, paddingBottom: 140 },
 
   tabsRow:          { flexDirection: 'row', gap: 12, marginBottom: 24 },
   tab:              { flex: 1, backgroundColor: '#fff', padding: 16, borderRadius: 16, borderWidth: 1, borderColor: '#ddd' },
@@ -645,6 +750,12 @@ const styles = StyleSheet.create({
   frecBtnActive:    { backgroundColor: colors.textSecondary, borderColor: colors.textSecondary },
   frecBtnText:      { color: colors.textPrimary, fontWeight: 'bold' },
   frecBtnTextActive:{ color: '#fff' },
+
+  participantesWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 4 },
+  participanteChip: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: '#EEF3F8', borderRadius: 999, paddingVertical: 8, paddingHorizontal: 12 },
+  participanteChipText: { fontSize: 13, color: colors.textPrimary, fontWeight: '600' },
+  participanteInputRow: { flexDirection: 'row', gap: 8, marginTop: 10, alignItems: 'center' },
+  btnAddParticipante: { width: 44, height: 44, borderRadius: 12, backgroundColor: colors.textSecondary, justifyContent: 'center', alignItems: 'center' },
 
   catSelector:      { backgroundColor: '#fff', padding: 16, borderRadius: 12, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   catSelectorText:  { fontSize: 16, color: colors.textPrimary },

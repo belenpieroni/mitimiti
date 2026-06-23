@@ -345,10 +345,11 @@ const guardarRegla = async () => {
           style: 'destructive',
           onPress: async () => {
             try {
-              await eliminarServicioVivienda(srv.id);
+                const idSeguro = srv.id || (srv.nombre || '').toLowerCase().replace(/[^a-z0-9]/g, '_');
+                await eliminarServicioVivienda(idSeguro);
               await cargarData();
             } catch (e) {
-              Alert.alert('Error', 'No se pudo eliminar el servicio');
+                Alert.alert('Error', e?.message || 'No se pudo eliminar el servicio');
             }
           },
         },
