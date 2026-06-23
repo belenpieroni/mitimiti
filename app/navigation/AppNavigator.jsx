@@ -181,7 +181,10 @@ function RootTabs() {
                 style={mStyles.optionCard}
                 onPress={() => {
                   setModalVisible(false);
-                  navigation.navigate('Juntadas', { screen: 'CrearJuntada' });
+                  navigation.navigate('AppTabs', { 
+                    screen: 'Juntadas', 
+                    params: { screen: 'CrearJuntada' } 
+                  });
                 }}
               >
                 <View style={[mStyles.optionIconBg, { backgroundColor: colors.secondary }]}>
@@ -198,7 +201,10 @@ function RootTabs() {
                 style={mStyles.optionCard}
                 onPress={() => {
                   setModalVisible(false);
-                  navigation.navigate('Vivienda', { screen: 'AgregarVivienda' });
+                  navigation.navigate('AppTabs', { 
+                    screen: 'Vivienda', 
+                    params: { screen: 'AgregarVivienda' } 
+                  });
                 }}
               >
                 <View style={[mStyles.optionIconBg, { backgroundColor: '#E3F2FD' }]}>
@@ -210,17 +216,6 @@ function RootTabs() {
                 </View>
               </TouchableOpacity>
 
-              {/* Próximamente */}
-              <View style={[mStyles.optionCard, mStyles.optionDisabled]}>
-                <View style={[mStyles.optionIconBg, { backgroundColor: '#F0F5F9' }]}>
-                  <Ionicons name="home-outline" size={24} color={colors.textSecondary} />
-                </View>
-                <View>
-                  <Text style={mStyles.optionTitle}>Nuevo gasto de vivienda</Text>
-                  <Text style={mStyles.optionTitle}>(Próximamente)</Text>
-                  <Text style={mStyles.optionSubtitle}>Super, internet, expensas...</Text>
-                </View>
-              </View>
             </View>
           </View>
         </KeyboardAvoidingView>
@@ -258,7 +253,6 @@ export default function AppNavigator() {
 
 const styles = StyleSheet.create({
   botonMasContainer: {
-    key: 'botonMasContainer',
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
