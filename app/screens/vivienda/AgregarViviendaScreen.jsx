@@ -174,11 +174,11 @@ const handleChange = (event, selectedDate) => {
       </TouchableOpacity>
 
       {/* Android: diálogo nativo */}
-      {mostrarPicker && (
+      {Platform.OS === 'android' && mostrarPicker && (
         <DateTimePicker
           value={dateValue}
           mode="date"
-          display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+          display="default"
           onChange={handleChange}
         />
       )}
@@ -205,8 +205,10 @@ const handleChange = (event, selectedDate) => {
                 display="spinner"
                 minimumDate={new Date()}
                 onChange={handleChange}
-                style={{ width: '100%' }}
+                style={{ width: '100%', backgroundColor: '#fff' }}
                 locale="es-AR"
+                textColor="#1E293B"
+                themeVariant="light"
               />
             </View>
           </View>
@@ -241,16 +243,6 @@ export default function AgregarViviendaScreen({ route, navigation }) {
   // cuando el usuario selecciona una fecha en el picker.
  // 1. Inicialización
 const [fechaVencimiento, setFechaVencimiento] = useState(new Date());
-const [showDatePicker, setShowDatePicker] = useState(false);
-
-// 2. Función de cambio
-const onFechaChange = (event, selectedDate) => {
-  setShowDatePicker(Platform.OS === 'ios');
-  if (selectedDate) {
-    setFechaVencimiento(selectedDate);
-  }
-};
-
   // ── Carga en modo edición ──────────────────────────────────────────────────
   useEffect(() => {
     if (editMode && data) {

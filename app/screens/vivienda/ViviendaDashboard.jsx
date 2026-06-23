@@ -57,6 +57,20 @@ const ICONS_MAP = {
   'Otro': 'receipt-outline',
 };
 
+const GASTO_ICONS_MAP = {
+  'Supermercado': 'cart-outline',
+  'Comidas y bebidas': 'restaurant-outline',
+  'Transporte': 'car-outline',
+  'Impuestos': 'document-text-outline',
+  'Salud y cuidado personal': 'medkit-outline',
+  'Suscripciones': 'albums-outline',
+  'Hogar': 'home-outline',
+  'Indumentaria': 'shirt-outline',
+  'Shopping': 'bag-outline',
+  'Transferencias': 'swap-horizontal-outline',
+  'Otras categorías': 'pricetag-outline',
+};
+
 // ─── Mapa de modelo (string) → { label, icon } ───────────────────────────────
 const MODELO_MAP = {
   proporcional:      { label: 'Proporcional',   icon: 'bar-chart-outline' },
@@ -97,6 +111,7 @@ const buildFormInicial = () => ({
 export default function ViviendaDashboard({ navigation }) {
   const [gastos, setGastos]       = useState([]);
   const [servicios, setServicios] = useState([]);
+  const [vistaActiva, setVistaActiva] = useState('servicios');
   const [servicioSeleccionado, setServicioSeleccionado] = useState(null);
 
   // Modal Acuerdos
@@ -257,9 +272,30 @@ const guardarRegla = async () => {
           </View>
         </TouchableOpacity>
 
-        <Text style={styles.sectionTitle}>SERVICIOS PERIÓDICOS</Text>
+        <View style={styles.tabsFiltroRow}>
+          <TouchableOpacity
+            style={[styles.tabFiltroBtn, vistaActiva === 'servicios' && styles.tabFiltroBtnActiva]}
+            onPress={() => setVistaActiva('servicios')}
+          >
+            <Text style={[styles.tabFiltroText, vistaActiva === 'servicios' && styles.tabFiltroTextActiva]}>
+              Servicios
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.tabFiltroBtn, vistaActiva === 'gastos' && styles.tabFiltroBtnActiva]}
+            onPress={() => setVistaActiva('gastos')}
+          >
+            <Text style={[styles.tabFiltroText, vistaActiva === 'gastos' && styles.tabFiltroTextActiva]}>
+              Gastos
+            </Text>
+          </TouchableOpacity>
+        </View>
 
-        {(servicios || []).map(srv => {
+        <Text style={styles.sectionTitle}>
+          {vistaActiva === 'servicios' ? 'SERVICIOS PERIÓDICOS' : 'GASTOS PUNTUALES'}
+        </Text>
+
+        {vistaActiva === 'servicios' ? (servicios || []).map(srv => {
           const isUrgente = new Date(srv.proximoVencimiento) - new Date() <= 5 * 24 * 60 * 60 * 1000;
           const iconName  = ICONS_MAP[srv.nombre] || 'receipt-outline';
           const tuParte   = srv.monto / (srv.participantes?.length || 1);
@@ -325,7 +361,42 @@ const guardarRegla = async () => {
 </View>
             </TouchableOpacity>
           );
+        }) : (gastos || []).map(gasto => {
+          const iconName = GASTO_ICONS_MAP[gasto.categoria] || 'receipt-outline';
+          return (
+            <View key={gasto.id} style={styles.servicioCard}>
+              <View style={[styles.servicioIcon, { backgroundColor: '#F0F4F8' }]}>
+                <Ionicons name={iconName} size={24} color={colors.textSecondary} />
+              </View>
+              <View style={styles.servicioInfo}>
+                <Text style={styles.servicioName}>{gasto.nombre}</Text>
+                <Text style={styles.servicioDate}>{gasto.categoria}</Text>
+                <Text style={styles.servicioTuParte}>
+                  {new Date(gasto.fecha).toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric' })}
+                </Text>
+                <Text style={styles.servicioTuParte}>Pagó: {gasto.pagador}</Text>
+              </View>
+              <View style={styles.servicioRight}>
+                <Text style={styles.servicioAmount}>${(gasto.monto || 0).toLocaleString('es-AR')}</Text>
+                <View style={styles.badgeAlDia}><Text style={styles.badgeAlDiaText}>Puntual</Text></View>
+              </View>
+            </View>
+          );
         })}
+
+        {vistaActiva === 'servicios' && (servicios || []).length === 0 && (
+          <View style={styles.emptyState}>
+            <Ionicons name="repeat-outline" size={36} color={colors.textSecondary} />
+            <Text style={styles.emptyStateText}>Todavía no hay servicios cargados</Text>
+          </View>
+        )}
+
+        {vistaActiva === 'gastos' && (gastos || []).length === 0 && (
+          <View style={styles.emptyState}>
+            <Ionicons name="bag-outline" size={36} color={colors.textSecondary} />
+            <Text style={styles.emptyStateText}>Todavía no hay gastos puntuales cargados</Text>
+          </View>
+        )}
       </ScrollView>
 
       {/* ── Modal Detalles Servicio ────────────────────────────────────────── */}
@@ -712,6 +783,12 @@ const styles = StyleSheet.create({
   badgeValue:       { color: '#F1948A', fontSize: 16, fontWeight: 'bold' },
 
   sectionTitle:     { fontSize: 14, fontWeight: '600', color: colors.textPrimary, marginBottom: 16 },
+
+  tabsFiltroRow:    { flexDirection: 'row', backgroundColor: '#EAF4FF', borderRadius: 16, padding: 4, marginBottom: 14, gap: 6 },
+  tabFiltroBtn:     { flex: 1, paddingVertical: 10, borderRadius: 12, alignItems: 'center' },
+  tabFiltroBtnActiva:{ backgroundColor: '#526D82' },
+  tabFiltroText:    { fontSize: 13, fontWeight: '700', color: colors.textSecondary },
+  tabFiltroTextActiva:{ color: '#FFFFFF' },
 
   servicioCard:     { backgroundColor: colors.cardBg, padding: 16, borderRadius: 16, flexDirection: 'row', alignItems: 'flex-start', marginBottom: 12, gap: 12 },
   servicioIcon:     { width: 48, height: 48, borderRadius: 16, backgroundColor: '#FDECEC', justifyContent: 'center', alignItems: 'center' },

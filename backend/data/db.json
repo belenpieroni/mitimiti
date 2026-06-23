@@ -474,6 +474,14 @@
           "Valentina Ortiz",
           "Martín Alves"
         ]
+      },
+      {
+        "id": "e7ed77ce-d633-49d4-b272-a7c2965139b6",
+        "nombre": "agua",
+        "monto": 100000,
+        "periodicidad": "mensual",
+        "proximoVencimiento": "2026-08-23T22:06:20.000Z",
+        "participantes": []
       }
     ],
     "acuerdosReparto": {
@@ -491,7 +499,33 @@
             "porcentaje": 50
           }
         ]
+      },
+      "netflix": {
+        "id": "netflix",
+        "nombre": "Netflix",
+        "modelo": "proporcional",
+        "participantes": [
+          {
+            "nombre": "Martín Alves",
+            "porcentaje": 0
+          },
+          {
+            "nombre": "Ana",
+            "porcentaje": 0
+          }
+        ]
       }
-    }
+    },
+    "gastos": [
+      {
+        "id": "e825ef3f-c3de-4fca-93cb-10234c4acb3f",
+        "nombre": "Super",
+        "monto": 20000,
+        "categoria": "Supermercado",
+        "fecha": "2026-06-23",
+        "pagador": "Thiago",
+        "participantes": []
+      }
+    ]
   }
 }
