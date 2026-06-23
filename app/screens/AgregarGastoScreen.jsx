@@ -64,6 +64,23 @@ export default function AgregarGastoScreen({ route, navigation }) {
     }
   }
 
+  // Tildar o destildar un subgrupo familiar entero
+  function toggleFamiliaCompleta(integrantes) {
+    const todosTildados = integrantes.every(i => seleccionados.includes(i));
+    if (todosTildados) {
+      // Si estaban todos, removemos a todos los integrantes de este grupo
+      setSeleccionados(seleccionados.filter(n => !integrantes.includes(n)));
+    } else {
+      // Si faltaba alguno, agregamos los que no estén seleccionados todavía
+      const nuevos = integrantes.filter(i => !seleccionados.includes(i));
+      setSeleccionados([...seleccionados, ...nuevos]);
+    }
+  }
+
+  // Separar los participantes que no tienen familia asignada ("Sueltos")
+  const integrantesEnGrupos = (juntada?.subgrupos || []).flatMap(sg => sg.integrantes || []);
+  const participantesSueltos = participantes.filter(p => !integrantesEnGrupos.includes(p.nombre));
+
   const montoNum = parseInt(monto) || 0;
   const puedeGuardar = nombre.trim() && montoNum > 0 && pagador && 
     (splitMode === 'equal' ? seleccionados.length > 0 : juntada?.subgrupos?.length > 0);
@@ -289,26 +306,78 @@ export default function AgregarGastoScreen({ route, navigation }) {
                 </View>
               </View>
               
-              <View style={styles.participantesListDivision}>
-                {participantes.map(p => {
-                  const activo = seleccionados.includes(p.nombre);
+              {/* ── CHECKLIST GRUPAL / FAMILIAR ── */}
+              <View style={styles.checklistContainer}>
+                {/* Renderizar Familias */}
+                {(juntada.subgrupos || []).map(sg => {
+                  const todosTildados = sg.integrantes.every(i => seleccionados.includes(i));
                   return (
-                    <TouchableOpacity
-                      key={p.id || p.nombre}
-                      style={[styles.chipParticipante, activo && styles.chipParticipanteActivo]}
-                      onPress={() => toggleParticipante(p.nombre)}
-                      disabled={guardando}
-                      activeOpacity={0.7}
-                    >
-                      <View style={[styles.avatarExtraChico, { backgroundColor: p.color }]}>
-                        <Text style={styles.avatarTextoExtraChico}>{p.iniciales}</Text>
+                    <View key={sg.id} style={styles.familiaCard}>
+                      <View style={styles.familiaHeader}>
+                        <Text style={styles.familiaNombre}>👨‍👩‍👧‍👦 {sg.nombre}</Text>
+                        <TouchableOpacity onPress={() => toggleFamiliaCompleta(sg.integrantes)}>
+                          <Text style={styles.btnFamiliaAction}>
+                            {todosTildados ? 'Quitar grupo' : 'Sumar grupo'}
+                          </Text>
+                        </TouchableOpacity>
                       </View>
-                      <Text style={[styles.chipNombre, activo && { fontWeight: '700', color: 'white' }]}>
-                        {p.nombre}
-                      </Text>
-                    </TouchableOpacity>
+
+                      <View style={styles.participantesListDivision}>
+                        {sg.integrantes.map(nombreInt => {
+                          const p = participantes.find(part => part.nombre === nombreInt);
+                          if (!p) return null;
+                          const activo = seleccionados.includes(p.nombre);
+                          return (
+                            <TouchableOpacity
+                              key={p.id || p.nombre}
+                              style={[styles.chipParticipante, activo && styles.chipParticipanteActivo]}
+                              onPress={() => toggleParticipante(p.nombre)}
+                              disabled={guardando}
+                              activeOpacity={0.7}
+                            >
+                              <View style={[styles.avatarExtraChico, { backgroundColor: p.color }]}>
+                                <Text style={styles.avatarTextoExtraChico}>{p.iniciales}</Text>
+                              </View>
+                              <Text style={[styles.chipNombre, activo && { fontWeight: '700', color: 'white' }]}>
+                                {p.nombre}
+                              </Text>
+                            </TouchableOpacity>
+                          );
+                        })}
+                      </View>
+                    </View>
                   );
                 })}
+
+                {/* Renderizar los que van solos */}
+                {participantesSueltos.length > 0 && (
+                  <View style={styles.familiaCard}>
+                    <View style={styles.familiaHeader}>
+                      <Text style={styles.familiaNombre}>👤 Individuales</Text>
+                    </View>
+                    <View style={styles.participantesListDivision}>
+                      {participantesSueltos.map(p => {
+                        const activo = seleccionados.includes(p.nombre);
+                        return (
+                          <TouchableOpacity
+                            key={p.id || p.nombre}
+                            style={[styles.chipParticipante, activo && styles.chipParticipanteActivo]}
+                            onPress={() => toggleParticipante(p.nombre)}
+                            disabled={guardando}
+                            activeOpacity={0.7}
+                          >
+                            <View style={[styles.avatarExtraChico, { backgroundColor: p.color }]}>
+                              <Text style={styles.avatarTextoExtraChico}>{p.iniciales}</Text>
+                            </View>
+                            <Text style={[styles.chipNombre, activo && { fontWeight: '700', color: 'white' }]}>
+                              {p.nombre}
+                            </Text>
+                          </TouchableOpacity>
+                        );
+                      })}
+                    </View>
+                  </View>
+                )}
               </View>
 
               {montoNum > 0 && seleccionados.length > 0 && (
@@ -384,7 +453,7 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     paddingHorizontal: 20,
-    paddingTop: 8,
+    pt: 8,
     paddingBottom: 40,
   },
   loadingContainer: {
@@ -589,9 +658,38 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 8,
+    marginBottom: 12,
   },
   btnActionTxt: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: colors.primary,
+  },
+  
+  // Agrupación Familiar e Interfaz Checklist
+  checklistContainer: {
+    gap: 14,
+    marginBottom: 12,
+  },
+  familiaCard: {
+    backgroundColor: '#fff',
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(82, 109, 130, 0.15)',
+    padding: 16,
+  },
+  familiaHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  familiaNombre: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: colors.textPrimary,
+  },
+  btnFamiliaAction: {
     fontSize: 12,
     fontWeight: '700',
     color: colors.primary,
@@ -600,18 +698,17 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 10,
-    marginBottom: 12,
   },
   chipParticipante: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-    backgroundColor: '#fff',
+    backgroundColor: '#f8fafc',
     borderRadius: 20,
     paddingVertical: 8,
     paddingHorizontal: 12,
     borderWidth: 1,
-    borderColor: 'rgba(82, 109, 130, 0.15)',
+    borderColor: 'rgba(82, 109, 130, 0.1)',
   },
   chipParticipanteActivo: {
     backgroundColor: colors.primary,
@@ -642,7 +739,7 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
 
-  // Subgrupos list
+  // Subgrupos list (Modo División por Familias puro)
   subgruposListDivision: {
     gap: 12,
     marginBottom: 24,
