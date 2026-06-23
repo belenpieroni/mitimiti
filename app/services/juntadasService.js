@@ -11,6 +11,10 @@ export const agregarParticipante = (juntadaId, p)   => api.post(`/juntadas/${jun
 export const quitarParticipante  = (juntadaId, pid) => api.delete(`/juntadas/${juntadaId}/participantes/${pid}`);
 
 // Gastos
+/**
+ * @param {string} juntadaId 
+ * @param {Object} g - { nombre, pagador, monto, splitMode, splitSubgroups, beneficiarios }
+ */
 export const agregarGasto        = (juntadaId, g)   => api.post(`/juntadas/${juntadaId}/gastos`, g);
 export const eliminarGasto       = (juntadaId, gid) => api.delete(`/juntadas/${juntadaId}/gastos/${gid}`);
 
@@ -20,7 +24,6 @@ export const obtenerBalanceGlobal = (nombre)   => api.get(`/juntadas/balance/glo
 
 // Subgrupos
 export async function agregarSubgrupo(juntadaId, datos) {
-  // datos espera un objeto: { nombre: string, integrantes: string[] }
   const response = await api.post(`/juntadas/${juntadaId}/subgrupos`, datos);
   return response;
 }

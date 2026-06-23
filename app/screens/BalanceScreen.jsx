@@ -75,14 +75,14 @@ export default function BalanceScreen({ route, navigation }) {
   }, [juntadaId]);
 
   useFocusEffect(
-    useCallback(() => { cargarBalance(); }, [cargarBalance])
+    ...[useCallback(() => { cargarBalance(); }, [cargarBalance])]
   );
 
-  // Helper para buscar datos del avatar (color e iniciales)
-  const getPersonaInfo = (nombre) => {
+  // Helper para buscar datos del avatar (color e iniciales) de la familia o persona
+  const getGrupoInfo = (nombre) => {
     if (!balance || !balance.saldos) return { iniciales: nombre.slice(0, 2).toUpperCase(), color: colors.primary };
-    const persona = balance.saldos.find(s => s.nombre === nombre);
-    return persona || { iniciales: nombre.slice(0, 2).toUpperCase(), color: colors.primary };
+    const grupo = balance.saldos.find(s => s.nombre === nombre);
+    return grupo || { iniciales: nombre.slice(0, 2).toUpperCase(), color: colors.primary };
   };
 
   if (cargando) {
@@ -109,20 +109,20 @@ export default function BalanceScreen({ route, navigation }) {
     <View style={styles.container}>
       <Toast visible={toast.visible} message={toast.message} type={toast.type} />
       
-      {/* Header Estilo Figma */}
+      {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity style={styles.btnVolver} onPress={() => navigation.goBack()}>
           <Ionicons name="chevron-back" size={20} color={colors.textPrimary} />
         </TouchableOpacity>
         <View style={styles.headerTextos}>
-          <Text style={styles.titulo}>Balance</Text>
+          <Text style={styles.titulo}>Balance consolidado</Text>
           <Text style={styles.subtitulo}>{balance.nombreEvento} · {formatPesos(balance.totalGastado)} total</Text>
         </View>
       </View>
 
       <ScrollView contentContainerStyle={styles.content}>
         
-       {/* Transferencias Pendientes */}
+        {/* Transferencias Pendientes entre Familias/Grupos */}
         <Text style={styles.seccionTituloPrincipal}>TRANSFERENCIAS PENDIENTES</Text>
         {balance.transferencias.length === 0 ? (
           <View style={styles.saldadoCentrado}>
@@ -131,13 +131,11 @@ export default function BalanceScreen({ route, navigation }) {
           </View>
         ) : (
           balance.transferencias.map((t, i) => {
-            const deInfo = getPersonaInfo(t.de);
-            const paraInfo = getPersonaInfo(t.para);
+            const deInfo = getGrupoInfo(t.de);
+            const paraInfo = getGrupoInfo(t.para);
 
             return (
               <View key={i} style={styles.transCard}>
-                
-                {/* Toda esta zona vuelve a ser clickable para copiar el CBU como hizo tu compañero */}
                 <TouchableOpacity 
                   style={styles.transRowArriba}
                   onPress={() => t.aliasDestino ? handleCopiarAlias(t.aliasDestino) : null}
@@ -156,7 +154,6 @@ export default function BalanceScreen({ route, navigation }) {
                     
                     <Text style={styles.transMontoGrande}>{formatPesos(t.monto)}</Text>
                     
-                    {/* El CBU ahora resalta mucho más y te avisa que se puede copiar */}
                     {t.aliasDestino ? (
                       <View style={styles.aliasPill}>
                         <Ionicons name="copy-outline" size={14} color={colors.primary} />
@@ -178,20 +175,19 @@ export default function BalanceScreen({ route, navigation }) {
                   <Ionicons name="checkmark" size={16} color={colors.greenGlobal} style={{ marginTop: 2 }} />
                   <Text style={styles.btnMarcarPagadoTexto}>Marcar como pagado</Text>
                 </TouchableOpacity>
-
               </View>
             );
           })
         )}
 
-        {/* Resumen Individual */}
-        <Text style={[styles.seccionTituloPrincipal, { marginTop: 32 }]}>RESUMEN INDIVIDUAL</Text>
+        {/* Resumen por Grupo / Familia */}
+        <Text style={[styles.seccionTituloPrincipal, { marginTop: 32 }]}>RESUMEN POR FAMILIA / GRUPO</Text>
         <View style={styles.listaSaldos}>
           {balance.saldos.map((s, i) => (
             <View key={i} style={[styles.saldoFilaFigma, i === balance.saldos.length - 1 && { borderBottomWidth: 0 }]}>
               <View style={styles.saldoFigmaIzq}>
                 <View style={[styles.avatarChico, { backgroundColor: s.color || colors.primary }]}>
-                  <Text style={styles.avatarTexto}>{s.iniciales}</Text>
+                  <Text style={styles.avatarTexto}>{s.iniciales || s.nombre.slice(0,2).toUpperCase()}</Text>
                 </View>
                 <Text style={styles.saldoNombreFigma}>{s.nombre}</Text>
               </View>
@@ -199,13 +195,13 @@ export default function BalanceScreen({ route, navigation }) {
                 styles.saldoMontoFigma, 
                 { color: s.saldo > 0 ? colors.greenGlobal : s.saldo < 0 ? colors.redGlobal : colors.textPrimary }
               ]}>
-                {s.saldo > 0 ? '+' : s.saldo < 0 ? '−' : ''} {formatPesos(s.saldo)}
+                {s.saldo > 0 ? 'A favor: ' : s.saldo < 0 ? 'Debe: ' : ''} {formatPesos(s.saldo)}
               </Text>
             </View>
           ))}
         </View>
 
-        {/* Desplegable de Cálculos */}
+        {/* Desplegable de Cálculos Inteligente */}
         <TouchableOpacity 
           style={styles.acordeonHeader} 
           onPress={() => setMostrarDetalle(!mostrarDetalle)}
@@ -216,7 +212,7 @@ export default function BalanceScreen({ route, navigation }) {
 
         {mostrarDetalle && (
           <View style={styles.cardDetalle}>
-            <Text style={styles.detalleSubtitulo}>Total gastado</Text>
+            <Text style={styles.detalleSubtitulo}>Historial de lo comprado</Text>
             {balance.gastosDetallados?.map((g, i) => (
               <View key={i} style={styles.filaCalculo}>
                 <Text style={styles.calcLabel}>{g.categoria || g.nombre}</Text>
@@ -225,17 +221,16 @@ export default function BalanceScreen({ route, navigation }) {
             ))}
             <View style={styles.linea} />
             <View style={styles.filaCalculo}>
-              <Text style={styles.calcTotalLabel}>Total</Text>
+              <Text style={styles.calcTotalLabel}>Total Gastado</Text>
               <Text style={styles.calcTotalValor}>{formatPesos(balance.totalGastado)}</Text>
             </View>
 
-            <Text style={styles.detalleSubtitulo}>División de gastos</Text>
+            <Text style={styles.detalleSubtitulo}>Criterio de división</Text>
             <View style={styles.filaCalculo}>
-              <Text style={styles.calcLabel}>{formatPesos(balance.totalGastado)} ÷ {balance.cantidadParticipantes} personas</Text>
-              <Text style={styles.calcValorResaltado}>{formatPesos(balance.parteIgualPorPersona)} c/u</Text>
+              <Text style={styles.calcLabel}>Basado en consumo real individual por artículo, consolidado por grupo familiar.</Text>
             </View>
 
-            <Text style={styles.detalleSubtitulo}>Cuánto puso cada uno</Text>
+            <Text style={styles.detalleSubtitulo}>Total aportado por cada grupo</Text>
             {balance.saldos.map((s, i) => (
               <View key={i} style={styles.filaCalculo}>
                 <Text style={styles.calcLabel}>{s.nombre}</Text>
@@ -243,25 +238,29 @@ export default function BalanceScreen({ route, navigation }) {
               </View>
             ))}
 
-            <Text style={styles.detalleSubtitulo}>Por qué cada uno debe lo que debe</Text>
-            <Text style={styles.formula}>Balance = lo que pagó − lo que le corresponde ({formatPesos(balance.parteIgualPorPersona)})</Text>
+            <Text style={styles.detalleSubtitulo}>Desglose final de saldos</Text>
+            <Text style={styles.formula}>Balance = Total Aportado − Consumo Total del Grupo</Text>
             
-            {balance.saldos.map((s, i) => (
-              <View key={i} style={styles.filaExplicacion}>
-                <View style={[styles.avatarExtraChico, { backgroundColor: s.color || colors.primary }]}>
-                  <Text style={styles.avatarTextoExtraChico}>{s.iniciales}</Text>
-                </View>
-                <View style={styles.explicacionTextos}>
-                  <Text style={styles.explicacionNombre}>{s.nombre}</Text>
-                  <Text style={styles.explicacionCalculo}>
-                    {formatPesos(s.pagado)} - {formatPesos(balance.parteIgualPorPersona)}
+            {balance.saldos.map((s, i) => {
+              // Si el backend no envía 's.consumido', lo calculamos como: lo que puso menos su saldo final.
+              const consumidoGrupo = s.consumido !== undefined ? s.consumido : (s.pagado - s.saldo);
+              return (
+                <View key={i} style={styles.filaExplicacion}>
+                  <View style={[styles.avatarExtraChico, { backgroundColor: s.color || colors.primary }]}>
+                    <Text style={styles.avatarTextoExtraChico}>{s.iniciales || s.nombre.slice(0,2).toUpperCase()}</Text>
+                  </View>
+                  <View style={styles.explicacionTextos}>
+                    <Text style={styles.explicacionNombre}>{s.nombre}</Text>
+                    <Text style={styles.explicacionCalculo}>
+                      Aportó {formatPesos(s.pagado)} — Consumió {formatPesos(consumidoGrupo)}
+                    </Text>
+                  </View>
+                  <Text style={[styles.explicacionMonto, { color: s.saldo >= 0 ? colors.greenGlobal : colors.redGlobal }]}>
+                    {s.saldo >= 0 ? '+' : '−'}{formatPesos(s.saldo)}
                   </Text>
                 </View>
-                <Text style={[styles.explicacionMonto, { color: s.saldo >= 0 ? colors.greenGlobal : colors.redGlobal }]}>
-                  {s.saldo >= 0 ? '+' : '−'}{formatPesos(s.saldo)}
-                </Text>
-              </View>
-            ))}
+              );
+            })}
           </View>
         )}
       </ScrollView>
@@ -280,7 +279,6 @@ const styles = StyleSheet.create({
   toastText: { color: 'white', fontWeight: 'bold', fontSize: 14, flex: 1 },
   centrado: { flex: 1, justifyContent: 'center', alignItems: 'center', gap: 12, padding: 32 },
   
-  // Header Figma
   header: {
     flexDirection: 'row', alignItems: 'center',
     paddingHorizontal: 20, paddingTop: 56, paddingBottom: 16, gap: 16,
@@ -295,69 +293,34 @@ const styles = StyleSheet.create({
   subtitulo: { fontSize: 13, color: colors.textSecondary, marginTop: 2 },
   
   content: { padding: 20, paddingBottom: 40 },
-
   seccionTituloPrincipal: {
     fontSize: 12, fontWeight: '700', color: colors.textSecondary,
     letterSpacing: 0.8, marginBottom: 12, textTransform: 'uppercase'
   },
 
-  // Tarjetas de Transferencia (Figma Make UI)
   transCard: {
     backgroundColor: '#fff', borderRadius: 20, padding: 16,
     marginBottom: 16, borderWidth: 1, borderColor: 'rgba(82, 109, 130, 0.12)',
   },
-  transRowArriba: {
-    flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between',
-  },
-  transData: {
-    flex: 1, marginLeft: 16, marginRight: 16,
-  },
-  transNombresRow: {
-    flexDirection: 'row', alignItems: 'center', gap: 6,
-  },
-  transNombreSecundario: {
-    fontSize: 14, color: colors.textSecondary, fontWeight: '500',
-  },
-  transMontoGrande: {
-    fontSize: 22, fontWeight: '800', color: colors.primary, marginTop: 6,
-  },
+  transRowArriba: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between' },
+  transData: { flex: 1, marginLeft: 16, marginRight: 16 },
+  transNombresRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  transNombreSecundario: { fontSize: 14, color: colors.textSecondary, fontWeight: '500' },
+  transMontoGrande: { fontSize: 22, fontWeight: '800', color: colors.primary, marginTop: 6 },
   aliasPill: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'rgba(71, 52, 114, 0.08)', // Un fondo violeta muy suave
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 8,
-    alignSelf: 'flex-start',
-    marginTop: 8,
-    gap: 6,
+    flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(71, 52, 114, 0.08)',
+    paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8, alignSelf: 'flex-start', marginTop: 8, gap: 6,
   },
-  aliasPillTexto: {
-    fontSize: 12,
-    color: colors.primary,
-    fontWeight: '700',
-  },
-  aliasBtn: {
-    flexDirection: 'row', alignItems: 'center', marginTop: 8, gap: 4,
-  },
-  aliasTexto: {
-    fontSize: 12, color: colors.textSecondary,
-  },
-  avatarGrande: {
-    width: 44, height: 44, borderRadius: 22, justifyContent: 'center', alignItems: 'center',
-  },
-  avatarTextoGrande: {
-    color: 'white', fontSize: 14, fontWeight: '700',
-  },
+  aliasPillTexto: { fontSize: 12, color: colors.primary, fontWeight: '700' },
+  avatarGrande: { width: 44, height: 44, borderRadius: 22, justifyContent: 'center', alignItems: 'center' },
+  avatarTextoGrande: { color: 'white', fontSize: 14, fontWeight: '700' },
   
   // Botón "Marcar como pagado"
   btnMarcarPagado: {
     marginTop: 20, backgroundColor: '#E8F4EF', borderRadius: 14, paddingVertical: 14,
     flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 6,
   },
-  btnMarcarPagadoTexto: {
-    color: colors.greenGlobal, fontWeight: '700', fontSize: 14,
-  },
+  btnMarcarPagadoTexto: { color: colors.greenGlobal, fontWeight: '700', fontSize: 14 },
 
   // Resumen Individual
   listaSaldos: { marginBottom: 16 },
@@ -365,28 +328,19 @@ const styles = StyleSheet.create({
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
     paddingVertical: 16, borderBottomWidth: 1, borderBottomColor: 'rgba(157, 178, 191, 0.25)',
   },
-  saldoFigmaIzq: {
-    flexDirection: 'row', alignItems: 'center', gap: 12,
-  },
+  saldoFigmaIzq: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   avatarChico: { width: 34, height: 34, borderRadius: 17, justifyContent: 'center', alignItems: 'center' },
   avatarTexto: { color: 'white', fontSize: 12, fontWeight: '700' },
   saldoNombreFigma: { fontSize: 15, color: colors.textPrimary, fontWeight: '500' },
-  saldoMontoFigma: { fontSize: 16, fontWeight: '700' },
+  saldoMontoFigma: { fontSize: 15, fontWeight: '700' },
 
-  // Desplegable Cálculos
-  acordeonHeader: {
-    flexDirection: 'row', justifyContent: 'center', alignItems: 'center',
-    padding: 20, gap: 8, marginTop: 16
-  },
+  acordeonHeader: { flexDirection: 'row', justifyContent: 'center', alignItems: 'center', padding: 20, gap: 8, marginTop: 16 },
   acordeonTitulo: { fontSize: 13, fontWeight: '700', color: colors.primary },
   
-  cardDetalle: {
-    backgroundColor: colors.cardBg, borderRadius: 16, padding: 16, marginBottom: 20,
-    borderWidth: 1, borderColor: '#eee'
-  },
+  cardDetalle: { backgroundColor: colors.cardBg, borderRadius: 16, padding: 16, marginBottom: 20, borderWidth: 1, borderColor: '#eee' },
   detalleSubtitulo: { fontSize: 14, fontWeight: '700', color: colors.textPrimary, marginTop: 18, marginBottom: 10 },
   filaCalculo: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 4 },
-  calcLabel: { fontSize: 13, color: colors.textSecondary },
+  calcLabel: { fontSize: 13, color: colors.textSecondary, flex: 1, paddingRight: 8 },
   calcValor: { fontSize: 13, color: colors.textPrimary },
   calcValorResaltado: { fontSize: 13, fontWeight: '700', color: colors.primary },
   calcTotalLabel: { fontSize: 14, fontWeight: '700', color: colors.textPrimary },

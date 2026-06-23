@@ -301,7 +301,15 @@ function agregarGasto(req, res, next) {
       return next(err);
     }
 
-    const { nombre, pagador, monto, splitMode = 'equal', splitSubgroups = [], ticketPhoto = null } = req.body;
+    const { 
+      nombre, 
+      pagador, 
+      monto, 
+      splitMode = 'equal', 
+      splitSubgroups = [], 
+      beneficiarios = [], 
+      ticketPhoto = null 
+    } = req.body;
 
     if (!nombre || nombre.trim() === '') {
       const err = new Error('El campo "nombre" del gasto es requerido.');
@@ -319,6 +327,7 @@ function agregarGasto(req, res, next) {
       return next(err);
     }
 
+    // Validar que el pagador sea un participante real
     const esParticipante = juntada.participantes.some(
       (p) => p.nombre.toLowerCase() === pagador.trim().toLowerCase()
     );
@@ -330,14 +339,30 @@ function agregarGasto(req, res, next) {
       return next(err);
     }
 
+    // Asegurar que los beneficiarios tildados existan en la juntada
+    if (beneficiarios && beneficiarios.length > 0) {
+      const nombresValidos = juntada.participantes.map(p => p.nombre.toLowerCase());
+      const invalidos = beneficiarios.filter(b => !nombresValidos.includes(b.trim().toLowerCase()));
+      
+      if (invalidos.length > 0) {
+        const err = new Error(
+          `Los siguientes beneficiarios no pertenecen a la juntada: ${invalidos.join(', ')}`
+        );
+        err.status = 422;
+        return next(err);
+      }
+    }
+
+    // Guardar el nuevo gasto incluyendo la lista limpia de beneficiarios
     const nuevo = {
       id: uuidv4(),
       nombre: nombre.trim(),
       pagador: pagador.trim(),
       splitMode,     
       splitSubgroups, 
-      monto: Math.round(monto * 100) / 100, // redondear a 2 decimales
-      ticketPhoto,   // URL de la foto del ticket (null si se cargó manual)
+      beneficiarios: beneficiarios.map(b => b.trim()),
+      monto: Math.round(monto * 100) / 100,
+      ticketPhoto,
       creadoEn: new Date().toISOString(),
     };
 

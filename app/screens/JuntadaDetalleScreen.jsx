@@ -85,6 +85,11 @@ export default function JuntadaDetalleScreen({ route, navigation }) {
     }
   }
 
+  // Simulación de copiado al portapapeles para el Alias
+  const copiarAlias = (alias) => {
+    Alert.alert('Alias Copiado', `"${alias}" se copió al portapapeles.`);
+  };
+
   if (cargando) {
     return (
       <View style={[styles.container, styles.centrado]}>
@@ -123,7 +128,7 @@ export default function JuntadaDetalleScreen({ route, navigation }) {
         </TouchableOpacity>
       </View>
 
-      <ScrollView contentContainerStyle={styles.content}>
+      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         {/* Card total */}
         <View style={styles.cardTotal}>
           <Text style={styles.cardTotalLabel}>Total gastado</Text>
@@ -146,7 +151,7 @@ export default function JuntadaDetalleScreen({ route, navigation }) {
             <Ionicons name="people" size={18} color={colors.primary} />
           </View>
           <View style={{ flex: 1 }}>
-            <Text style={styles.subgruposBtnTitulo}>Subgrupos</Text>
+            <Text style={styles.subgruposBtnTitulo}>Subgrupos familiares</Text>
             <Text style={styles.subgruposBtnSubtitulo}>
               {!juntada.subgrupos || juntada.subgrupos.length === 0
                 ? 'Agrupá parejas o familias para dividir por núcleo'
@@ -155,6 +160,57 @@ export default function JuntadaDetalleScreen({ route, navigation }) {
           </View>
           <Ionicons name="add" size={18} color={colors.primary} />
         </TouchableOpacity>
+
+        {/* ── SECCIÓN NUEVA: Alias de transferencia ──────────────────────── */}
+        {juntada.alias && (
+          <View style={styles.aliasCard}>
+            <View style={styles.aliasIconContainer}>
+              <Ionicons name="wallet-outline" size={20} color={colors.primary} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.aliasLabel}>Alias de destino para transferencias</Text>
+              <Text style={styles.aliasTexto}>{juntada.alias}</Text>
+            </View>
+            <TouchableOpacity style={styles.btnCopiar} onPress={() => copiarAlias(juntada.alias)}>
+              <Ionicons name="copy-outline" size={18} color={colors.primary} />
+            </TouchableOpacity>
+          </View>
+        )}
+
+        {/* ── SECCIÓN NUEVA: Saldos Consolidados ─────────────────────────── */}
+        {juntada.saldos && juntada.saldos.length > 0 && (
+          <View style={styles.saldosContainer}>
+            <Text style={styles.seccionLabel}>SALDOS CONSOLIDADOS</Text>
+            <View style={styles.saldosCard}>
+              {juntada.saldos.map((s, idx) => {
+                const esAFavor = s.monto >= 0; // Arreglado: todo junto
+                return (
+                  <View 
+                    key={idx} 
+                    style={[
+                      styles.saldoRow, 
+                      idx < juntada.saldos.length - 1 && styles.saldoRowBorder
+                    ]}
+                  >
+                    <View style={styles.saldoInfoLeft}>
+                      <View style={[styles.saldoMiniIcon, { backgroundColor: esAFavor ? '#E8F5E9' : '#FFEBEE' }]}>
+                        <Ionicons 
+                          name={esAFavor ? "arrow-up-circle" : "arrow-down-circle"} 
+                          size={16} 
+                          color={esAFavor ? "#2E7D32" : "#C62828"} 
+                        />
+                      </View>
+                      <Text style={styles.saldoNombre}>{s.nombre}</Text>
+                    </View>
+                    <Text style={[styles.saldoMonto, esAFavor ? styles.saldoPositivo : styles.saldoNegativo]}>
+                      {esAFavor ? `A favor: ` : `Debe: `}{formatPesos(s.monto)}
+                    </Text>
+                  </View>
+                );
+              })}
+            </View>
+          </View>
+        )}
 
         {/* Gastos */}
         <View style={styles.gastosHeader}>
@@ -202,7 +258,7 @@ export default function JuntadaDetalleScreen({ route, navigation }) {
           style={styles.btnBalance}
           onPress={() => navigation.navigate('Balance', { juntadaId })}
         >
-          <Text style={styles.btnBalanceTexto}>Ver balance</Text>
+          <Text style={styles.btnBalanceTexto}>Ver balance detallado</Text>
         </TouchableOpacity>
       </View>
 
@@ -251,6 +307,7 @@ export default function JuntadaDetalleScreen({ route, navigation }) {
           }}
         />
       )}
+
       {/* Visor de foto del ticket (clip) */}
       <Modal visible={!!fotoTicket} transparent animationType="fade" onRequestClose={() => setFotoTicket(null)}>
         <View style={styles.fotoOverlay}>
@@ -629,9 +686,9 @@ const styles = StyleSheet.create({
   headerInfo: { flex: 1 },
   headerTitulo: { fontSize: 18, fontWeight: 'bold', color: colors.textPrimary },
   headerSub: { fontSize: 12, color: colors.textSecondary },
-  content: { padding: 16, paddingBottom: 100 },
+  content: { padding: 16, paddingBottom: 110 },
   cardTotal: {
-    backgroundColor: colors.primary, borderRadius: 20, padding: 20, marginBottom: 24,
+    backgroundColor: colors.primary, borderRadius: 20, padding: 20, marginBottom: 16,
   },
   cardTotalLabel: { color: 'rgba(255,255,255,0.7)', fontSize: 13, marginBottom: 8 },
   cardTotalMonto: { color: 'white', fontSize: 36, fontWeight: 'bold', marginBottom: 16 },
@@ -644,7 +701,7 @@ const styles = StyleSheet.create({
   avatarTexto: { color: 'white', fontSize: 10, fontWeight: 'bold' },
   gastosHeader: {
     flexDirection: 'row', justifyContent: 'space-between',
-    alignItems: 'center', marginBottom: 12,
+    alignItems: 'center', marginTop: 12, marginBottom: 12,
   },
   gastosLabel: { fontSize: 12, fontWeight: '600', color: colors.textSecondary, letterSpacing: 0.5 },
   btnAgregar: { fontSize: 14, fontWeight: '600', color: colors.primary },
@@ -701,7 +758,7 @@ const styles = StyleSheet.create({
   subgruposBtn: {
     flexDirection: 'row', alignItems: 'center', gap: 12,
     backgroundColor: 'white', borderRadius: 16, padding: 14,
-    marginBottom: 20, borderWidth: 1, borderColor: colors.cardBg,
+    marginBottom: 12, borderWidth: 1, borderColor: colors.cardBg,
   },
   subgruposBtnIcon: {
     width: 36, height: 36, borderRadius: 10,
@@ -709,4 +766,34 @@ const styles = StyleSheet.create({
   },
   subgruposBtnTitulo: { fontSize: 13, fontWeight: '600', color: colors.textPrimary },
   subgruposBtnSubtitulo: { fontSize: 11, color: colors.textSecondary, marginTop: 2 },
+  
+  // Estilos Nuevos: Alias de Transferencia
+  aliasCard: {
+    flexDirection: 'row', alignItems: 'center', gap: 12,
+    backgroundColor: 'white', borderRadius: 16, padding: 14,
+    marginBottom: 16, borderWidth: 1, borderColor: colors.cardBg,
+  },
+  aliasIconContainer: {
+    width: 36, height: 36, borderRadius: 10,
+    backgroundColor: colors.primary + '12', justifyContent: 'center', alignItems: 'center',
+  },
+  aliasLabel: { fontSize: 11, color: colors.textSecondary },
+  aliasTexto: { fontSize: 14, fontWeight: '700', color: colors.textPrimary, marginTop: 2 },
+  btnCopiar: { width: 32, height: 32, borderRadius: 16, justifyContent: 'center', alignItems: 'center' },
+
+  // Estilos Nuevos: Saldos Consolidados Familiares
+  seccionLabel: { fontSize: 11, fontWeight: '700', color: colors.textSecondary, letterSpacing: 0.5, marginBottom: 8 },
+  saldosContainer: { marginBottom: 16 },
+  saldosCard: {
+    backgroundColor: 'white', borderRadius: 16, paddingVertical: 4, 
+    paddingHorizontal: 14, borderWidth: 1, borderColor: colors.cardBg,
+  },
+  saldoRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 12 },
+  saldoRowBorder: { borderBottomWidth: 1, borderBottomColor: colors.background },
+  saldoInfoLeft: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  saldoMiniIcon: { width: 24, height: 24, borderRadius: 12, justifyContent: 'center', alignItems: 'center' },
+  saldoNombre: { fontSize: 13, fontWeight: '600', color: colors.textPrimary },
+  saldoMonto: { fontSize: 13, fontWeight: '700' },
+  saldoPositivo: { color: '#2E7D32' },
+  saldoNegativo: { color: '#C62828' },
 });
