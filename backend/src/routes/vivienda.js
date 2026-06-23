@@ -10,5 +10,9 @@ router.put('/gastos/:id', ctrl.editarGasto);
 router.get('/servicios', ctrl.listarServicios);
 router.post('/servicios', ctrl.crearServicio);
 router.put('/servicios/:id', ctrl.editarServicio);
+//NURVO//
+router.get('/acuerdos', ctrl.listarAcuerdos);
+router.post('/acuerdos', ctrl.guardarAcuerdo);
+router.delete('/acuerdos/:id', ctrl.eliminarAcuerdo);
 
 module.exports = router;

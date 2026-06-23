@@ -1,25 +1,17 @@
 import api from './api';
 
-export const getGastosVivienda = async () => {
-  return await api.get('/vivienda/gastos');
-};
+// Si tu api.js ya tiene un interceptor que hace: response => response.data
+// Entonces NO debes poner { data } = ...
 
-export const crearGastoVivienda = async (gastoData) => {
-  return await api.post('/vivienda/gastos', gastoData);
-};
+export const getGastosVivienda = async () => await api.get('/vivienda/gastos');
+export const guardarGastoVivienda = async (data) => await api.post('/vivienda/gastos', data);
+export const actualizarGastoVivienda = async (id, data) => await api.put(`/vivienda/gastos/${id}`, data);
 
-export const getServiciosVivienda = async () => {
-  return await api.get('/vivienda/servicios');
-};
+export const getServiciosVivienda = async () => await api.get('/vivienda/servicios');
+export const crearServicioVivienda = async (data) => await api.post('/vivienda/servicios', data);
+export const eliminarServicioVivienda = async (id) => await api.delete(`/vivienda/servicios/${id}`);
 
-export const crearServicioVivienda = async (servicioData) => {
-  return await api.post('/vivienda/servicios', servicioData);
-};
+export const getAcuerdosReparto = async () => await api.get('/vivienda/acuerdos');
+export const guardarAcuerdoReparto = async (data) => await api.post('/vivienda/acuerdos', data);
+export const eliminarAcuerdoReparto = async (id) => await api.delete(`/vivienda/acuerdos/${id}`);
 
-export const actualizarGastoVivienda = async (id, gastoData) => {
-  return await api.put(`/vivienda/gastos/${id}`, gastoData);
-};
-
-export const actualizarServicioVivienda = async (id, servicioData) => {
-  return await api.put(`/vivienda/servicios/${id}`, servicioData);
-};

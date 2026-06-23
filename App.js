@@ -1,5 +1,10 @@
 import AppNavigator from './app/navigation/AppNavigator';
+import { ViviendaProvider } from './app/context/ViviendaContext';
 
 export default function App() {
-  return <AppNavigator />;
+  return (
+    <ViviendaProvider>
+      <AppNavigator />
+    </ViviendaProvider>
+  );
 }
