@@ -149,13 +149,13 @@ function RootTabs() {
           })}
         />
         <Tab.Screen 
-            name="Deudas" 
-            component={DeudasScreen} // <--- CAMBIALO POR ESTE
-            options={{
-              tabBarLabel: 'Deudas',
-              tabBarIcon: ({ color, size }) => (
-                 <Ionicons name="wallet-outline" color={color} size={size} /> // O el icono que prefieras
-              ),
+          name="Deudas" 
+          component={DeudasScreen}
+          options={{
+            tabBarLabel: 'Deudas',
+            tabBarIcon: ({ color, size }) => (
+               <Ionicons name="wallet-outline" color={color} size={size} />
+            ),
           }}
         />
       </Tab.Navigator>
@@ -210,7 +210,7 @@ function RootTabs() {
                 </View>
               </TouchableOpacity>
 
-              {/* Nuevo gasto de Vivienda */}
+              {/* Próximamente */}
               <View style={[mStyles.optionCard, mStyles.optionDisabled]}>
                 <View style={[mStyles.optionIconBg, { backgroundColor: '#F0F5F9' }]}>
                   <Ionicons name="home-outline" size={24} color={colors.textSecondary} />
@@ -249,28 +249,16 @@ export default function AppNavigator() {
             <Stack.Screen name="Login" component={LoginScreen} />
           )}
         </Stack.Navigator>
-        {state.isLoading ? (
-          <Stack.Navigator screenOptions={{ headerShown: false }}>
-            <Stack.Screen name="Bootstrap" component={BootstrapScreen} />
-          </Stack.Navigator>
-        ) : state.isAuthenticated ? (
-          <Stack.Navigator screenOptions={{ headerShown: false }}>
-            <Stack.Screen name="MainTabs" component={RootTabs} />
-            <Stack.Screen name="Perfil" component={PerfilScreen} />
-            <Stack.Screen name="PerfilAlias" component={PerfilAliasScreen} />
-          </Stack.Navigator>
-        ) : (
-          <LoginScreen />
-        )}
       </NavigationContainer>
     </AuthContext.Provider>
   );
 }
 
-// ── Constants ─────────────────────────────────────────────────────────────────
+// ── Estilos ──────────────────────────────────────────────────────────────────
 
 const styles = StyleSheet.create({
   botonMasContainer: {
+    key: 'botonMasContainer',
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
