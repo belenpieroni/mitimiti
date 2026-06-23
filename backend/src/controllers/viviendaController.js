@@ -163,11 +163,55 @@ function editarServicio(req, res, next) {
   }
 }
 
-module.exports = {
-  listarGastos,
-  crearGasto,
-  editarGasto,
-  listarServicios,
-  crearServicio,
-  editarServicio
-};
+//NURVO//
+
+function listarAcuerdos(req, res, next) {
+  try {
+    const db = leerDB();
+    const acuerdosObj = db.vivienda?.acuerdosReparto ?? {};
+    // Convertimos el objeto a array para que el frontend lo maneje fácil
+    const acuerdosArray = Object.values(acuerdosObj);
+    res.json({ ok: true, data: acuerdosArray });
+  } catch (err) { next(err); }
+}
+
+function guardarAcuerdo(req, res, next) {
+  try {
+    const db = leerDB();
+    if (!db.vivienda) db.vivienda = { gastos: [], serviciosPeriodicos: [], acuerdosReparto: {} };
+    
+    const { nombre, modelo, participantes } = req.body;
+    
+    // --- ESTE ES EL CAMBIO CLAVE ---
+    // Limpiamos el nombre para usarlo como clave única en el objeto
+    const key = nombre.toLowerCase().replace(/[^a-z0-9]/g, '_');
+    
+    db.vivienda.acuerdosReparto[key] = { id: key, nombre, modelo, participantes };
+    escribirDB(db);
+    
+    res.status(201).json({ ok: true, data: db.vivienda.acuerdosReparto[key] });
+  } catch (err) { next(err); }
+}
+
+function eliminarAcuerdo(req, res, next) {
+  try {
+    const db = leerDB();
+    // Normalizamos el ID que viene de la URL para que sea igual a como lo guardaste
+    const id = req.params.id.toLowerCase().trim();
+    
+    console.log("Buscando en DB el ID:", id); // Para ver qué está buscando
+
+    if (db.vivienda?.acuerdosReparto[id]) {
+      delete db.vivienda.acuerdosReparto[id];
+      escribirDB(db);
+      return res.status(200).json({ ok: true, message: "Eliminado" });
+    } else {
+      // Si no existe, imprime las claves disponibles para que sepas qué está pasando
+      console.log("Claves disponibles:", Object.keys(db.vivienda?.acuerdosReparto || {}));
+      return res.status(404).json({ ok: false, message: "ID no encontrado" });
+    }
+  } catch (err) { next(err); }
+}
+module.exports = { listarGastos, crearGasto, editarGasto, listarServicios, crearServicio, editarServicio, listarAcuerdos, guardarAcuerdo, eliminarAcuerdo };
+
+

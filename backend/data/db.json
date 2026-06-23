@@ -1,6 +1,103 @@
 {
   "juntadas": [
     {
+      "id": "358afc6e-29dd-43be-89d7-675cb6c72c4b",
+      "nombre": "asado",
+      "descripcion": "pepe",
+      "fecha": "2026-06-23",
+      "creadaEn": "2026-06-23T20:40:54.962Z",
+      "participantes": [
+        {
+          "id": "02b4df0f-e12a-4c5c-91c7-b500dbc242d4",
+          "nombre": "Martín",
+          "iniciales": "MR",
+          "color": "#473472"
+        }
+      ],
+      "gastos": [],
+      "subgrupos": []
+    },
+    {
+      "id": "f8742d46-4ad0-4aab-928e-f506f90196a2",
+      "nombre": "asa",
+      "descripcion": "sasas",
+      "fecha": "2026-06-23",
+      "creadaEn": "2026-06-23T06:11:32.106Z",
+      "participantes": [
+        {
+          "id": "7bc2d6ee-605d-47f2-9d5d-ae670d4cd5b9",
+          "nombre": "Martín",
+          "iniciales": "MR",
+          "color": "#473472"
+        }
+      ],
+      "gastos": [],
+      "subgrupos": []
+    },
+    {
+      "id": "ec16fb22-242d-4724-86d2-8640c8d6e257",
+      "nombre": "saas",
+      "descripcion": "sa",
+      "fecha": "2026-06-23",
+      "creadaEn": "2026-06-23T06:09:30.963Z",
+      "participantes": [
+        {
+          "id": "0f762414-5690-449f-9595-94ca683902c8",
+          "nombre": "Martín",
+          "iniciales": "MR",
+          "color": "#473472"
+        },
+        {
+          "id": "2c17cee4-a38d-4a07-9b6b-89caf8437056",
+          "nombre": "gfgfg",
+          "iniciales": "GF",
+          "color": "#526D82"
+        }
+      ],
+      "gastos": [],
+      "subgrupos": []
+    },
+    {
+      "id": "3fb8ec8a-2486-4d4a-beba-6cee39e0efbf",
+      "nombre": "asaso",
+      "descripcion": "martin",
+      "fecha": "2026-06-23",
+      "creadaEn": "2026-06-23T06:07:52.924Z",
+      "participantes": [
+        {
+          "id": "9a4c4390-2a5b-48e7-bb9b-34c95ef892d3",
+          "nombre": "Martín",
+          "iniciales": "MR",
+          "color": "#473472"
+        }
+      ],
+      "gastos": [],
+      "subgrupos": []
+    },
+    {
+      "id": "9fe984b2-4e75-4f41-9e3a-63841db2a2dc",
+      "nombre": "asado",
+      "descripcion": "",
+      "fecha": "2026-06-23",
+      "creadaEn": "2026-06-23T06:07:33.523Z",
+      "participantes": [
+        {
+          "id": "5e74052a-390e-4049-b9b6-6c7c1b69d467",
+          "nombre": "Martín",
+          "iniciales": "MR",
+          "color": "#473472"
+        },
+        {
+          "id": "44e976f0-7dfc-42b4-ad08-e0e601617416",
+          "nombre": "juan",
+          "iniciales": "JU",
+          "color": "#526D82"
+        }
+      ],
+      "gastos": [],
+      "subgrupos": []
+    },
+    {
       "id": "cfaff7d9-f5a6-4671-a365-5fdd5337734d",
       "nombre": "asadu",
       "descripcion": "sas",
@@ -307,149 +404,44 @@
       },
       {
         "id": "sv2",
-        "nombre": "Internet / Fibra",
-        "monto": 17000,
-        "periodicidad": "anual",
-        "proximoVencimiento": "2026-07-02T00:00:00.000Z",
-        "participantes": [
-          "Martín",
-          "Jorge"
-        ]
-      },
-      {
-        "id": "sv3",
-        "nombre": "Netflix",
-        "monto": 8000,
-        "periodicidad": "bimestral",
-        "proximoVencimiento": "2026-06-25T00:00:00.000Z",
-        "participantes": [
-          "Martín",
-          "Jorge",
-          "Sofía",
-          "Alan"
-        ]
-      }
-    ],
-    "gastos": [
-      {
-        "id": "g1",
-        "nombre": "Super",
-        "monto": 17200,
-        "categoria": "Supermercado",
-        "fecha": "2026-06-15T12:00:00.000Z",
-        "pagador": "Martín",
-        "participantes": [
-          "Martín",
-          "Jorge",
-          "Sofía",
-          "Alan"
-        ]
-      },
-      {
-        "id": "g2",
-        "nombre": "Cena",
-        "monto": 37800,
-        "categoria": "Comidas y bebidas",
-        "fecha": "2026-06-10T21:00:00.000Z",
-        "pagador": "Belen",
-        "participantes": [
-          "Martín",
-          "Belen"
-        ]
-      },
-      {
-        "id": "g3",
-        "nombre": "Carga SUBE",
-        "monto": 4500,
-        "categoria": "Transporte",
-        "fecha": "2026-06-09T08:00:00.000Z",
-        "pagador": "Jorge",
-        "participantes": [
-          "Jorge"
-        ]
-      },
-      {
-        "id": "g4",
-        "nombre": "Coto",
-        "monto": 25000,
-        "categoria": "Supermercado",
-        "fecha": "2026-06-12T10:00:00.000Z",
-        "pagador": "Jorge",
-        "participantes": [
-          "Jorge",
-          "Martín"
-        ]
-      },
-      {
-        "id": "g5",
-        "nombre": "Jumbo",
-        "monto": 18500,
-        "categoria": "Supermercado",
-        "fecha": "2026-06-05T18:30:00.000Z",
-        "pagador": "Sofía",
-        "participantes": [
-          "Sofía",
-          "Alan"
-        ]
-      },
-      {
-        "id": "g6",
-        "nombre": "Almuerzo",
-        "monto": 15000,
-        "categoria": "Comidas y bebidas",
-        "fecha": "2026-06-11T13:00:00.000Z",
-        "pagador": "Martín",
-        "participantes": [
-          "Martín"
-        ]
-      },
-      {
-        "id": "g7",
-        "nombre": "Uber",
-        "monto": 6500,
-        "categoria": "Transporte",
-        "fecha": "2026-06-08T22:00:00.000Z",
-        "pagador": "Martín",
-        "participantes": [
-          "Martín",
-          "Jorge"
-        ]
-      },
-      {
-        "id": "1e7d2bee-b376-4032-b53c-841c7276a4b1",
-        "nombre": "Mayorista",
+        "nombre": "Factura de Agua",
         "monto": 30000,
-        "categoria": "Supermercado",
-        "fecha": "2026-06-21T08:22:52.978Z",
-        "pagador": "Martín",
-        "participantes": [
-          "Martín"
-        ]
-      },
-      {
-        "id": "889b8566-1720-429a-926f-d22b42a1aea7",
-        "nombre": "Shampoo y cremas ",
-        "monto": 25000,
-        "categoria": "Salud y cuidado personal",
-        "fecha": "2026-06-21T08:28:27.193Z",
-        "pagador": "Martín",
-        "participantes": [
-          "Martín"
-        ]
-      },
-      {
-        "id": "a70e38ee-25c7-4b07-b06b-a8140607edcc",
-        "nombre": "Factura de Luz",
-        "monto": 45000,
-        "categoria": "Hogar",
-        "fecha": "2026-06-23T02:20:39.624Z",
-        "pagador": "Martín",
+        "periodicidad": "mensual",
+        "proximoVencimiento": "2026-07-15T00:00:00.000Z",
         "participantes": [
           "Martín",
           "Jorge",
           "Sofía"
         ]
+      },
+      {
+        "id": "de161cb8-28e1-4627-bf37-1490bb667284",
+        "nombre": "Internet / Fibra",
+        "monto": 200,
+        "periodicidad": "mensual",
+        "proximoVencimiento": "2026-06-23T21:48:08.297Z",
+        "participantes": [
+          "Valentina Ortiz",
+          "Martín Alves"
+        ]
       }
-    ]
+    ],
+    "acuerdosReparto": {
+      "internet / fibra": {
+        "id": "internet / fibra",
+        "nombre": "Internet / Fibra",
+        "modelo": "proporcional",
+        "participantes": [
+          {
+            "nombre": "Valentina Ortiz",
+            "porcentaje": 50
+          },
+          {
+            "nombre": "Martín Alves",
+            "porcentaje": 50
+          }
+        ]
+      }
+    }
   }
 }
