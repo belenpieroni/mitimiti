@@ -138,7 +138,8 @@ export default function CrearJuntadaScreen({ navigation, route }) {
         await editarJuntadaService(editando.juntadaId, { 
           nombre: nombre.trim(), 
           descripcion: descripcion.trim(),
-          fecha: formatFecha(fecha)
+          fecha: formatFecha(fecha),
+          participantes: personas,
         });
       } else {
         const nueva = {
