@@ -4,6 +4,7 @@ import { useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { colors } from '../theme/colors';
 import { listarJuntadas } from '../services/juntadasService';
+import { useAuth } from '../navigation/AppNavigator';
 
 // ── Colores disponibles para asignar a participantes ──────────────────────────
 export const coloresDisponibles = [
@@ -13,23 +14,25 @@ export const coloresDisponibles = [
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 export function getIniciales(nombre) {
+  if (!nombre) return '??';
   const partes = nombre.trim().split(' ');
   if (partes.length >= 2) return (partes[0][0] + partes[1][0]).toUpperCase();
   return nombre.slice(0, 2).toUpperCase();
 }
 
 function formatPesos(monto) {
+  if (monto === undefined || monto === null || isNaN(monto)) return '$0';
   return '$' + Math.abs(monto).toLocaleString('es-AR');
 }
 
 function AvatarStack({ personas }) {
-  const visibles = personas.slice(0, 4);
-  const extras = personas.length - 4;
+  const visibles = personas?.slice(0, 4) || [];
+  const extras = (personas?.length || 0) - 4;
   return (
     <View style={styles.avatarStack}>
       {visibles.map((p, i) => (
-        <View key={i} style={[styles.avatar, { backgroundColor: p.color, marginLeft: i === 0 ? 0 : -8 }]}>
-          <Text style={styles.avatarTexto}>{p.iniciales}</Text>
+        <View key={i} style={[styles.avatar, { backgroundColor: p.color || colors.textSecondary, marginLeft: i === 0 ? 0 : -8 }]}>
+          <Text style={styles.avatarTexto}>{p.iniciales || getIniciales(p.nombre)}</Text>
         </View>
       ))}
       {extras > 0 && (
@@ -43,27 +46,37 @@ function AvatarStack({ personas }) {
 
 // ── Componente ────────────────────────────────────────────────────────────────
 export default function JuntadasScreen({ navigation }) {
+  const { user } = useAuth(); 
   const [juntadas, setJuntadas] = useState([]);
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState(null);
 
-  // Recarga los datos cada vez que la pantalla recibe el foco.
-  // useFocusEffect no acepta async directo → definimos la función adentro y la llamamos.
   const cargarJuntadas = useCallback(async () => {
+    const nombreUsuario = user?.name || user?.nombre;
+    
+    if (!nombreUsuario) {
+      setCargando(false);
+      return;
+    }
+
     setCargando(true);
     setError(null);
     try {
-      const datos = await listarJuntadas();
-      setJuntadas(datos);
+      const response = await listarJuntadas(nombreUsuario); 
+      const datos = response?.data || response;
+      setJuntadas(Array.isArray(datos) ? datos : []);
     } catch (e) {
+      console.error("Error cargando juntadas:", e);
       setError('No se pudo conectar con el servidor.');
     } finally {
       setCargando(false);
     }
-  }, []);
+  }, [user]);
 
   useFocusEffect(
-    useCallback(() => { cargarJuntadas(); }, [cargarJuntadas])
+    useCallback(() => { 
+      cargarJuntadas(); 
+    }, [cargarJuntadas])
   );
 
   // ── Render estados ────────────────────────────────────────────────────────
@@ -112,39 +125,57 @@ export default function JuntadasScreen({ navigation }) {
         </View>
       ) : (
         <ScrollView contentContainerStyle={styles.lista}>
-          {juntadas.map((j) => (
-            <TouchableOpacity
-              key={j.id}
-              style={styles.card}
-              onPress={() => navigation.navigate('JuntadaDetalle', { juntadaId: j.id })}
-            >
-              <View style={styles.cardFila}>
-                <View style={styles.iconoContenedor}>
-                  <Ionicons name="people-outline" size={22} color={colors.primary} />
+          {juntadas.map((j) => {
+            const totalGastado = j.totalGastado !== undefined 
+              ? j.totalGastado 
+              : (j.gastos?.reduce((sum, g) => sum + (g.monto || 0), 0) || 0);
+
+            const cantidadParticipantes = j.cantidadParticipantes !== undefined 
+              ? j.cantidadParticipantes 
+              : (j.participantes?.length || 0);
+
+            const cantidadGastos = j.cantidadGastos !== undefined 
+              ? j.cantidadGastos 
+              : (j.gastos?.length || 0);
+
+            const tipoDeuda = j.tipo || 'ninguna';
+            const montoDeuda = j.deuda || 0;
+
+            return (
+              <TouchableOpacity
+                key={j.id}
+                style={styles.card}
+                onPress={() => navigation.navigate('JuntadaDetalle', { juntadaId: j.id })}
+              >
+                <View style={styles.cardFila}>
+                  <View style={styles.iconoContenedor}>
+                    <Ionicons name="people-outline" size={22} color={colors.primary} />
+                  </View>
+                  <View style={styles.cardInfo}>
+                    <Text style={styles.cardNombre}>{j.nombre}</Text>
+                    <Text style={styles.cardSub}>
+                      {cantidadParticipantes} personas · {cantidadGastos} gastos
+                    </Text>
+                    <AvatarStack personas={j.participantes} />
+                  </View>
+                  <View style={styles.cardDerecha}>
+                    <Text style={styles.cardMonto}>{formatPesos(totalGastado)}</Text>
+                    {tipoDeuda === 'cobrar' && <Text style={styles.teCobrar}>Te deben {formatPesos(montoDeuda)}</Text>}
+                    {tipoDeuda === 'pagar'  && <Text style={styles.teDebes}>Debés {formatPesos(montoDeuda)}</Text>}
+                    {tipoDeuda === 'ninguna' && <Text style={styles.sinDeuda}>Sin deudas</Text>}
+                  </View>
+                  <Ionicons name="ellipsis-horizontal" size={18} color={colors.textSecondary} />
                 </View>
-                <View style={styles.cardInfo}>
-                  <Text style={styles.cardNombre}>{j.nombre}</Text>
-                  <Text style={styles.cardSub}>
-                    {j.cantidadParticipantes} personas · {j.cantidadGastos} gastos
-                  </Text>
-                  <AvatarStack personas={j.participantes} />
-                </View>
-                <View style={styles.cardDerecha}>
-                  <Text style={styles.cardMonto}>{formatPesos(j.totalGastado)}</Text>
-                  {j.tipo === 'cobrar' && <Text style={styles.teCobrar}>Te deben {formatPesos(j.deuda)}</Text>}
-                  {j.tipo === 'pagar'  && <Text style={styles.teDebes}>Debés {formatPesos(j.deuda)}</Text>}
-                  {j.tipo === 'ninguna'&& <Text style={styles.sinDeuda}>Sin deudas</Text>}
-                </View>
-                <Ionicons name="ellipsis-horizontal" size={18} color={colors.textSecondary} />
-              </View>
-            </TouchableOpacity>
-          ))}
+              </TouchableOpacity>
+            );
+          })}
         </ScrollView>
       )}
     </View>
   );
 }
 
+// ── Estilos ──────────────────────────────────────────────────────────────────
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background },
   centrado: { flex: 1, justifyContent: 'center', alignItems: 'center', gap: 12, padding: 32 },

@@ -1,9 +1,10 @@
-import { useMemo } from 'react';
+import { useMemo, useState, useCallback } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView } from 'react-native';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { colors } from '../theme/colors';
 import { useAuth } from '../navigation/AppNavigator';
+import { listarJuntadas } from '../services/juntadasService';
 
 function getInitials(name) {
   if (!name) return 'US';
@@ -38,10 +39,32 @@ export default function PerfilScreen() {
   const iniciales = useMemo(() => getInitials(nombre), [nombre]);
   const miniAlias = useMemo(() => getAliasFromEmail(email), [email]);
 
+  const [cantidadJuntadas, setCantidadJuntadas] = useState(0);
+
+  const cargarContadorJuntadas = useCallback(async () => {
+    const nombreUsuario = user?.name || user?.nombre;
+    if (!nombreUsuario) return;
+
+    try {
+      const response = await listarJuntadas(nombreUsuario);
+      const datos = response?.data || response;
+      if (Array.isArray(datos)) {
+        setCantidadJuntadas(datos.length);
+      }
+    } catch (e) {
+      console.error("Error cargando contador de juntadas en perfil:", e);
+    }
+  }, [user]);
+
+  useFocusEffect(
+    useCallback(() => {
+      cargarContadorJuntadas();
+    }, [cargarContadorJuntadas])
+  );
+
   const stats = [
-    { label: 'Juntadas', value: 3 },
+    { label: 'Juntadas', value: cantidadJuntadas },
     { label: 'Servicios', value: 2 },
-    { label: 'Viajes', value: 1 },
   ];
 
   const handleItemPress = (id) => {
@@ -124,8 +147,8 @@ const styles = StyleSheet.create({
     marginBottom: 14,
   },
   avatarText: { color: 'white', fontSize: 23, fontWeight: '700' },
-  name: { fontSize: 11, fontWeight: '700', color: colors.textPrimary, marginBottom: 4 },
-  email: { fontSize: 8.2, color: '#446380', fontWeight: '500' },
+  name: { fontSize: 16, fontWeight: '700', color: colors.textPrimary, marginBottom: 4 },
+  email: { fontSize: 13, color: '#446380', fontWeight: '500' },
   statsCard: {
     backgroundColor: '#F5F6F8',
     borderRadius: 20,
