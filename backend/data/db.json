@@ -51,7 +51,7 @@
         },
         {
           "id": "6f1b5fea-4018-4e39-818f-38a479dc422c",
-          "nombre": "Belu",
+          "nombre": "Belen",
           "iniciales": "BE",
           "color": "#9DB2BF"
         },
@@ -94,7 +94,7 @@
           "nombre": "Pareja 🫶🏻",
           "integrantes": [
             "Ivo",
-            "Belu"
+            "Belen"
           ]
         }
       ]
@@ -261,7 +261,7 @@
       "alias": "thiago.pago.mp"
     },
     "Belen": {
-      "alias": "belen.dinero"
+      "alias": "belen.dinero.1"
     },
     "Jorge": {
       "alias": "3840200500000028844555"
@@ -298,7 +298,7 @@
         "nombre": "Factura de Luz",
         "monto": 45000,
         "periodicidad": "mensual",
-        "proximoVencimiento": "2026-06-23T00:00:00.000Z",
+        "proximoVencimiento": "2026-07-23T00:00:00.000Z",
         "participantes": [
           "Martín",
           "Jorge",
@@ -435,6 +435,19 @@
         "pagador": "Martín",
         "participantes": [
           "Martín"
+        ]
+      },
+      {
+        "id": "a70e38ee-25c7-4b07-b06b-a8140607edcc",
+        "nombre": "Factura de Luz",
+        "monto": 45000,
+        "categoria": "Hogar",
+        "fecha": "2026-06-23T02:20:39.624Z",
+        "pagador": "Martín",
+        "participantes": [
+          "Martín",
+          "Jorge",
+          "Sofía"
         ]
       }
     ]
