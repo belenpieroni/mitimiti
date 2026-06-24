@@ -24,6 +24,14 @@ if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental
 
 const getIcono = (tipo) => (tipo === 'Vivienda' ? "home-outline" : "balloon-outline");
 
+const formatPesos = (monto) => {
+  const valor = Number(monto) || 0;
+  return valor.toLocaleString('es-AR', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
+};
+
 export default function DeudasScreen() {
   const { user } = useAuth();
   const [expandedId, setExpandedId] = useState(null);
@@ -142,7 +150,7 @@ export default function DeudasScreen() {
 
         <View style={styles.balanceCard}>
           <Text style={styles.balanceLabel}>TOTAL A PAGAR</Text>
-          <Text style={styles.balanceAmount}>${totalAPagar.toFixed(2)}</Text>
+          <Text style={styles.balanceAmount}>${formatPesos(totalAPagar)}</Text>
           <Text style={styles.balanceInfo}>{totalConceptos} deudas pendientes - {pendientes.length} acreedor</Text>
         </View>
 
@@ -161,7 +169,7 @@ export default function DeudasScreen() {
                 </View>
               </View>
               <View style={styles.amountInfo}>
-                <Text style={styles.totalAmount}>${acreedor.totalAcreedor.toFixed(2)}</Text>
+                <Text style={styles.totalAmount}>${formatPesos(acreedor.totalAcreedor)}</Text>
                 <Ionicons name={expandedId === acreedor.id ? "chevron-up" : "chevron-down"} size={20} color="#666" />
               </View>
             </TouchableOpacity>
@@ -178,7 +186,7 @@ export default function DeudasScreen() {
                       <Text style={styles.conceptPath}>{concepto.sub}</Text>
                     </View>
                     <View style={styles.conceptRight}>
-                      <Text style={styles.conceptPrice}>${concepto.monto.toFixed(2)}</Text>
+                      <Text style={styles.conceptPrice}>${formatPesos(concepto.monto)}</Text>
                       {confirmingId === concepto.id ? (
                         <View style={{ flexDirection: 'row', gap: 5 }}>
                           <TouchableOpacity style={styles.btnConfirmar} onPress={() => handleConfirmarPago(acreedor, concepto)}><Text style={styles.btnConfirmarText}>Confirmar</Text></TouchableOpacity>
@@ -190,7 +198,7 @@ export default function DeudasScreen() {
                     </View>
                   </View>
                 ))}
-                <TouchableOpacity style={styles.btnPagarTodo} onPress={() => handlePagarTodo(acreedor)}><Text style={styles.btnPagarTodoText}>Pagar todo a {acreedor.nombre} - ${acreedor.totalAcreedor.toFixed(2)}</Text></TouchableOpacity>
+                <TouchableOpacity style={styles.btnPagarTodo} onPress={() => handlePagarTodo(acreedor)}><Text style={styles.btnPagarTodoText}>Pagar todo a {acreedor.nombre} - ${formatPesos(acreedor.totalAcreedor)}</Text></TouchableOpacity>
               </View>
             )}
           </View>
@@ -205,7 +213,7 @@ export default function DeudasScreen() {
               <Text style={styles.pagoSub}>{pago.sub}</Text>
             </View>
             <View style={styles.pagoRight}>
-              <Text style={styles.pagoAmount}>${pago.monto.toFixed(2)}</Text>
+              <Text style={styles.pagoAmount}>${formatPesos(pago.monto)}</Text>
               <View style={styles.pagoDate}><Ionicons name="time-outline" size={12} color="#999" /><Text style={styles.pagoDateText}>{pago.fecha}</Text></View>
             </View>
           </View>

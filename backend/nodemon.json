@@ -1,0 +1,5 @@
+{
+  "watch": ["src/"],
+  "ignore": ["data/db.json", "node_modules/"],
+  "delay": 2000
+}
