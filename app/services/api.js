@@ -53,12 +53,22 @@ const API_BASE = getApiBase();
 
 async function request(endpoint, options = {}) {
   const url = `${API_BASE}${endpoint}`;
+  const defaultHeaders = { 'Content-Type': 'application/json' };
   const config = {
-    headers: { 'Content-Type': 'application/json' },
     ...options,
+    headers: {
+      ...defaultHeaders,
+      ...(options.headers || {}),
+    },
   };
 
-  const response = await fetch(url, config);
+  let response;
+  try {
+    response = await fetch(url, config);
+  } catch (error) {
+    throw new Error(`Network request failed (${url})`);
+  }
+
   const json = await response.json();
 
   if (!response.ok || !json.ok) {
@@ -69,11 +79,11 @@ async function request(endpoint, options = {}) {
 }
 
 const api = {
-  get:    (endpoint)       => request(endpoint),
-  post:   (endpoint, body) => request(endpoint, { method: 'POST',   body: JSON.stringify(body) }),
-  put:    (endpoint, body) => request(endpoint, { method: 'PUT',    body: JSON.stringify(body) }),
-  patch:  (endpoint, body) => request(endpoint, { method: 'PATCH',  body: JSON.stringify(body) }),
-  delete: (endpoint)       => request(endpoint, { method: 'DELETE' }),
+  get:    (endpoint, options = {})       => request(endpoint, options),
+  post:   (endpoint, body, options = {}) => request(endpoint, { method: 'POST',   body: JSON.stringify(body), ...options }),
+  put:    (endpoint, body, options = {}) => request(endpoint, { method: 'PUT',    body: JSON.stringify(body), ...options }),
+  patch:  (endpoint, body, options = {}) => request(endpoint, { method: 'PATCH',  body: JSON.stringify(body), ...options }),
+  delete: (endpoint, options = {})       => request(endpoint, { method: 'DELETE', ...options }),
 };
 
 export const API_URL = API_BASE.replace('/api', '');

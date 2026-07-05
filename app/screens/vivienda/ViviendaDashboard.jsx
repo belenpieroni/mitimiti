@@ -129,7 +129,10 @@ export default function ViviendaDashboard({ navigation }) {
 
   // ── Data ──────────────────────────────────────────────────────────────────
   useFocusEffect(
-    React.useCallback(() => { cargarData(); }, [])
+    React.useCallback(() => {
+      cargarData();
+      recargar();
+    }, [recargar])
   );
 
   const cargarData = async () => {

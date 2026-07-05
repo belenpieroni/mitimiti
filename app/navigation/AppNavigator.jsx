@@ -1,4 +1,4 @@
-import { createContext, useContext, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { NavigationContainer, useNavigation } from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
@@ -13,6 +13,7 @@ import JuntadaDetalleScreen from '../screens/JuntadaDetalleScreen';
 import CrearJuntadaScreen from '../screens/CrearJuntadaScreen';
 import PerfilScreen from '../screens/PerfilScreen';
 import PerfilAliasScreen from '../screens/PerfilAliasScreen';
+import NotificationSettingsScreen from '../screens/NotificationSettingsScreen';
 import BalanceScreen from '../screens/BalanceScreen';
 import LoginScreen from '../screens/LoginScreen';
 import AgregarGastoScreen from '../screens/AgregarGastoScreen';
@@ -20,12 +21,11 @@ import ViviendaDashboard from '../screens/vivienda/ViviendaDashboard';
 import AgregarViviendaScreen from '../screens/vivienda/AgregarViviendaScreen';
 import SalidasPorCategoriaScreen from '../screens/vivienda/SalidasPorCategoriaScreen';
 import CategoriaDetalleScreen from '../screens/vivienda/CategoriaDetalleScreen';
+import NotificationsScreen from '../screens/NotificationsScreen';
+import { AuthContext } from '../context/AuthContext';
 
 const Tab = createBottomTabNavigator();
 const Stack = createNativeStackNavigator();
-
-const AuthContext = createContext(null);
-export const useAuth = () => useContext(AuthContext);
 
 function JuntadasStack() {
   return (
@@ -45,6 +45,8 @@ function HomeStack() {
       <Stack.Screen name="HomeMain" component={HomeScreen} />
       <Stack.Screen name="Perfil" component={PerfilScreen} />
       <Stack.Screen name="PerfilAlias" component={PerfilAliasScreen} />
+      <Stack.Screen name="NotificationSettings" component={NotificationSettingsScreen} />
+      <Stack.Screen name="Notifications" component={NotificationsScreen} />
     </Stack.Navigator>
   );
 }
@@ -225,14 +227,28 @@ function RootTabs() {
 }
 
 export default function AppNavigator() {
-  const [user, setUser] = useState(null);
+  const [session, setSession] = useState(null);
 
   const authValue = useMemo(() => ({
-    user,
-    isAuthenticated: Boolean(user),
-    login: (userData) => setUser(userData),
-    logout: () => setUser(null),
-  }), [user]);
+    user: session?.user || null,
+    token: session?.token || null,
+    isAuthenticated: Boolean(session?.user),
+    login: (payload) => {
+      if (payload?.user) {
+        setSession({
+          user: payload.user,
+          token: payload.token || null,
+        });
+        return;
+      }
+
+      setSession({
+        user: payload || null,
+        token: null,
+      });
+    },
+    logout: () => setSession(null),
+  }), [session]);
 
   return (
     <AuthContext.Provider value={authValue}>

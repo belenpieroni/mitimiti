@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, TouchableOpacity, ScrollView } from 'react-nati
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { colors } from '../theme/colors';
-import { useAuth } from '../navigation/AppNavigator';
+import { useAuth } from '../context/AuthContext';
 import { listarJuntadas } from '../services/juntadasService';
 
 function getInitials(name) {
@@ -23,7 +23,7 @@ function getAliasFromEmail(email) {
 }
 
 const profileItems = [
-  { id: 'notificaciones', label: 'Notificaciones', icon: 'notifications-outline', iconBg: '#ECE9F5', iconColor: colors.primary },
+  { id: 'notificaciones', label: 'Configuracion de notificaciones', icon: 'notifications-outline', iconBg: '#ECE9F5', iconColor: colors.primary },
   { id: 'preferencias', label: 'Preferencias', icon: 'settings-outline', iconBg: '#EEF2F6', iconColor: colors.textSecondary },
   { id: 'privacidad', label: 'Privacidad', icon: 'shield-checkmark-outline', iconBg: '#EAF4EF', iconColor: '#2E7D5C' },
   { id: 'ayuda', label: 'Ayuda y soporte', icon: 'help-circle-outline', iconBg: '#FBEAEA', iconColor: '#D64B3B' },
@@ -70,6 +70,11 @@ export default function PerfilScreen() {
   const handleItemPress = (id) => {
     if (id === 'alias') {
       navigation.navigate('PerfilAlias');
+      return;
+    }
+
+    if (id === 'notificaciones') {
+      navigation.navigate('NotificationSettings');
     }
   };
 

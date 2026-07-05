@@ -23,6 +23,7 @@ services:
       - backend
     environment:
       EXPO_PUBLIC_API_URL: ${EXPO_PUBLIC_API_URL:-http://localhost:3000/api}
+      EXPO_TOKEN: ${EXPO_TOKEN:-}
       EXPO_NO_TELEMETRY: "1"
     ports:
       - "8081:8081"

@@ -4,7 +4,7 @@ import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { colors } from '../theme/colors';
 import { obtenerPerfil, actualizarPerfil, eliminarPerfil } from '../services/perfilService';
-import { useAuth } from '../navigation/AppNavigator';
+import { useAuth } from '../context/AuthContext';
 
 const Toast = ({ visible, message, type }) => {
   const translateY = useRef(new Animated.Value(-100)).current;
