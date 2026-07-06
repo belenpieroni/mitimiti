@@ -1,61 +1,105 @@
-import { useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Modal, Pressable, Alert } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as Notifications from 'expo-notifications';
+import { useFocusEffect } from '@react-navigation/native';
 import { colors } from '../theme/colors';
 import { useAuth } from '../context/AuthContext';
 import {
   enviarNotificacionRemotaPrueba,
+  marcarNotificacionLeida,
+  marcarTodasNotificacionesLeidas,
+  obtenerNotificaciones,
   registrarTokenDispositivo,
 } from '../services/notificationsService';
 
-const INITIAL_NOTIFICATIONS = [
-  {
-    id: '1',
-    title: 'Factura de luz vence en 3 dias',
-    subtitle: 'Hace 2 horas',
-    description: 'Recordatorio: la factura de luz vence en 48 horas. Te recomendamos pagarla hoy para evitar recargos.',
-    icon: 'flash-outline',
-    iconBg: '#FBEAEA',
-    iconColor: '#D64B3B',
-    unread: true,
-  },
-  {
-    id: '2',
-    title: 'Ivo agrego un gasto en Cumpleanos',
-    subtitle: 'Hace 5 horas',
-    description: 'Se agrego un gasto nuevo en la juntada Cumpleanos. Revisa el detalle para ver tu parte pendiente.',
-    icon: 'cash-outline',
-    iconBg: '#E8F8EF',
-    iconColor: '#2E7D5C',
-    unread: true,
-  },
-  {
-    id: '3',
-    title: 'Te agregaron a Noche de Tacos',
-    subtitle: 'Ayer',
-    description: 'Ahora participas en la juntada Noche de Tacos. Ya podes cargar gastos y ver balances.',
-    icon: 'people-outline',
-    iconBg: '#EEE9FA',
-    iconColor: colors.primary,
-    unread: false,
-  },
-];
+function getRelativeTimeLabel(fechaIso) {
+  if (!fechaIso) return 'Reciente';
+  const deltaMs = Date.now() - new Date(fechaIso).getTime();
+  const mins = Math.floor(deltaMs / 60000);
+  if (mins < 1) return 'Ahora';
+  if (mins < 60) return `Hace ${mins} min`;
+  const hours = Math.floor(mins / 60);
+  if (hours < 24) return `Hace ${hours} h`;
+  const days = Math.floor(hours / 24);
+  if (days === 1) return 'Ayer';
+  return `Hace ${days} dias`;
+}
+
+function getVisualByCategory(category) {
+  switch (category) {
+    case 'recordatorios_vencimiento':
+      return { icon: 'flash-outline', iconBg: '#FBEAEA', iconColor: '#D64B3B' };
+    case 'nuevos_gastos':
+      return { icon: 'cash-outline', iconBg: '#E8F8EF', iconColor: '#2E7D5C' };
+    case 'nuevas_juntadas':
+      return { icon: 'people-outline', iconBg: '#EEE9FA', iconColor: colors.primary };
+    default:
+      return { icon: 'notifications-outline', iconBg: '#F2F4F6', iconColor: colors.textSecondary };
+  }
+}
+
+function mapNotificationFromApi(row) {
+  const visual = getVisualByCategory(row.categoria);
+  return {
+    id: row.id,
+    title: row.titulo,
+    subtitle: getRelativeTimeLabel(row.creada_en),
+    description: row.cuerpo,
+    icon: visual.icon,
+    iconBg: visual.iconBg,
+    iconColor: visual.iconColor,
+    unread: !row.leida,
+  };
+}
 
 export default function NotificationsScreen({ navigation }) {
   const { token } = useAuth();
-  const [notifications, setNotifications] = useState(INITIAL_NOTIFICATIONS);
+  const [notifications, setNotifications] = useState([]);
+  const [loadingFeed, setLoadingFeed] = useState(false);
   const [selectedId, setSelectedId] = useState(null);
+
+  const cargarNotificaciones = useCallback(async () => {
+    if (!token) {
+      setNotifications([]);
+      return;
+    }
+
+    try {
+      setLoadingFeed(true);
+      const data = await obtenerNotificaciones(token);
+      const mapped = Array.isArray(data) ? data.map(mapNotificationFromApi) : [];
+      setNotifications(mapped);
+    } catch (error) {
+      console.error('Error cargando notificaciones:', error);
+      setNotifications([]);
+    } finally {
+      setLoadingFeed(false);
+    }
+  }, [token]);
+
+  useFocusEffect(
+    useCallback(() => {
+      cargarNotificaciones();
+    }, [cargarNotificaciones])
+  );
 
   const selected = useMemo(
     () => notifications.find((n) => n.id === selectedId) || null,
     [notifications, selectedId]
   );
 
-  const markAsRead = (id) => {
+  const markAsRead = async (id) => {
     setNotifications((prev) =>
       prev.map((n) => (n.id === id ? { ...n, unread: false } : n))
     );
+
+    if (!token) return;
+    try {
+      await marcarNotificacionLeida(token, id);
+    } catch (error) {
+      console.error('Error marcando notificacion leida:', error);
+    }
   };
 
   const abrirDetalle = (item) => {
@@ -67,8 +111,15 @@ export default function NotificationsScreen({ navigation }) {
     setSelectedId(null);
   };
 
-  const markAllAsRead = () => {
+  const markAllAsRead = async () => {
     setNotifications((prev) => prev.map((n) => ({ ...n, unread: false })));
+
+    if (!token) return;
+    try {
+      await marcarTodasNotificacionesLeidas(token);
+    } catch (error) {
+      console.error('Error marcando todas las notificaciones como leidas:', error);
+    }
   };
 
   const handleTestNotification = async () => {
@@ -169,6 +220,13 @@ export default function NotificationsScreen({ navigation }) {
           <Text style={styles.testBtnText}>Probar push real (backend)</Text>
         </TouchableOpacity>
 
+        {!loadingFeed && notifications.length === 0 ? (
+          <View style={styles.emptyCard}>
+            <Ionicons name="notifications-off-outline" size={18} color={colors.textSecondary} />
+            <Text style={styles.emptyText}>Todavia no tenes notificaciones reales.</Text>
+          </View>
+        ) : null}
+
         {notifications.map((item) => (
           <TouchableOpacity key={item.id} style={styles.card} onPress={() => abrirDetalle(item)}>
             <View style={[styles.iconWrap, { backgroundColor: item.iconBg }]}> 
@@ -248,6 +306,19 @@ const styles = StyleSheet.create({
   title: { fontSize: 18, fontWeight: '700', color: colors.textPrimary },
   readAll: { fontSize: 12, color: colors.primary, fontWeight: '700' },
   content: { padding: 16 },
+  emptyCard: {
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: '#E3E7EC',
+    backgroundColor: '#F7F9FB',
+    paddingVertical: 14,
+    paddingHorizontal: 12,
+    marginBottom: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  emptyText: { color: colors.textSecondary, fontSize: 13, fontWeight: '600' },
   testBtn: {
     borderRadius: 14,
     borderWidth: 1,

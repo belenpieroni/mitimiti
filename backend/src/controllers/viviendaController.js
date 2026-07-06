@@ -1,264 +1,249 @@
-const fs = require('fs');
-const path = require('path');
 const { randomUUID: uuidv4 } = require('crypto');
+const { pool } = require('../db');
 
-const DB_PATH = path.join(__dirname, '../../data/db.json');
+// ── Gastos ────────────────────────────────────────────────────────────────────
 
-function leerDB() {
-  const raw = fs.readFileSync(DB_PATH, 'utf8');
-  return JSON.parse(raw);
-}
-
-function escribirDB(data) {
-  fs.writeFileSync(DB_PATH, JSON.stringify(data, null, 2), 'utf8');
-}
-
-function asegurarEstructuraVivienda(db) {
-  if (!db.vivienda || typeof db.vivienda !== 'object') {
-    db.vivienda = {};
-  }
-  if (!Array.isArray(db.vivienda.gastos)) {
-    db.vivienda.gastos = [];
-  }
-  if (!Array.isArray(db.vivienda.serviciosPeriodicos)) {
-    db.vivienda.serviciosPeriodicos = [];
-  }
-  if (!db.vivienda.acuerdosReparto || typeof db.vivienda.acuerdosReparto !== 'object') {
-    db.vivienda.acuerdosReparto = {};
-  }
-}
-
-function listarGastos(req, res, next) {
+async function listarGastos(req, res, next) {
   try {
-    const db = leerDB();
-    asegurarEstructuraVivienda(db);
-    res.json({ ok: true, data: db.vivienda.gastos });
+    const { rows } = await pool.query(
+      `SELECT id::text, nombre, monto::float, categoria, fecha::text, pagador,
+              imagen_url AS "imagenUrl", participantes, creado_en AS "creadoEn"
+       FROM vivienda_gastos ORDER BY fecha DESC, creado_en DESC`
+    );
+    res.json({ ok: true, data: rows });
   } catch (err) {
     next(err);
   }
 }
 
-function crearGasto(req, res, next) {
+async function crearGasto(req, res, next) {
   try {
-    const db = leerDB();
-    asegurarEstructuraVivienda(db);
-    const { nombre, monto, categoria, fecha, pagador, participantes } = req.body;
+    const { nombre, monto, categoria, fecha, pagador, participantes = [], imagenUrl } = req.body;
 
     if (!nombre || !monto || !categoria || !fecha || !pagador) {
       const err = new Error('Faltan campos obligatorios para crear un gasto.');
-      err.status = 400;
-      return next(err);
+      err.status = 400; return next(err);
     }
 
-    const nuevo = {
-      id: uuidv4(),
-      nombre,
-      monto: Number(monto),
-      categoria,
-      fecha,
-      pagador,
-      participantes: participantes || []
-    };
+    const id = uuidv4();
+    await pool.query(
+      `INSERT INTO vivienda_gastos (id, nombre, monto, categoria, fecha, pagador, imagen_url, participantes)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+      [id, nombre, Number(monto), categoria, fecha, pagador, imagenUrl || null, participantes]
+    );
 
-    db.vivienda.gastos.push(nuevo);
-    escribirDB(db);
-
-    res.status(201).json({ ok: true, data: nuevo });
+    res.status(201).json({
+      ok: true,
+      data: { id, nombre, monto: Number(monto), categoria, fecha, pagador, imagenUrl: imagenUrl || null, participantes },
+    });
   } catch (err) {
     next(err);
   }
 }
 
-function listarServicios(req, res, next) {
+async function editarGasto(req, res, next) {
   try {
-    const db = leerDB();
-    asegurarEstructuraVivienda(db);
-    res.json({ ok: true, data: db.vivienda.serviciosPeriodicos });
+    const { id } = req.params;
+    const { nombre, monto, categoria, fecha, pagador, participantes, imagenUrl } = req.body;
+
+    const { rows: [existing] } = await pool.query(
+      'SELECT id FROM vivienda_gastos WHERE id = $1', [id]
+    );
+    if (!existing) {
+      const err = new Error('Gasto no encontrado'); err.status = 404; return next(err);
+    }
+
+    const { rows: [updated] } = await pool.query(
+      `UPDATE vivienda_gastos SET
+         nombre = COALESCE($1, nombre),
+         monto = COALESCE($2, monto),
+         categoria = COALESCE($3, categoria),
+         fecha = COALESCE($4, fecha),
+         pagador = COALESCE($5, pagador),
+         participantes = COALESCE($6, participantes),
+         imagen_url = COALESCE($7, imagen_url)
+       WHERE id = $8
+       RETURNING id::text, nombre, monto::float, categoria, fecha::text, pagador,
+                 imagen_url AS "imagenUrl", participantes`,
+      [nombre || null, monto != null ? Number(monto) : null, categoria || null,
+       fecha || null, pagador || null, participantes || null, imagenUrl || null, id]
+    );
+
+    res.json({ ok: true, data: updated });
   } catch (err) {
     next(err);
   }
 }
 
-function crearServicio(req, res, next) {
+// ── Servicios periódicos ──────────────────────────────────────────────────────
+
+async function listarServicios(req, res, next) {
   try {
-    const db = leerDB();
-    asegurarEstructuraVivienda(db);
-    const { nombre, monto, periodicidad, proximoVencimiento, participantes } = req.body;
+    const { rows } = await pool.query(
+      `SELECT id::text, nombre, monto::float, periodicidad,
+              proximo_vencimiento::text AS "proximoVencimiento",
+              participantes, creado_en AS "creadoEn"
+       FROM vivienda_servicios ORDER BY proximo_vencimiento`
+    );
+    res.json({ ok: true, data: rows });
+  } catch (err) {
+    next(err);
+  }
+}
+
+async function crearServicio(req, res, next) {
+  try {
+    const { nombre, monto, periodicidad, proximoVencimiento, participantes = [] } = req.body;
 
     if (!nombre || !monto || !periodicidad || !proximoVencimiento) {
       const err = new Error('Faltan campos obligatorios para crear un servicio periódico.');
-      err.status = 400;
-      return next(err);
+      err.status = 400; return next(err);
     }
 
-    const nuevo = {
-      id: uuidv4(),
-      nombre,
-      monto: Number(monto),
-      periodicidad,
-      proximoVencimiento,
-      participantes: participantes || []
-    };
+    const id = uuidv4();
+    await pool.query(
+      `INSERT INTO vivienda_servicios (id, nombre, monto, periodicidad, proximo_vencimiento, participantes)
+       VALUES ($1, $2, $3, $4, $5, $6)`,
+      [id, nombre, Number(monto), periodicidad, proximoVencimiento, participantes]
+    );
 
-    db.vivienda.serviciosPeriodicos.push(nuevo);
-    escribirDB(db);
-
-    res.status(201).json({ ok: true, data: nuevo });
+    res.status(201).json({
+      ok: true,
+      data: { id, nombre, monto: Number(monto), periodicidad, proximoVencimiento, participantes },
+    });
   } catch (err) {
     next(err);
   }
 }
 
-function editarGasto(req, res, next) {
+async function editarServicio(req, res, next) {
   try {
-    const db = leerDB();
-    asegurarEstructuraVivienda(db);
-    const { id } = req.params;
-    const { nombre, monto, categoria, fecha, pagador, participantes } = req.body;
-    
-    const idx = db.vivienda.gastos.findIndex(g => g.id === id);
-    if (idx === -1) {
-      const err = new Error('Gasto no encontrado');
-      err.status = 404;
-      return next(err);
-    }
-    
-    const actualizado = {
-      ...db.vivienda.gastos[idx],
-      nombre: nombre || db.vivienda.gastos[idx].nombre,
-      monto: monto !== undefined ? Number(monto) : db.vivienda.gastos[idx].monto,
-      categoria: categoria || db.vivienda.gastos[idx].categoria,
-      fecha: fecha || db.vivienda.gastos[idx].fecha,
-      pagador: pagador || db.vivienda.gastos[idx].pagador,
-      participantes: participantes || db.vivienda.gastos[idx].participantes
-    };
-    
-    db.vivienda.gastos[idx] = actualizado;
-    escribirDB(db);
-    
-    res.json({ ok: true, data: actualizado });
-  } catch (err) {
-    next(err);
-  }
-}
-
-function editarServicio(req, res, next) {
-  try {
-    const db = leerDB();
-    asegurarEstructuraVivienda(db);
     const { id } = req.params;
     const { nombre, monto, periodicidad, proximoVencimiento, participantes } = req.body;
-    
-    const idx = db.vivienda.serviciosPeriodicos.findIndex(s => s.id === id);
-    if (idx === -1) {
-      const err = new Error('Servicio no encontrado');
-      err.status = 404;
-      return next(err);
+
+    const { rows: [existing] } = await pool.query(
+      'SELECT id FROM vivienda_servicios WHERE id = $1', [id]
+    );
+    if (!existing) {
+      const err = new Error('Servicio no encontrado'); err.status = 404; return next(err);
     }
-    
-    const actualizado = {
-      ...db.vivienda.serviciosPeriodicos[idx],
-      nombre: nombre || db.vivienda.serviciosPeriodicos[idx].nombre,
-      monto: monto !== undefined ? Number(monto) : db.vivienda.serviciosPeriodicos[idx].monto,
-      periodicidad: periodicidad || db.vivienda.serviciosPeriodicos[idx].periodicidad,
-      proximoVencimiento: proximoVencimiento || db.vivienda.serviciosPeriodicos[idx].proximoVencimiento,
-      participantes: participantes || db.vivienda.serviciosPeriodicos[idx].participantes
-    };
-    
-    db.vivienda.serviciosPeriodicos[idx] = actualizado;
-    escribirDB(db);
-    
-    res.json({ ok: true, data: actualizado });
+
+    const { rows: [updated] } = await pool.query(
+      `UPDATE vivienda_servicios SET
+         nombre = COALESCE($1, nombre),
+         monto = COALESCE($2, monto),
+         periodicidad = COALESCE($3, periodicidad),
+         proximo_vencimiento = COALESCE($4, proximo_vencimiento),
+         participantes = COALESCE($5, participantes)
+       WHERE id = $6
+       RETURNING id::text, nombre, monto::float, periodicidad,
+                 proximo_vencimiento::text AS "proximoVencimiento", participantes`,
+      [nombre || null, monto != null ? Number(monto) : null, periodicidad || null,
+       proximoVencimiento || null, participantes || null, id]
+    );
+
+    res.json({ ok: true, data: updated });
   } catch (err) {
     next(err);
   }
 }
 
-function eliminarServicio(req, res, next) {
+async function eliminarServicio(req, res, next) {
   try {
-    const db = leerDB();
-    asegurarEstructuraVivienda(db);
     const { id } = req.params;
 
     const normalizar = (txt = '') =>
-      String(txt)
-        .normalize('NFD')
-        .replace(/[\u0300-\u036f]/g, '')
-        .toLowerCase()
-        .replace(/[^a-z0-9]/g, '_');
+      String(txt).normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9]/g, '_');
 
-    const idx = db.vivienda.serviciosPeriodicos.findIndex((s) => {
-      if (String(s.id) === String(id)) return true;
-      // Fallback: permitir eliminar por nombre normalizado para datos legacy.
-      return normalizar(s.nombre) === normalizar(id);
-    });
-    if (idx === -1) {
-      const err = new Error('Servicio no encontrado');
-      err.status = 404;
-      return next(err);
+    // Buscar por UUID exacto primero, luego por nombre normalizado como fallback legacy
+    let { rows: [servicio] } = await pool.query(
+      'SELECT id FROM vivienda_servicios WHERE id::text = $1', [id]
+    );
+
+    if (!servicio) {
+      const { rows } = await pool.query('SELECT id, nombre FROM vivienda_servicios');
+      const match = rows.find((s) => normalizar(s.nombre) === normalizar(id));
+      if (match) servicio = match;
     }
 
-    const eliminado = db.vivienda.serviciosPeriodicos[idx];
-    db.vivienda.serviciosPeriodicos.splice(idx, 1);
-    escribirDB(db);
+    if (!servicio) {
+      const err = new Error('Servicio no encontrado'); err.status = 404; return next(err);
+    }
 
-    res.json({ ok: true, data: eliminado });
+    await pool.query('DELETE FROM vivienda_servicios WHERE id = $1', [servicio.id]);
+    res.json({ ok: true, data: servicio });
   } catch (err) {
     next(err);
   }
 }
 
-//NURVO//
+// ── Acuerdos de reparto ───────────────────────────────────────────────────────
 
-function listarAcuerdos(req, res, next) {
+async function listarAcuerdos(req, res, next) {
   try {
-    const db = leerDB();
-    asegurarEstructuraVivienda(db);
-    const acuerdosObj = db.vivienda.acuerdosReparto;
-    // Convertimos el objeto a array para que el frontend lo maneje fácil
-    const acuerdosArray = Object.values(acuerdosObj);
-    res.json({ ok: true, data: acuerdosArray });
-  } catch (err) { next(err); }
+    const { rows: acuerdos } = await pool.query(
+      'SELECT id, nombre, modelo FROM vivienda_acuerdos'
+    );
+
+    const resultado = await Promise.all(
+      acuerdos.map(async (a) => {
+        const { rows: participantes } = await pool.query(
+          'SELECT nombre, porcentaje::float FROM acuerdo_participantes WHERE acuerdo_id = $1',
+          [a.id]
+        );
+        return { ...a, participantes };
+      })
+    );
+
+    res.json({ ok: true, data: resultado });
+  } catch (err) {
+    next(err);
+  }
 }
 
-function guardarAcuerdo(req, res, next) {
+async function guardarAcuerdo(req, res, next) {
   try {
-    const db = leerDB();
-    asegurarEstructuraVivienda(db);
-    
     const { nombre, modelo, participantes } = req.body;
-    
-    // --- ESTE ES EL CAMBIO CLAVE ---
-    // Limpiamos el nombre para usarlo como clave única en el objeto
     const key = nombre.toLowerCase().replace(/[^a-z0-9]/g, '_');
-    
-    db.vivienda.acuerdosReparto[key] = { id: key, nombre, modelo, participantes };
-    escribirDB(db);
-    
-    res.status(201).json({ ok: true, data: db.vivienda.acuerdosReparto[key] });
-  } catch (err) { next(err); }
-}
 
-function eliminarAcuerdo(req, res, next) {
-  try {
-    const db = leerDB();
-    asegurarEstructuraVivienda(db);
-    // Normalizamos el ID que viene de la URL para que sea igual a como lo guardaste
-    const id = req.params.id.toLowerCase().trim();
-    
-    console.log("Buscando en DB el ID:", id); // Para ver qué está buscando
+    await pool.query(
+      `INSERT INTO vivienda_acuerdos (id, nombre, modelo) VALUES ($1, $2, $3)
+       ON CONFLICT (id) DO UPDATE SET nombre = $2, modelo = $3`,
+      [key, nombre, modelo]
+    );
 
-    if (db.vivienda.acuerdosReparto[id]) {
-      delete db.vivienda.acuerdosReparto[id];
-      escribirDB(db);
-      return res.status(200).json({ ok: true, message: "Eliminado" });
-    } else {
-      // Si no existe, imprime las claves disponibles para que sepas qué está pasando
-      console.log("Claves disponibles:", Object.keys(db.vivienda.acuerdosReparto));
-      return res.status(404).json({ ok: false, message: "ID no encontrado" });
+    await pool.query('DELETE FROM acuerdo_participantes WHERE acuerdo_id = $1', [key]);
+    if (Array.isArray(participantes)) {
+      for (const p of participantes) {
+        await pool.query(
+          'INSERT INTO acuerdo_participantes (acuerdo_id, nombre, porcentaje) VALUES ($1, $2, $3)',
+          [key, p.nombre, p.porcentaje]
+        );
+      }
     }
-  } catch (err) { next(err); }
+
+    res.status(201).json({ ok: true, data: { id: key, nombre, modelo, participantes: participantes || [] } });
+  } catch (err) {
+    next(err);
+  }
 }
-module.exports = { listarGastos, crearGasto, editarGasto, listarServicios, crearServicio, editarServicio, eliminarServicio, listarAcuerdos, guardarAcuerdo, eliminarAcuerdo };
 
+async function eliminarAcuerdo(req, res, next) {
+  try {
+    const id = req.params.id.toLowerCase().trim();
+    const { rowCount } = await pool.query('DELETE FROM vivienda_acuerdos WHERE id = $1', [id]);
 
+    if (rowCount === 0)
+      return res.status(404).json({ ok: false, message: 'ID no encontrado' });
+
+    res.status(200).json({ ok: true, message: 'Eliminado' });
+  } catch (err) {
+    next(err);
+  }
+}
+
+module.exports = {
+  listarGastos, crearGasto, editarGasto,
+  listarServicios, crearServicio, editarServicio, eliminarServicio,
+  listarAcuerdos, guardarAcuerdo, eliminarAcuerdo,
+};

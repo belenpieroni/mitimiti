@@ -1,26 +1,8 @@
-const fs = require('fs');
-const path = require('path');
 const { randomUUID: uuidv4 } = require('crypto');
+const { pool } = require('../db');
+const { cargarJuntadaCompleta } = require('../helpers/juntadaHelpers');
 const { calcularBalance, calcularBalanceGlobal } = require('../services/balanceService');
-const {
-  notifyUsersByName,
-  NOTIFICATION_CATEGORIES,
-} = require('../services/pushNotificationService');
-
-const DB_PATH = path.join(__dirname, '../../data/db.json');
-
-// ── Helpers de persistencia ───────────────────────────────────────────────────
-
-function leerDB() {
-  const raw = fs.readFileSync(DB_PATH, 'utf8');
-  return JSON.parse(raw);
-}
-
-function escribirDB(data) {
-  fs.writeFileSync(DB_PATH, JSON.stringify(data, null, 2), 'utf8');
-}
-
-// ── Helpers de colores para participantes ─────────────────────────────────────
+const { notifyUsersByName, NOTIFICATION_CATEGORIES } = require('../services/pushNotificationService');
 
 const COLORES_DISPONIBLES = [
   '#473472', '#526D82', '#9DB2BF', '#42b271',
@@ -33,56 +15,51 @@ function getIniciales(nombre) {
   return nombre.slice(0, 2).toUpperCase();
 }
 
-// ── Controladores ─────────────────────────────────────────────────────────────
+// ── Juntadas ──────────────────────────────────────────────────────────────────
 
-/**
- * GET /api/juntadas
- * Devuelve la lista de juntadas filtradas por el parámetro ?usuario=Nombre
- */
-function listarJuntadas(req, res, next) {
+async function listarJuntadas(req, res, next) {
   try {
-    const db = leerDB();
     const usuario = req.query.usuario;
+    if (!usuario)
+      return res.status(400).json({ ok: false, error: 'El parámetro "usuario" es requerido para listar las juntadas.' });
 
-    if (!usuario) {
-      return res.status(400).json({ 
-        ok: false, 
-        error: 'El parámetro "usuario" es requerido para listar las juntadas.' 
-      });
-    }
+    console.log('Usuario recibido:', usuario);
 
-    // Filtramos las juntadas donde el usuario actual es un participante activo
-    const resultado = db.juntadas
-      .filter((j) => j.participantes.some((p) => p.nombre.toLowerCase() === usuario.toLowerCase()))
-      .map((j) => {
-        const balance = calcularBalance(j);
-        
-        // CORREGIDO: Buscamos dinámicamente el saldo del usuario actual, chau 'Martín'
-        const saldoUsuario = balance.saldos.find((s) => s.nombre.toLowerCase() === usuario.toLowerCase());
-        const saldoNetoUsuario = saldoUsuario
-          ? (typeof saldoUsuario.saldoPendiente === 'number' ? saldoUsuario.saldoPendiente : saldoUsuario.saldo)
-          : 0;
-        console.log('Usuario recibido:', req.query.usuario);
-        return {
-          id: j.id,
-          nombre: j.nombre,
-          descripcion: j.descripcion,
-          fecha: j.fecha,
-          cantidadParticipantes: j.participantes.length,
-          cantidadGastos: j.gastos.length,
-          totalGastado: balance.totalGastado,
-          participantes: j.participantes,
-          // Info de deuda real para este usuario
-          deuda: Math.abs(saldoNetoUsuario),
-          tipo: saldoUsuario
-            ? saldoNetoUsuario > 0.01
-              ? 'cobrar'
-              : saldoNetoUsuario < -0.01
-              ? 'pagar'
-              : 'ninguna'
-            : 'ninguna',
-        };
-      });
+    const { rows: ids } = await pool.query(
+      `SELECT DISTINCT j.id::text, j.creada_en
+       FROM juntadas j
+       JOIN juntada_participantes p ON p.juntada_id = j.id
+       WHERE LOWER(p.nombre) = LOWER($1)
+       ORDER BY j.creada_en DESC`,
+      [usuario]
+    );
+
+    const juntadas = await Promise.all(ids.map(({ id }) => cargarJuntadaCompleta(id)));
+
+    const resultado = juntadas.map((juntada) => {
+      const balance = calcularBalance(juntada);
+      const saldoUsuario = balance.saldos.find(
+        (s) => s.nombre.toLowerCase() === usuario.toLowerCase()
+      );
+      const saldoNeto = saldoUsuario
+        ? (typeof saldoUsuario.saldoPendiente === 'number' ? saldoUsuario.saldoPendiente : saldoUsuario.saldo)
+        : 0;
+
+      return {
+        id: juntada.id,
+        nombre: juntada.nombre,
+        descripcion: juntada.descripcion,
+        fecha: juntada.fecha,
+        cantidadParticipantes: juntada.participantes.length,
+        cantidadGastos: juntada.gastos.length,
+        totalGastado: balance.totalGastado,
+        participantes: juntada.participantes,
+        deuda: Math.abs(saldoNeto),
+        tipo: saldoUsuario
+          ? saldoNeto > 0.01 ? 'cobrar' : saldoNeto < -0.01 ? 'pagar' : 'ninguna'
+          : 'ninguna',
+      };
+    });
 
     res.json({ ok: true, data: resultado });
   } catch (err) {
@@ -90,75 +67,68 @@ function listarJuntadas(req, res, next) {
   }
 }
 
-/**
- * POST /api/juntadas
- */
-function crearJuntada(req, res, next) {
+async function crearJuntada(req, res, next) {
   try {
     const { nombre, descripcion = '', participantes = [] } = req.body;
 
     if (!nombre || nombre.trim() === '') {
-      const err = new Error('El campo "nombre" es requerido.');
-      err.status = 400;
-      return next(err);
+      const err = new Error('El campo "nombre" es requerido.'); err.status = 400; return next(err);
     }
-
     if (!Array.isArray(participantes) || participantes.length === 0) {
-      const err = new Error('Se requiere al menos un participante.');
-      err.status = 400;
-      return next(err);
+      const err = new Error('Se requiere al menos un participante.'); err.status = 400; return next(err);
     }
 
-    const nuevosParticipantes = participantes.map((p, i) => ({
-      id: uuidv4(),
-      nombre: p.nombre.trim(),
-      iniciales: p.iniciales || getIniciales(p.nombre),
-      color: p.color || COLORES_DISPONIBLES[i % COLORES_DISPONIBLES.length],
-    }));
+    const id = uuidv4();
+    const fecha = new Date().toISOString().split('T')[0];
 
-    const nueva = {
-      id: uuidv4(),
-      nombre: nombre.trim(),
-      descripcion: descripcion.trim(),
-      fecha: new Date().toISOString().split('T')[0],
-      creadaEn: new Date().toISOString(),
-      participantes: nuevosParticipantes,
-      gastos: [],
-      subgrupos: [],
-    };
+    await pool.query(
+      `INSERT INTO juntadas (id, nombre, descripcion, fecha) VALUES ($1, $2, $3, $4)`,
+      [id, nombre.trim(), descripcion.trim(), fecha]
+    );
 
-    const db = leerDB();
-    db.juntadas.unshift(nueva);
-    escribirDB(db);
+    const nuevosParticipantes = [];
+    for (let i = 0; i < participantes.length; i++) {
+      const p = participantes[i];
+      const pid = uuidv4();
+      const pnombre = p.nombre.trim();
+      const piniciales = p.iniciales || getIniciales(pnombre);
+      const pcolor = p.color || COLORES_DISPONIBLES[i % COLORES_DISPONIBLES.length];
 
-    res.status(201).json({ ok: true, data: nueva });
+      await pool.query(
+        `INSERT INTO juntada_participantes (id, juntada_id, nombre, iniciales, color)
+         VALUES ($1, $2, $3, $4, $5)`,
+        [pid, id, pnombre, piniciales, pcolor]
+      );
+      nuevosParticipantes.push({ id: pid, nombre: pnombre, iniciales: piniciales, color: pcolor });
+    }
+
+    res.status(201).json({
+      ok: true,
+      data: {
+        id, nombre: nombre.trim(), descripcion: descripcion.trim(),
+        fecha, creadaEn: new Date().toISOString(),
+        participantes: nuevosParticipantes, gastos: [], subgrupos: [],
+      },
+    });
   } catch (err) {
     next(err);
   }
 }
 
-/**
- * GET /api/juntadas/:id
- */
-function obtenerJuntada(req, res, next) {
+async function obtenerJuntada(req, res, next) {
   try {
-    const db = leerDB();
-    const juntada = db.juntadas.find((j) => j.id === req.params.id);
-
+    const juntada = await cargarJuntadaCompleta(req.params.id);
     if (!juntada) {
       const err = new Error(`Juntada con id "${req.params.id}" no encontrada.`);
-      err.status = 404;
-      return next(err);
+      err.status = 404; return next(err);
     }
 
     const balance = calcularBalance(juntada);
-    
-    if (db.perfiles) {
-      balance.transferencias = balance.transferencias.map(t => ({
-        ...t,
-        aliasDestino: db.perfiles[t.para] ? db.perfiles[t.para].alias : null
-      }));
-    }
+    const { rows: perfiles } = await pool.query('SELECT nombre, alias FROM perfiles');
+    const perfilesMap = Object.fromEntries(perfiles.map((p) => [p.nombre, p.alias]));
+    balance.transferencias = balance.transferencias.map((t) => ({
+      ...t, aliasDestino: perfilesMap[t.para] || null,
+    }));
 
     res.json({ ok: true, data: { ...juntada, balance } });
   } catch (err) {
@@ -166,67 +136,61 @@ function obtenerJuntada(req, res, next) {
   }
 }
 
-/**
- * DELETE /api/juntadas/:id
- */
-function editarJuntada(req, res, next) {
+async function editarJuntada(req, res, next) {
   try {
-    const db = leerDB();
-    const juntada = db.juntadas.find((j) => j.id === req.params.id);
-    if (!juntada) {
+    const { rows: [existing] } = await pool.query('SELECT id FROM juntadas WHERE id = $1', [req.params.id]);
+    if (!existing) {
       const err = new Error(`Juntada con id "${req.params.id}" no encontrada.`);
-      err.status = 404;
-      return next(err);
+      err.status = 404; return next(err);
     }
-    const { nombre, descripcion, participantes } = req.body;
-    if (nombre !== undefined) juntada.nombre = nombre.trim();
-    if (descripcion !== undefined) juntada.descripcion = descripcion.trim();
 
-    // Si vienen participantes, solo agregamos los nuevos por nombre (no eliminamos existentes)
-    // para evitar inconsistencias con gastos ya cargados.
+    const { nombre, descripcion, participantes } = req.body;
+
+    if (nombre !== undefined || descripcion !== undefined) {
+      const updates = []; const values = []; let idx = 1;
+      if (nombre !== undefined) { updates.push(`nombre = $${idx++}`); values.push(nombre.trim()); }
+      if (descripcion !== undefined) { updates.push(`descripcion = $${idx++}`); values.push(descripcion.trim()); }
+      values.push(req.params.id);
+      await pool.query(`UPDATE juntadas SET ${updates.join(', ')} WHERE id = $${idx}`, values);
+    }
+
     let nombresNuevos = [];
     if (Array.isArray(participantes)) {
-      const nombresActuales = new Set(
-        juntada.participantes.map((p) => p.nombre.toLowerCase())
+      const { rows: existingParts } = await pool.query(
+        'SELECT nombre FROM juntada_participantes WHERE juntada_id = $1', [req.params.id]
       );
+      const nombresActuales = new Set(existingParts.map((p) => p.nombre.toLowerCase()));
+      const baseIndex = existingParts.length;
 
-      const baseIndex = juntada.participantes.length;
       const nuevos = participantes
         .filter((p) => p?.nombre && p.nombre.trim() !== '')
         .filter((p) => !nombresActuales.has(p.nombre.trim().toLowerCase()))
-        .map((p, idx) => {
-          const nombreLimpio = p.nombre.trim();
-          return {
-            id: p.id || uuidv4(),
-            nombre: nombreLimpio,
-            iniciales: p.iniciales || getIniciales(nombreLimpio),
-            color:
-              p.color ||
-              COLORES_DISPONIBLES[
-                (baseIndex + idx) % COLORES_DISPONIBLES.length
-              ],
-          };
-        });
+        .map((p, idx) => ({
+          id: p.id || uuidv4(),
+          nombre: p.nombre.trim(),
+          iniciales: p.iniciales || getIniciales(p.nombre.trim()),
+          color: p.color || COLORES_DISPONIBLES[(baseIndex + idx) % COLORES_DISPONIBLES.length],
+        }));
 
+      for (const p of nuevos) {
+        await pool.query(
+          `INSERT INTO juntada_participantes (id, juntada_id, nombre, iniciales, color)
+           VALUES ($1, $2, $3, $4, $5)`,
+          [p.id, req.params.id, p.nombre, p.iniciales, p.color]
+        );
+      }
       nombresNuevos = nuevos.map((p) => p.nombre);
-      juntada.participantes.push(...nuevos);
     }
 
-    escribirDB(db);
+    const juntada = await cargarJuntadaCompleta(req.params.id);
 
     if (nombresNuevos.length > 0) {
-      notifyUsersByName(db, nombresNuevos, {
+      notifyUsersByName(nombresNuevos, {
         title: 'Te agregaron a una juntada',
         body: `Ahora participas en "${juntada.nombre}"`,
-        data: {
-          type: 'juntada_invite',
-          juntadaId: juntada.id,
-          juntadaNombre: juntada.nombre,
-        },
-      }, {
-        category: NOTIFICATION_CATEGORIES.NUEVAS_JUNTADAS,
-      }).catch((error) => {
-        console.error('[push] Error enviando notificacion de juntada:', error.message);
+        data: { type: 'juntada_invite', juntadaId: juntada.id, juntadaNombre: juntada.nombre },
+      }, { category: NOTIFICATION_CATEGORIES.NUEVAS_JUNTADAS }).catch((err) => {
+        console.error('[push] Error enviando notificacion de juntada:', err.message);
       });
     }
 
@@ -236,20 +200,13 @@ function editarJuntada(req, res, next) {
   }
 }
 
-function eliminarJuntada(req, res, next) {
+async function eliminarJuntada(req, res, next) {
   try {
-    const db = leerDB();
-    const index = db.juntadas.findIndex((j) => j.id === req.params.id);
-
-    if (index === -1) {
+    const { rowCount } = await pool.query('DELETE FROM juntadas WHERE id = $1', [req.params.id]);
+    if (rowCount === 0) {
       const err = new Error(`Juntada con id "${req.params.id}" no encontrada.`);
-      err.status = 404;
-      return next(err);
+      err.status = 404; return next(err);
     }
-
-    db.juntadas.splice(index, 1);
-    escribirDB(db);
-
     res.json({ ok: true, mensaje: 'Juntada eliminada correctamente.' });
   } catch (err) {
     next(err);
@@ -258,85 +215,72 @@ function eliminarJuntada(req, res, next) {
 
 // ── Participantes ─────────────────────────────────────────────────────────────
 
-function agregarParticipante(req, res, next) {
+async function agregarParticipante(req, res, next) {
   try {
-    const db = leerDB();
-    const juntada = db.juntadas.find((j) => j.id === req.params.id);
-
+    const { rows: [juntada] } = await pool.query('SELECT id FROM juntadas WHERE id = $1', [req.params.id]);
     if (!juntada) {
       const err = new Error(`Juntada con id "${req.params.id}" no encontrada.`);
-      err.status = 404;
-      return next(err);
+      err.status = 404; return next(err);
     }
 
     const { nombre, iniciales, color } = req.body;
     if (!nombre || nombre.trim() === '') {
       const err = new Error('El campo "nombre" del participante es requerido.');
-      err.status = 400;
-      return next(err);
+      err.status = 400; return next(err);
     }
 
     const nombreLimpio = nombre.trim();
-
-    const yaExiste = juntada.participantes.some(
-      (p) => p.nombre.toLowerCase() === nombreLimpio.toLowerCase()
+    const { rows: existing } = await pool.query(
+      'SELECT id FROM juntada_participantes WHERE juntada_id = $1 AND LOWER(nombre) = LOWER($2)',
+      [req.params.id, nombreLimpio]
     );
-    if (yaExiste) {
+    if (existing.length > 0) {
       const err = new Error(`El participante "${nombreLimpio}" ya está en esta juntada.`);
-      err.status = 409;
-      return next(err);
+      err.status = 409; return next(err);
     }
 
-    const colorAsignado =
-      color || COLORES_DISPONIBLES[juntada.participantes.length % COLORES_DISPONIBLES.length];
+    const { rows: [countRow] } = await pool.query(
+      'SELECT COUNT(*)::int AS c FROM juntada_participantes WHERE juntada_id = $1', [req.params.id]
+    );
+    const colorAsignado = color || COLORES_DISPONIBLES[countRow.c % COLORES_DISPONIBLES.length];
+    const pid = uuidv4();
 
-    const nuevo = {
-      id: uuidv4(),
-      nombre: nombreLimpio,
-      iniciales: iniciales || getIniciales(nombreLimpio),
-      color: colorAsignado,
-    };
+    await pool.query(
+      `INSERT INTO juntada_participantes (id, juntada_id, nombre, iniciales, color)
+       VALUES ($1, $2, $3, $4, $5)`,
+      [pid, req.params.id, nombreLimpio, iniciales || getIniciales(nombreLimpio), colorAsignado]
+    );
 
-    juntada.participantes.push(nuevo);
-    escribirDB(db);
-
-    res.status(201).json({ ok: true, data: nuevo });
+    res.status(201).json({
+      ok: true,
+      data: { id: pid, nombre: nombreLimpio, iniciales: iniciales || getIniciales(nombreLimpio), color: colorAsignado },
+    });
   } catch (err) {
     next(err);
   }
 }
 
-function quitarParticipante(req, res, next) {
+async function quitarParticipante(req, res, next) {
   try {
-    const db = leerDB();
-    const juntada = db.juntadas.find((j) => j.id === req.params.id);
-
-    if (!juntada) {
-      const err = new Error(`Juntada con id "${req.params.id}" no encontrada.`);
-      err.status = 404;
-      return next(err);
-    }
-
-    const index = juntada.participantes.findIndex((p) => p.id === req.params.pid);
-    if (index === -1) {
+    const { rows: [participante] } = await pool.query(
+      'SELECT id, nombre FROM juntada_participantes WHERE id = $1 AND juntada_id = $2',
+      [req.params.pid, req.params.id]
+    );
+    if (!participante) {
       const err = new Error(`Participante con id "${req.params.pid}" no encontrado.`);
-      err.status = 404;
-      return next(err);
+      err.status = 404; return next(err);
     }
 
-    const participante = juntada.participantes[index];
-    const tieneGastos = juntada.gastos.some((g) => g.pagador === participante.nombre);
-    if (tieneGastos) {
-      const err = new Error(
-        `No se puede quitar a "${participante.nombre}" porque tiene gastos registrados en esta juntada.`
-      );
-      err.status = 422;
-      return next(err);
+    const { rows: gastos } = await pool.query(
+      'SELECT id FROM juntada_gastos WHERE juntada_id = $1 AND LOWER(pagador) = LOWER($2)',
+      [req.params.id, participante.nombre]
+    );
+    if (gastos.length > 0) {
+      const err = new Error(`No se puede quitar a "${participante.nombre}" porque tiene gastos registrados en esta juntada.`);
+      err.status = 422; return next(err);
     }
 
-    juntada.participantes.splice(index, 1);
-    escribirDB(db);
-
+    await pool.query('DELETE FROM juntada_participantes WHERE id = $1', [req.params.pid]);
     res.json({ ok: true, mensaje: `Participante "${participante.nombre}" eliminado.` });
   } catch (err) {
     next(err);
@@ -345,105 +289,74 @@ function quitarParticipante(req, res, next) {
 
 // ── Gastos ────────────────────────────────────────────────────────────────────
 
-function agregarGasto(req, res, next) {
+async function agregarGasto(req, res, next) {
   try {
-    const db = leerDB();
-    const juntada = db.juntadas.find((j) => j.id === req.params.id);
-
+    const juntada = await cargarJuntadaCompleta(req.params.id);
     if (!juntada) {
       const err = new Error(`Juntada con id "${req.params.id}" no encontrada.`);
-      err.status = 404;
-      return next(err);
+      err.status = 404; return next(err);
     }
 
-    const { 
-      nombre, 
-      pagador, 
-      monto, 
-      splitMode = 'equal', 
-      splitSubgroups = [], 
-      beneficiarios = [], 
-      ticketPhoto = null 
+    const {
+      nombre, pagador, monto,
+      splitMode = 'equal', splitSubgroups = [], beneficiarios = [], ticketPhoto = null,
     } = req.body;
 
     if (!nombre || nombre.trim() === '') {
-      const err = new Error('El campo "nombre" del gasto es requerido.');
-      err.status = 400;
-      return next(err);
+      const err = new Error('El campo "nombre" del gasto es requerido.'); err.status = 400; return next(err);
     }
     if (!pagador || pagador.trim() === '') {
-      const err = new Error('El campo "pagador" es requerido.');
-      err.status = 400;
-      return next(err);
+      const err = new Error('El campo "pagador" es requerido.'); err.status = 400; return next(err);
     }
     if (typeof monto !== 'number' || monto <= 0) {
-      const err = new Error('El campo "monto" debe ser un número mayor a 0.');
-      err.status = 400;
-      return next(err);
+      const err = new Error('El campo "monto" debe ser un número mayor a 0.'); err.status = 400; return next(err);
     }
 
-    // Validar que el pagador sea un participante real
     const esParticipante = juntada.participantes.some(
       (p) => p.nombre.toLowerCase() === pagador.trim().toLowerCase()
     );
     if (!esParticipante) {
-      const err = new Error(
-        `"${pagador}" no es un participante de esta juntada. Agregalo primero.`
-      );
-      err.status = 422;
-      return next(err);
+      const err = new Error(`"${pagador}" no es un participante de esta juntada. Agregalo primero.`);
+      err.status = 422; return next(err);
     }
 
-    // Asegurar que los beneficiarios tildados existan en la juntada
-    if (beneficiarios && beneficiarios.length > 0) {
-      const nombresValidos = juntada.participantes.map(p => p.nombre.toLowerCase());
-      const invalidos = beneficiarios.filter(b => !nombresValidos.includes(b.trim().toLowerCase()));
-      
+    if (beneficiarios.length > 0) {
+      const nombresValidos = juntada.participantes.map((p) => p.nombre.toLowerCase());
+      const invalidos = beneficiarios.filter((b) => !nombresValidos.includes(b.trim().toLowerCase()));
       if (invalidos.length > 0) {
-        const err = new Error(
-          `Los siguientes beneficiarios no pertenecen a la juntada: ${invalidos.join(', ')}`
-        );
-        err.status = 422;
-        return next(err);
+        const err = new Error(`Los siguientes beneficiarios no pertenecen a la juntada: ${invalidos.join(', ')}`);
+        err.status = 422; return next(err);
       }
     }
 
-    // Guardar el nuevo gasto incluyendo la lista limpia de beneficiarios
-    const nuevo = {
-      id: uuidv4(),
-      nombre: nombre.trim(),
-      pagador: pagador.trim(),
-      splitMode,     
-      splitSubgroups, 
-      beneficiarios: beneficiarios.map(b => b.trim()),
-      monto: Math.round(monto * 100) / 100,
-      ticketPhoto,
-      creadoEn: new Date().toISOString(),
-    };
+    const id = uuidv4();
+    const montoRedondeado = Math.round(monto * 100) / 100;
 
-    juntada.gastos.push(nuevo);
-    escribirDB(db);
+    await pool.query(
+      `INSERT INTO juntada_gastos
+         (id, juntada_id, nombre, pagador, monto, split_mode, split_subgroups, beneficiarios, ticket_photo)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+      [id, req.params.id, nombre.trim(), pagador.trim(), montoRedondeado,
+       splitMode, splitSubgroups, beneficiarios.map((b) => b.trim()), ticketPhoto]
+    );
+
+    const nuevo = {
+      id, nombre: nombre.trim(), pagador: pagador.trim(),
+      splitMode, splitSubgroups, beneficiarios: beneficiarios.map((b) => b.trim()),
+      monto: montoRedondeado, ticketPhoto, creadoEn: new Date().toISOString(),
+    };
 
     const receptores = juntada.participantes
       .map((p) => p.nombre)
-      .filter((nombreParticipante) =>
-        nombreParticipante.trim().toLowerCase() !== pagador.trim().toLowerCase()
-      );
+      .filter((n) => n.trim().toLowerCase() !== pagador.trim().toLowerCase());
 
     if (receptores.length > 0) {
-      notifyUsersByName(db, receptores, {
+      notifyUsersByName(receptores, {
         title: 'Nuevo gasto en juntada',
         body: `${pagador.trim()} agrego "${nombre.trim()}" en ${juntada.nombre}.`,
-        data: {
-          type: 'new_expense',
-          juntadaId: juntada.id,
-          juntadaNombre: juntada.nombre,
-          gastoId: nuevo.id,
-        },
-      }, {
-        category: NOTIFICATION_CATEGORIES.NUEVOS_GASTOS,
-      }).catch((error) => {
-        console.error('[push] Error enviando notificacion de nuevo gasto:', error.message);
+        data: { type: 'new_expense', juntadaId: juntada.id, juntadaNombre: juntada.nombre, gastoId: id },
+      }, { category: NOTIFICATION_CATEGORIES.NUEVOS_GASTOS }).catch((err) => {
+        console.error('[push] Error enviando notificacion de nuevo gasto:', err.message);
       });
     }
 
@@ -453,27 +366,16 @@ function agregarGasto(req, res, next) {
   }
 }
 
-function eliminarGasto(req, res, next) {
+async function eliminarGasto(req, res, next) {
   try {
-    const db = leerDB();
-    const juntada = db.juntadas.find((j) => j.id === req.params.id);
-
-    if (!juntada) {
-      const err = new Error(`Juntada con id "${req.params.id}" no encontrada.`);
-      err.status = 404;
-      return next(err);
-    }
-
-    const index = juntada.gastos.findIndex((g) => g.id === req.params.gid);
-    if (index === -1) {
+    const { rowCount } = await pool.query(
+      'DELETE FROM juntada_gastos WHERE id = $1 AND juntada_id = $2',
+      [req.params.gid, req.params.id]
+    );
+    if (rowCount === 0) {
       const err = new Error(`Gasto con id "${req.params.gid}" no encontrado.`);
-      err.status = 404;
-      return next(err);
+      err.status = 404; return next(err);
     }
-
-    juntada.gastos.splice(index, 1);
-    escribirDB(db);
-
     res.json({ ok: true, mensaje: 'Gasto eliminado correctamente.' });
   } catch (err) {
     next(err);
@@ -482,71 +384,68 @@ function eliminarGasto(req, res, next) {
 
 // ── Balance ───────────────────────────────────────────────────────────────────
 
-function obtenerBalance(req, res, next) {
+async function obtenerBalance(req, res, next) {
   try {
-    const db = leerDB();
-    const juntada = db.juntadas.find((j) => j.id === req.params.id);
-
+    const juntada = await cargarJuntadaCompleta(req.params.id);
     if (!juntada) {
       const err = new Error(`Juntada con id "${req.params.id}" no encontrada.`);
-      err.status = 404;
-      return next(err);
+      err.status = 404; return next(err);
     }
-
     const balance = calcularBalance(juntada);
-    
-    if (db.perfiles) {
-      balance.transferencias = balance.transferencias.map(t => ({
-        ...t,
-        aliasDestino: db.perfiles[t.para] ? db.perfiles[t.para].alias : null
-      }));
-    }
-
+    const { rows: perfiles } = await pool.query('SELECT nombre, alias FROM perfiles');
+    const perfilesMap = Object.fromEntries(perfiles.map((p) => [p.nombre, p.alias]));
+    balance.transferencias = balance.transferencias.map((t) => ({
+      ...t, aliasDestino: perfilesMap[t.para] || null,
+    }));
     res.json({ ok: true, data: balance });
   } catch (err) {
     next(err);
   }
 }
 
-function obtenerBalanceGlobal(req, res, next) {
+async function obtenerBalanceGlobal(req, res, next) {
   try {
-    const db = leerDB();
     const nombre = decodeURIComponent(req.params.nombre);
-    const balance = calcularBalanceGlobal(nombre, db.juntadas);
+    const { rows: ids } = await pool.query(
+      `SELECT DISTINCT j.id::text FROM juntadas j
+       JOIN juntada_participantes p ON p.juntada_id = j.id
+       WHERE LOWER(p.nombre) = LOWER($1)`,
+      [nombre]
+    );
+    const juntadas = await Promise.all(ids.map(({ id }) => cargarJuntadaCompleta(id)));
+    const balance = calcularBalanceGlobal(nombre, juntadas);
     res.json({ ok: true, data: balance });
   } catch (err) {
     next(err);
   }
 }
+
+// ── Subgrupos ─────────────────────────────────────────────────────────────────
 
 const agregarSubgrupo = async (req, res) => {
   try {
     const { id } = req.params;
     const { nombre, integrantes } = req.body;
 
-    // Validación del CA1: Mínimo 2 participantes
-    if (!nombre || !integrantes || integrantes.length < 2) {
+    if (!nombre || !integrantes || integrantes.length < 2)
       return res.status(400).json({ error: 'El subgrupo debe tener un nombre y al menos 2 integrantes.' });
-    }
 
-    const data = leerDB();
-    const juntada = data.juntadas.find(j => j.id === id);
-
+    const { rows: [juntada] } = await pool.query('SELECT id FROM juntadas WHERE id = $1', [id]);
     if (!juntada) return res.status(404).json({ error: 'Juntada no encontrada' });
 
-    // Si por ser una juntada vieja no tiene el array, se lo creamos
-    if (!juntada.subgrupos) juntada.subgrupos = [];
+    const sgId = uuidv4();
+    await pool.query(
+      'INSERT INTO juntada_subgrupos (id, juntada_id, nombre) VALUES ($1, $2, $3)',
+      [sgId, id, nombre.trim()]
+    );
+    for (const integrante of integrantes) {
+      await pool.query(
+        'INSERT INTO subgrupo_integrantes (subgrupo_id, nombre) VALUES ($1, $2) ON CONFLICT DO NOTHING',
+        [sgId, integrante]
+      );
+    }
 
-    const nuevoSubgrupo = {
-      id: uuidv4(),
-      nombre: nombre.trim(),
-      integrantes
-    };
-
-    juntada.subgrupos.push(nuevoSubgrupo);
-    escribirDB(data);
-
-    res.status(201).json({ ok: true, data: nuevoSubgrupo });
+    res.status(201).json({ ok: true, data: { id: sgId, nombre: nombre.trim(), integrantes } });
   } catch (error) {
     res.status(500).json({ error: 'Error al crear el subgrupo' });
   }
@@ -557,22 +456,23 @@ const editarSubgrupo = async (req, res) => {
     const { id, sgid } = req.params;
     const { nombre, integrantes } = req.body;
 
-    if (!nombre || !integrantes || integrantes.length < 2) {
+    if (!nombre || !integrantes || integrantes.length < 2)
       return res.status(400).json({ error: 'El subgrupo debe tener un nombre y al menos 2 integrantes.' });
-    }
 
-    const data = leerDB();
-    const juntada = data.juntadas.find(j => j.id === id);
-    if (!juntada) return res.status(404).json({ error: 'Juntada no encontrada' });
-
-    const sg = (juntada.subgrupos || []).find(s => s.id === sgid);
+    const { rows: [sg] } = await pool.query(
+      'SELECT id FROM juntada_subgrupos WHERE id = $1 AND juntada_id = $2', [sgid, id]
+    );
     if (!sg) return res.status(404).json({ error: 'Subgrupo no encontrado' });
 
-    sg.nombre = nombre.trim();
-    sg.integrantes = integrantes;
-    escribirDB(data);
+    await pool.query('UPDATE juntada_subgrupos SET nombre = $1 WHERE id = $2', [nombre.trim(), sgid]);
+    await pool.query('DELETE FROM subgrupo_integrantes WHERE subgrupo_id = $1', [sgid]);
+    for (const integrante of integrantes) {
+      await pool.query(
+        'INSERT INTO subgrupo_integrantes (subgrupo_id, nombre) VALUES ($1, $2)', [sgid, integrante]
+      );
+    }
 
-    res.json({ ok: true, data: sg });
+    res.json({ ok: true, data: { id: sgid, nombre: nombre.trim(), integrantes } });
   } catch (error) {
     res.status(500).json({ error: 'Error al editar el subgrupo' });
   }
@@ -581,19 +481,10 @@ const editarSubgrupo = async (req, res) => {
 const eliminarSubgrupo = async (req, res) => {
   try {
     const { id, sgid } = req.params;
-
-    const data = leerDB();
-    const juntada = data.juntadas.find(j => j.id === id);
-
-    if (!juntada) return res.status(404).json({ error: 'Juntada no encontrada' });
-    if (!juntada.subgrupos) juntada.subgrupos = [];
-
-    const indiceSg = juntada.subgrupos.findIndex(sg => sg.id === sgid);
-    if (indiceSg === -1) return res.status(404).json({ error: 'Subgrupo no encontrado' });
-
-    juntada.subgrupos.splice(indiceSg, 1);
-    escribirDB(data);
-
+    const { rowCount } = await pool.query(
+      'DELETE FROM juntada_subgrupos WHERE id = $1 AND juntada_id = $2', [sgid, id]
+    );
+    if (rowCount === 0) return res.status(404).json({ error: 'Subgrupo no encontrado' });
     res.status(200).json({ ok: true, mensaje: 'Subgrupo eliminado' });
   } catch (error) {
     res.status(500).json({ error: 'Error al eliminar el subgrupo' });
@@ -601,18 +492,9 @@ const eliminarSubgrupo = async (req, res) => {
 };
 
 module.exports = {
-  listarJuntadas,
-  crearJuntada,
-  editarJuntada,
-  obtenerJuntada,
-  eliminarJuntada,
-  agregarParticipante,
-  quitarParticipante,
-  agregarGasto,
-  eliminarGasto,
-  obtenerBalance,
-  obtenerBalanceGlobal,
-  agregarSubgrupo,
-  editarSubgrupo,
-  eliminarSubgrupo,
+  listarJuntadas, crearJuntada, editarJuntada, obtenerJuntada, eliminarJuntada,
+  agregarParticipante, quitarParticipante,
+  agregarGasto, eliminarGasto,
+  obtenerBalance, obtenerBalanceGlobal,
+  agregarSubgrupo, editarSubgrupo, eliminarSubgrupo,
 };

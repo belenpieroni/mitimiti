@@ -51,3 +51,6 @@ else
 fi
 
 docker compose up --build "$@"
+
+# Tras levantar el stack, migrá los datos del db.json si es la primera vez:
+# docker compose exec backend npm run seed

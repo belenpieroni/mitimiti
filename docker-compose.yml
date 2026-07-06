@@ -1,18 +1,46 @@
 services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: ${DB_NAME:-mitimiti}
+      POSTGRES_USER: ${DB_USER:-mitimiti}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-mitimiti_dev}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-mitimiti} -d ${DB_NAME:-mitimiti}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
   backend:
     build:
       context: ./backend
+    depends_on:
+      db:
+        condition: service_healthy
     ports:
       - "3000:3000"
     environment:
       NODE_ENV: development
-      # OCR en la nube (opcional pero recomendado). Conseguí una key gratis en
-      # https://ocr.space/ocrapi y ponela en un archivo .env como OCR_SPACE_API_KEY=...
-      # Si queda vacía, el backend usa Tesseract local automáticamente.
+      JWT_SECRET: ${JWT_SECRET:-mitimiti_seguro_2026}
       OCR_SPACE_API_KEY: ${OCR_SPACE_API_KEY:-}
+      FIREBASE_PROJECT_ID: ${FIREBASE_PROJECT_ID:-}
+      FIREBASE_CLIENT_EMAIL: ${FIREBASE_CLIENT_EMAIL:-}
+      FIREBASE_PRIVATE_KEY: ${FIREBASE_PRIVATE_KEY:-}
+      DB_HOST: db
+      DB_PORT: 5432
+      DB_NAME: ${DB_NAME:-mitimiti}
+      DB_USER: ${DB_USER:-mitimiti}
+      DB_PASSWORD: ${DB_PASSWORD:-mitimiti_dev}
+      UPLOADS_DIR: /app/uploads
     volumes:
       - ./backend/src:/app/src
       - ./backend/data:/app/data
+      - uploads:/app/uploads
     restart: unless-stopped
 
   front:
@@ -39,3 +67,5 @@ services:
 
 volumes:
   node_modules:
+  postgres_data:
+  uploads:

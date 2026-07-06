@@ -1,144 +1,67 @@
-const fs = require('fs');
-const path = require('path');
-const { randomUUID: uuidv4 } = require('crypto');
-const {
-  notifyUsersByName,
-  NOTIFICATION_CATEGORIES,
-} = require('./pushNotificationService');
+const cron = require('node-cron');
+const { pool } = require('../db');
+const { notifyUsersByName, NOTIFICATION_CATEGORIES } = require('./pushNotificationService');
 
-const DB_PATH = path.join(__dirname, '../../data/db.json');
+const DIAS_DE_ANTICIPACION = 2;
 
-function leerDB() {
-  const raw = fs.readFileSync(DB_PATH, 'utf8');
-  return JSON.parse(raw);
-}
-
-function escribirDB(data) {
-  fs.writeFileSync(DB_PATH, JSON.stringify(data, null, 2), 'utf8');
-}
-
-function asegurarInfraNotificaciones(db) {
-  if (!db.notificaciones || typeof db.notificaciones !== 'object') {
-    db.notificaciones = {};
-  }
-  if (!Array.isArray(db.notificaciones.recordatorios48hEnviados)) {
-    db.notificaciones.recordatorios48hEnviados = [];
-  }
-}
-
-async function procesarRecordatorios48h(db) {
-  if (!db.vivienda || !Array.isArray(db.vivienda.serviciosPeriodicos)) {
-    return false;
-  }
-
-  asegurarInfraNotificaciones(db);
-
-  const ahora = new Date();
-  const dosDiasMs = 48 * 60 * 60 * 1000;
-  const ventanaMs = 24 * 60 * 60 * 1000;
-  let huboCambios = false;
-
-  for (const servicio of db.vivienda.serviciosPeriodicos) {
-    if (!servicio.proximoVencimiento) {
-      continue;
-    }
-
-    const vencimiento = new Date(servicio.proximoVencimiento);
-    const diffMs = vencimiento.getTime() - ahora.getTime();
-
-    const estaEnVentana48h = diffMs <= dosDiasMs && diffMs > dosDiasMs - ventanaMs;
-    if (!estaEnVentana48h) {
-      continue;
-    }
-
-    const recordatorioKey = `${servicio.id || servicio.nombre}|${vencimiento.toISOString().slice(0, 10)}`;
-    if (db.notificaciones.recordatorios48hEnviados.includes(recordatorioKey)) {
-      continue;
-    }
-
-    const destinatarios = Array.isArray(servicio.participantes) ? servicio.participantes : [];
-
-    if (destinatarios.length > 0) {
-      await notifyUsersByName(db, destinatarios, {
-        title: 'Recordatorio de vencimiento',
-        body: `${servicio.nombre} vence en menos de 48 horas.`,
-        data: {
-          type: 'servicio_due_48h',
-          servicioId: String(servicio.id || ''),
-          servicioNombre: String(servicio.nombre || ''),
-          fechaVencimiento: vencimiento.toISOString(),
-        },
-      }, {
-        category: NOTIFICATION_CATEGORIES.RECORDATORIOS_VENCIMIENTO,
-      });
-    }
-
-    db.notificaciones.recordatorios48hEnviados.push(recordatorioKey);
-    huboCambios = true;
-  }
-
-  return huboCambios;
-}
-
-function sumarFrecuencia(fecha, periodicidad) {
-  const date = new Date(fecha);
-  switch (periodicidad.toLowerCase()) {
-    case 'semanal': date.setDate(date.getDate() + 7); break;
-    case 'mensual': date.setMonth(date.getMonth() + 1); break;
-    case 'bimestral': date.setMonth(date.getMonth() + 2); break;
-    case '6 meses': date.setMonth(date.getMonth() + 6); break;
-    case 'anual': date.setFullYear(date.getFullYear() + 1); break;
-  }
-  return date.toISOString();
-}
-
-async function procesarServiciosPeriodicos() {
+async function checkProximosVencimientos() {
+  console.log('[cron] Verificando vencimientos de servicios...');
   try {
-    const db = leerDB();
-    if (!db.vivienda || !db.vivienda.serviciosPeriodicos) return;
+    const hoy = new Date();
+    const limite = new Date();
+    limite.setDate(hoy.getDate() + DIAS_DE_ANTICIPACION);
+    const limiteStr = limite.toISOString().split('T')[0];
+    const hoyStr = hoy.toISOString().split('T')[0];
 
-    const ahora = new Date();
-    let modificado = false;
+    const { rows: servicios } = await pool.query(
+      `SELECT id::text, nombre, proximo_vencimiento::text AS "proximoVencimiento", participantes
+       FROM vivienda_servicios
+       WHERE proximo_vencimiento BETWEEN $1 AND $2`,
+      [hoyStr, limiteStr]
+    );
 
-    for (let servicio of db.vivienda.serviciosPeriodicos) {
-      const vencimiento = new Date(servicio.proximoVencimiento);
-      if (ahora >= vencimiento) {
-        // Generar el gasto automático
-        const nuevoGasto = {
-          id: uuidv4(),
-          nombre: servicio.nombre,
-          monto: servicio.monto,
-          categoria: 'Hogar', // Default para servicios
-          fecha: new Date().toISOString(),
-          pagador: 'Martín', // Usuario default para MVP
-          participantes: servicio.participantes || []
-        };
-        db.vivienda.gastos.push(nuevoGasto);
+    for (const servicio of servicios) {
+      const { rows: [yaEnviado] } = await pool.query(
+        `SELECT id FROM notificacion_recordatorios_enviados
+         WHERE servicio_id = $1 AND fecha_recordatorio = $2`,
+        [servicio.id, servicio.proximoVencimiento]
+      );
 
-        // Actualizar la fecha del próximo vencimiento
-        servicio.proximoVencimiento = sumarFrecuencia(servicio.proximoVencimiento, servicio.periodicidad);
-        modificado = true;
+      if (yaEnviado) continue;
+
+      const destinatarios = Array.isArray(servicio.participantes)
+        ? servicio.participantes
+        : [];
+
+      if (destinatarios.length > 0) {
+        await notifyUsersByName(
+          destinatarios,
+          {
+            title: 'Vencimiento próximo',
+            body: `"${servicio.nombre}" vence el ${servicio.proximoVencimiento}`,
+            data: { type: 'service_reminder', servicioId: servicio.id },
+          },
+          { category: NOTIFICATION_CATEGORIES.RECORDATORIOS_VENCIMIENTO }
+        );
       }
-    }
 
-    const recordatoriosNuevos = await procesarRecordatorios48h(db);
+      await pool.query(
+        `INSERT INTO notificacion_recordatorios_enviados (servicio_id, fecha_recordatorio)
+         VALUES ($1, $2) ON CONFLICT DO NOTHING`,
+        [servicio.id, servicio.proximoVencimiento]
+      );
 
-    if (modificado || recordatoriosNuevos) {
-      escribirDB(db);
-      console.log('Servicios periodicos procesados y recordatorios evaluados.');
+      console.log(`[cron] Recordatorio enviado para: ${servicio.nombre}`);
     }
-  } catch (error) {
-    console.error('Error al procesar servicios periódicos:', error);
+  } catch (err) {
+    console.error('[cron] Error verificando vencimientos:', err.message);
   }
 }
 
-function iniciarCron() {
-  console.log('Servicio cron de vivienda iniciado.');
-  // Ejecutar inmediatamente al inicio
-  procesarServiciosPeriodicos();
-  
-  // Ejecutar cada 24 horas (86400000 ms)
-  setInterval(procesarServiciosPeriodicos, 86400000);
+function iniciarCronJobs() {
+  // Ejecuta cada día a las 09:00
+  cron.schedule('0 9 * * *', checkProximosVencimientos, { timezone: 'America/Argentina/Buenos_Aires' });
+  console.log('[cron] Cron de vencimientos iniciado.');
 }
 
-module.exports = { iniciarCron, procesarServiciosPeriodicos };
+module.exports = { iniciarCronJobs };
