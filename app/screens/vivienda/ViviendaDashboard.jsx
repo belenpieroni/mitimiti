@@ -1,13 +1,22 @@
 import React, { useState } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
-  Modal, TextInput, KeyboardAvoidingView, Platform, Pressable, Alert, // <--- Aquí agregamos Alert
+  Modal, TextInput, KeyboardAvoidingView, Platform, Pressable, Alert, Share,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { colors } from '../../theme/colors';
 import { useVivienda } from '../../context/ViviendaContext';
+import { useAuth } from '../../context/AuthContext';
 import { useFocusEffect } from '@react-navigation/native';
-import { getGastosVivienda, getServiciosVivienda, eliminarAcuerdoReparto, eliminarServicioVivienda } from '../../services/viviendaService';
+import {
+  getGastosVivienda,
+  getServiciosVivienda,
+  eliminarAcuerdoReparto,
+  eliminarServicioVivienda,
+  getMiVivienda,
+  crearMiVivienda,
+  obtenerInvitacionVivienda,
+} from '../../services/viviendaService';
 // ─── Colores para Avatares ────────────────────────────────────────────────────
 const coloresDisponibles = [
   '#473472', '#526D82', '#9DB2BF', '#42b271',
@@ -20,6 +29,13 @@ function getIniciales(nombre) {
   const partes = nombre.trim().split(' ');
   if (partes.length >= 2) return (partes[0][0] + partes[1][0]).toUpperCase();
   return nombre.slice(0, 2).toUpperCase();
+}
+
+function getPrimerNombre(nombre) {
+  if (typeof nombre !== 'string') return '';
+  const limpio = nombre.trim();
+  if (!limpio) return '';
+  return limpio.split(/\s+/)[0];
 }
 
 function getColorByNombre(nombre) {
@@ -96,19 +112,19 @@ const MODELOS = [
 ];
 
 // ─── Estado inicial del formulario ────────────────────────────────────────────
-const INTEGRANTES_DEFAULT = ['Martín Alves'];
-
-const buildFormInicial = () => ({
-  integrantes: INTEGRANTES_DEFAULT,
+const buildFormInicial = (integranteInicial = 'Yo') => ({
+  integrantes: [integranteInicial],
   categoria: CATEGORIAS[0],
   modeloIdx: 0,
   categoriaCustom: '',
   proporcional: Object.fromEntries(
-    INTEGRANTES_DEFAULT.map(n => [n, { sueldo: '', porcentaje: '' }])
+    [[integranteInicial, { sueldo: '', porcentaje: '' }]]
   ),
 });
 
 export default function ViviendaDashboard({ navigation }) {
+  const { user } = useAuth();
+  const integranteInicial = user?.name || user?.nombre || 'Yo';
   const [gastos, setGastos]       = useState([]);
   const [servicios, setServicios] = useState([]);
   const [vistaActiva, setVistaActiva] = useState('servicios');
@@ -120,10 +136,14 @@ export default function ViviendaDashboard({ navigation }) {
   const { reglas, agregarRegla, recargar } = useVivienda();
 
   // Formulario "Nueva Regla"
-  const [form, setForm]                         = useState(buildFormInicial());
+  const [form, setForm]                         = useState(buildFormInicial(integranteInicial));
   const [nuevoIntegrante, setNuevoIntegrante]   = useState('');
   const [mostrarInputIntegrante, setMostrarInputIntegrante] = useState(false);
   const [dropdownAbierto, setDropdownAbierto]   = useState(false);
+  const [modalInicioViviendaVisible, setModalInicioViviendaVisible] = useState(false);
+  const [modalMiembrosVisible, setModalMiembrosVisible] = useState(false);
+  const [miVivienda, setMiVivienda] = useState(null);
+  const [nuevaViviendaNombre, setNuevaViviendaNombre] = useState(() => `Vivienda de ${integranteInicial}`);
 
   const [cargando, setCargando] = useState(true);
 
@@ -137,16 +157,28 @@ export default function ViviendaDashboard({ navigation }) {
 
   const cargarData = async () => {
     try {
+      const viviendaActual = await getMiVivienda();
+      setMiVivienda(viviendaActual || null);
+      if (!viviendaActual) {
+        setModalInicioViviendaVisible(true);
+        setGastos([]);
+        setServicios([]);
+        return;
+      }
+
+      setModalInicioViviendaVisible(false);
       const gastosData    = await getGastosVivienda();
       const serviciosData = await getServiciosVivienda();
       setGastos(gastosData || []);
       setServicios(serviciosData || []);
     } catch (error) {
       console.error(error);
+      setModalInicioViviendaVisible(true);
     }
   };
 
  const totalMes = (gastos || []).reduce((sum, g) => sum + (g.monto || 0), 0);
+ const nombreHeader = getPrimerNombre(user?.name || user?.nombre || '') || 'Vivienda';
 
   const renderDiasParaVencer = (isoDate) => {
     const diff = new Date(isoDate) - new Date();
@@ -199,14 +231,14 @@ export default function ViviendaDashboard({ navigation }) {
   const cerrarModalAcuerdos = () => {
     setModalAcuerdosVisible(false);
     setVistaFormulario(false);
-    setForm(buildFormInicial());
+    setForm(buildFormInicial(integranteInicial));
     setNuevoIntegrante('');
     setMostrarInputIntegrante(false);
     setDropdownAbierto(false);
   };
 
   const abrirFormulario = () => {
-    setForm(buildFormInicial());
+    setForm(buildFormInicial(integranteInicial));
     setDropdownAbierto(false);
     setVistaFormulario(true);
   };
@@ -236,8 +268,32 @@ const guardarRegla = async () => {
   };
   await agregarRegla(nuevaRegla);  // esto ya hace refetch interno
   setVistaFormulario(false);        // volvés a la lista, que ya tiene reglas actualizadas
-  setForm(buildFormInicial());
+  setForm(buildFormInicial(integranteInicial));
   setDropdownAbierto(false);
+};
+
+const handleCrearMiVivienda = async () => {
+  try {
+    const nombre = (nuevaViviendaNombre || '').trim() || `Vivienda de ${integranteInicial}`;
+    const creada = await crearMiVivienda({ nombre });
+    setMiVivienda(creada);
+    setModalInicioViviendaVisible(false);
+    setNuevaViviendaNombre(`Vivienda de ${integranteInicial}`);
+    await cargarData();
+  } catch (e) {
+    Alert.alert('Error', e.message || 'No se pudo crear la vivienda.');
+  }
+};
+
+const handleCompartirInvitacionVivienda = async () => {
+  try {
+    const invitacion = await obtenerInvitacionVivienda();
+    const nombre = miVivienda?.nombre || invitacion?.viviendaNombre || 'mi vivienda';
+    const mensaje = `¡Te invito a unirte a "${nombre}" en MitiMiti!\n\nHacé clic acá para sumarte: ${invitacion.deepLink}`;
+    await Share.share({ title: 'Invitación a vivienda', message: mensaje });
+  } catch (e) {
+    Alert.alert('Error', e.message || 'No se pudo generar el enlace de vivienda.');
+  }
 };
 
 
@@ -247,20 +303,48 @@ const guardarRegla = async () => {
       <ScrollView contentContainerStyle={styles.scroll}>
         <Text style={styles.headerTitle}>Casa compartida</Text>
         <View style={styles.headerRow}>
-          <Text style={styles.mainTitle}>Vivienda</Text>
-          <View style={{ flexDirection: 'row', gap: 10 }}>
-            <TouchableOpacity style={styles.btnAcuerdos} onPress={() => setModalAcuerdosVisible(true)}>
+          <Text style={styles.mainTitle} numberOfLines={1} ellipsizeMode="tail">
+            {nombreHeader}
+          </Text>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            style={styles.headerActionsScroll}
+            contentContainerStyle={styles.headerActions}
+          >
+            {miVivienda && (
+              <TouchableOpacity style={styles.btnAcuerdos} onPress={handleCompartirInvitacionVivienda}>
+                <Ionicons name="link-outline" size={16} color={colors.textSecondary} />
+                <Text style={styles.btnAcuerdosText}>Invitar</Text>
+              </TouchableOpacity>
+            )}
+            <TouchableOpacity
+              style={styles.btnAcuerdos}
+              onPress={() => {
+                if (!miVivienda) return Alert.alert('Vivienda', 'Primero creá o uníte a una vivienda.');
+                setModalAcuerdosVisible(true);
+              }}
+            >
               <Ionicons name="settings-outline" size={16} color={colors.textSecondary} />
               <Text style={styles.btnAcuerdosText}>Acuerdos</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={styles.btnGasto} onPress={() => navigation.navigate('AgregarVivienda')}>
+            <TouchableOpacity
+              style={styles.btnGasto}
+              onPress={() => {
+                if (!miVivienda) return Alert.alert('Vivienda', 'Primero creá o uníte a una vivienda.');
+                navigation.navigate('AgregarVivienda');
+              }}
+            >
               <Ionicons name="add" size={16} color="#fff" />
               <Text style={styles.btnGastoText}>Gasto</Text>
             </TouchableOpacity>
-          </View>
+          </ScrollView>
         </View>
 
-        <TouchableOpacity style={styles.totalCard} onPress={() => navigation.navigate('SalidasPorCategoria')}>
+        <TouchableOpacity
+          style={styles.totalCard}
+          onPress={() => miVivienda ? navigation.navigate('SalidasPorCategoria') : Alert.alert('Vivienda', 'Primero creá o uníte a una vivienda.')}
+        >
           <Text style={styles.totalLabel}>Total del mes</Text>
           <Text style={styles.totalAmount}>${totalMes.toLocaleString('es-AR')}</Text>
           <View style={styles.badgesRow}>
@@ -273,6 +357,14 @@ const guardarRegla = async () => {
               <Text style={[styles.badgeValue, { color: colors.greenGlobal }]}>$0</Text>
             </View>
           </View>
+
+          {!!miVivienda?.miembros?.length && (
+            <TouchableOpacity style={styles.integrantesQuick} onPress={() => setModalMiembrosVisible(true)}>
+              <Text style={styles.integrantesQuickLabel}>Integrantes</Text>
+              <AvatarStack personas={(miVivienda.miembros || []).map((m) => m.name)} />
+              <Ionicons name="chevron-forward" size={16} color="rgba(255,255,255,0.75)" />
+            </TouchableOpacity>
+          )}
         </TouchableOpacity>
 
         <View style={styles.tabsFiltroRow}>
@@ -727,25 +819,19 @@ const guardarRegla = async () => {
         </View>
       </View>
 
-      {/* BOTÓN ELIMINAR */}
-<TouchableOpacity 
-  style={{ padding: 8 }}
-// En tu botón de eliminar dentro de ViviendaDashboard.jsx
-onPress={async () => {
-  try {
-    // Convertimos 'Internet / Fibra' en 'internet_fibra' (o simplemente lo que prefieras)
-    const idLimpio = regla.nombre.toLowerCase().replace(/[^a-z0-9]/g, '_');
-    
-    console.log("Intentando eliminar ID limpio:", idLimpio);
-    await eliminarAcuerdoReparto(idLimpio); 
-    await recargar();
-  } catch (error) {
-    Alert.alert("Error", "No se pudo eliminar");
-  }
-}}
->
-  <Ionicons name="trash-outline" size={20} color="#ec6c6a" />
-</TouchableOpacity>
+      <TouchableOpacity
+        style={{ padding: 8 }}
+        onPress={async () => {
+          try {
+            await eliminarAcuerdoReparto(regla.id);
+            await recargar();
+          } catch (error) {
+            Alert.alert('Error', 'No se pudo eliminar');
+          }
+        }}
+      >
+        <Ionicons name="trash-outline" size={20} color="#ec6c6a" />
+      </TouchableOpacity>
     </View>
   );
 })}
@@ -761,6 +847,83 @@ onPress={async () => {
           </View>
         </KeyboardAvoidingView>
       </Modal>
+
+      {/* ── Modal Inicio Vivienda (crear o unirse) ───────────────────────── */}
+      <Modal visible={modalMiembrosVisible} transparent animationType="fade">
+        <View style={styles.modalOverlayFade}>
+          <Pressable style={StyleSheet.absoluteFill} onPress={() => setModalMiembrosVisible(false)} />
+          <View style={styles.modalSheetCentered}>
+            <View style={styles.modalHeader}>
+              <Text style={{ fontSize: 20, fontWeight: 'bold', color: colors.textPrimary }}>Mi vivienda</Text>
+              <TouchableOpacity onPress={() => setModalMiembrosVisible(false)}>
+                <Ionicons name="close" size={24} color={colors.textSecondary} />
+              </TouchableOpacity>
+            </View>
+
+            <View style={styles.listadoMetaCard}>
+              <Text style={styles.listadoMetaLabel}>Vivienda</Text>
+              <Text style={styles.listadoMetaValue}>{miVivienda?.nombre || '-'}</Text>
+            </View>
+
+            <Text style={styles.listadoTitulo}>Integrantes</Text>
+            <ScrollView style={{ maxHeight: 280 }} showsVerticalScrollIndicator={false}>
+              {(miVivienda?.miembros || []).map((m, idx) => {
+                const esCreador = String(m?.id || '') === String(miVivienda?.creadorId || '');
+                return (
+                  <View key={m.id || idx} style={styles.miembroRow}>
+                    <View style={[styles.miembroAvatar, { backgroundColor: getColorByNombre(m?.name || 'NN') }]}>
+                      <Text style={styles.miembroAvatarText}>{getIniciales(m?.name || 'NN')}</Text>
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.miembroNombre}>{m?.name || 'Sin nombre'}</Text>
+                      {esCreador && <Text style={styles.miembroRol}>Creador</Text>}
+                    </View>
+                  </View>
+                );
+              })}
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
+
+      {/* ── Modal Inicio Vivienda (crear o unirse) ───────────────────────── */}
+      <Modal visible={modalInicioViviendaVisible} transparent animationType="fade">
+        <View style={styles.modalOverlayFade}>
+          <View style={styles.modalInicioCard}>
+            <Text style={styles.modalInicioTitulo}>Vivienda</Text>
+            <Text style={styles.modalInicioSubtitulo}>
+              Elegí cómo querés empezar: crear tu vivienda o unirte con enlace.
+            </Text>
+
+            <TextInput
+              style={styles.modalInicioInput}
+              placeholder="Nombre de la vivienda"
+              placeholderTextColor={colors.textSecondary}
+              value={nuevaViviendaNombre}
+              onChangeText={setNuevaViviendaNombre}
+            />
+
+            <TouchableOpacity
+              style={styles.modalInicioPrimary}
+              onPress={handleCrearMiVivienda}
+            >
+              <Ionicons name="home-outline" size={18} color="white" />
+              <Text style={styles.modalInicioPrimaryTxt}>Tener mi vivienda</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.modalInicioSecondary}
+              onPress={() => {
+                setModalInicioViviendaVisible(false);
+                navigation.navigate('ViviendaJoinViaLink');
+              }}
+            >
+              <Ionicons name="link-outline" size={18} color={colors.primary} />
+              <Text style={styles.modalInicioSecondaryTxt}>Unirme a una vivienda con enlace</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -770,13 +933,15 @@ const styles = StyleSheet.create({
   container:        { flex: 1, backgroundColor: colors.background },
   scroll:           { padding: 20, paddingTop: 56, paddingBottom: 100 },
   headerTitle:      { color: colors.textSecondary, fontSize: 13 },
-  headerRow:        { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 },
+  headerRow:        { marginBottom: 20 },
   mainTitle:        { fontSize: 28, fontWeight: 'bold', color: colors.textPrimary },
+  headerActionsScroll:{ marginTop: 12 },
+  headerActions:    { flexDirection: 'row', gap: 8, paddingRight: 4 },
 
-  btnGasto:         { flexDirection: 'row', backgroundColor: colors.textSecondary, paddingHorizontal: 16, paddingVertical: 10, borderRadius: 20, alignItems: 'center', gap: 4 },
+  btnGasto:         { flexDirection: 'row', alignItems: 'center', backgroundColor: colors.primary, paddingHorizontal: 16, paddingVertical: 10, borderRadius: 20, gap: 4 },
   btnGastoText:     { color: '#fff', fontWeight: '600', fontSize: 14 },
-  btnAcuerdos:      { flexDirection: 'row', backgroundColor: '#F0F4F8', paddingHorizontal: 12, paddingVertical: 10, borderRadius: 20, alignItems: 'center', gap: 4, borderWidth: 1, borderColor: colors.textSecondary },
-  btnAcuerdosText:  { color: colors.textSecondary, fontWeight: '600', fontSize: 14 },
+  btnAcuerdos:      { flexDirection: 'row', alignItems: 'center', backgroundColor: '#EEF4FA', paddingHorizontal: 14, paddingVertical: 10, borderRadius: 20, gap: 4, borderWidth: 1, borderColor: '#CAD8E5' },
+  btnAcuerdosText:  { color: colors.primary, fontWeight: '600', fontSize: 14 },
 
   totalCard:        { backgroundColor: colors.textSecondary, borderRadius: 20, padding: 20, marginBottom: 30 },
   totalLabel:       { color: 'rgba(255,255,255,0.7)', fontSize: 13, marginBottom: 8 },
@@ -785,6 +950,16 @@ const styles = StyleSheet.create({
   badge:            { backgroundColor: 'rgba(255,255,255,0.15)', padding: 12, borderRadius: 12, flex: 1 },
   badgeLabel:       { color: 'rgba(255,255,255,0.7)', fontSize: 12, marginBottom: 4 },
   badgeValue:       { color: '#F1948A', fontSize: 16, fontWeight: 'bold' },
+  integrantesQuick: {
+    marginTop: 12,
+    paddingTop: 10,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(255,255,255,0.22)',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  integrantesQuickLabel: { color: 'rgba(255,255,255,0.82)', fontSize: 13, fontWeight: '600' },
 
   sectionTitle:     { fontSize: 14, fontWeight: '600', color: colors.textPrimary, marginBottom: 16 },
 
@@ -825,6 +1000,49 @@ const styles = StyleSheet.create({
 
   modalOverlayFade:   { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'stretch', padding: 20 },
   modalSheetCentered: { backgroundColor: '#fff', borderRadius: 24, width: '100%', padding: 24, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.25, shadowRadius: 4, elevation: 5, maxHeight: '90%' },
+  modalInicioCard: {
+    backgroundColor: '#fff', borderRadius: 24, padding: 24,
+    shadowColor: '#000', shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2, shadowRadius: 6, elevation: 4,
+  },
+  modalInicioTitulo: { fontSize: 22, fontWeight: '700', color: colors.textPrimary, marginBottom: 8 },
+  modalInicioSubtitulo: { fontSize: 14, color: colors.textSecondary, marginBottom: 18, lineHeight: 20 },
+  modalInicioInput: {
+    borderWidth: 1,
+    borderColor: '#D7E2EC',
+    backgroundColor: '#F8FAFC',
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+    color: colors.textPrimary,
+    marginBottom: 12,
+  },
+  modalInicioPrimary: {
+    backgroundColor: colors.primary, borderRadius: 14, paddingVertical: 14, paddingHorizontal: 12,
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, marginBottom: 10,
+  },
+  modalInicioPrimaryTxt: { color: 'white', fontSize: 15, fontWeight: '700' },
+  modalInicioSecondary: {
+    backgroundColor: '#F5F7FA', borderRadius: 14, paddingVertical: 14, paddingHorizontal: 12,
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
+  },
+  modalInicioSecondaryTxt: { color: colors.primary, fontSize: 14, fontWeight: '600' },
+
+  listadoMetaCard: {
+    backgroundColor: '#F7FAFC', borderRadius: 14, padding: 12, marginBottom: 12,
+    borderWidth: 1, borderColor: '#E2E8F0',
+  },
+  listadoMetaLabel: { fontSize: 12, color: colors.textSecondary, marginBottom: 4 },
+  listadoMetaValue: { fontSize: 15, color: colors.textPrimary, fontWeight: '700' },
+  listadoTitulo: { fontSize: 14, fontWeight: '700', color: colors.textPrimary, marginBottom: 8 },
+  miembroRow: {
+    flexDirection: 'row', alignItems: 'center', gap: 10,
+    paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: '#EEF2F6',
+  },
+  miembroAvatar: { width: 36, height: 36, borderRadius: 18, justifyContent: 'center', alignItems: 'center' },
+  miembroAvatarText: { color: 'white', fontSize: 11, fontWeight: '700' },
+  miembroNombre: { fontSize: 14, color: colors.textPrimary, fontWeight: '600' },
+  miembroRol: { fontSize: 12, color: colors.textSecondary, marginTop: 2 },
 
   formContainer:    { width: '100%', gap: 16, paddingBottom: 8 },
   formSection:      { width: '100%' },

@@ -5,9 +5,11 @@ const { calcularBalance, calcularBalanceGlobal } = require('../services/balanceS
 const { notifyUsersByName, NOTIFICATION_CATEGORIES } = require('../services/pushNotificationService');
 
 const COLORES_DISPONIBLES = [
-  '#473472', '#526D82', '#9DB2BF', '#42b271',
-  '#c084fc', '#f97316', '#ec6c6a', '#38bdf8',
+  '#2E7D32', '#E67E22', '#C62828', '#00897B',
+  '#AD1457', '#F9A825', '#1565C0', '#6D4C41',
 ];
+
+const normalizeId = (value) => String(value || '').trim().toLowerCase();
 
 function getIniciales(nombre) {
   const partes = nombre.trim().split(' ');
@@ -69,45 +71,49 @@ async function listarJuntadas(req, res, next) {
 
 async function crearJuntada(req, res, next) {
   try {
-    const { nombre, descripcion = '', participantes = [] } = req.body;
+    const { nombre, descripcion = '' } = req.body;
 
     if (!nombre || nombre.trim() === '') {
       const err = new Error('El campo "nombre" es requerido.'); err.status = 400; return next(err);
     }
-    if (!Array.isArray(participantes) || participantes.length === 0) {
-      const err = new Error('Se requiere al menos un participante.'); err.status = 400; return next(err);
+
+    // req.user proviene del JWT verificado por requireAuth
+    const { rows: [creador] } = await pool.query(
+      'SELECT id, name, iniciales FROM usuarios WHERE id = $1',
+      [req.user.id]
+    );
+    if (!creador) {
+      const err = new Error('Usuario creador no encontrado.'); err.status = 404; return next(err);
     }
 
     const id = uuidv4();
     const fecha = new Date().toISOString().split('T')[0];
 
     await pool.query(
-      `INSERT INTO juntadas (id, nombre, descripcion, fecha) VALUES ($1, $2, $3, $4)`,
-      [id, nombre.trim(), descripcion.trim(), fecha]
+      `INSERT INTO juntadas (id, nombre, descripcion, creador_id, fecha)
+       VALUES ($1, $2, $3, $4, $5)`,
+      [id, nombre.trim(), descripcion.trim(), req.user.id, fecha]
     );
 
-    const nuevosParticipantes = [];
-    for (let i = 0; i < participantes.length; i++) {
-      const p = participantes[i];
-      const pid = uuidv4();
-      const pnombre = p.nombre.trim();
-      const piniciales = p.iniciales || getIniciales(pnombre);
-      const pcolor = p.color || COLORES_DISPONIBLES[i % COLORES_DISPONIBLES.length];
+    // Agregar al creador como único participante inicial
+    const pid = uuidv4();
+    const pnombre = creador.name.trim();
+    const piniciales = creador.iniciales || getIniciales(pnombre);
+    const pcolor = COLORES_DISPONIBLES[0];
 
-      await pool.query(
-        `INSERT INTO juntada_participantes (id, juntada_id, nombre, iniciales, color)
-         VALUES ($1, $2, $3, $4, $5)`,
-        [pid, id, pnombre, piniciales, pcolor]
-      );
-      nuevosParticipantes.push({ id: pid, nombre: pnombre, iniciales: piniciales, color: pcolor });
-    }
+    await pool.query(
+      `INSERT INTO juntada_participantes (id, juntada_id, nombre, iniciales, color)
+       VALUES ($1, $2, $3, $4, $5)`,
+      [pid, id, pnombre, piniciales, pcolor]
+    );
 
     res.status(201).json({
       ok: true,
       data: {
         id, nombre: nombre.trim(), descripcion: descripcion.trim(),
         fecha, creadaEn: new Date().toISOString(),
-        participantes: nuevosParticipantes, gastos: [], subgrupos: [],
+        participantes: [{ id: pid, nombre: pnombre, iniciales: piniciales, color: pcolor }],
+        gastos: [], subgrupos: [],
       },
     });
   } catch (err) {
@@ -117,10 +123,31 @@ async function crearJuntada(req, res, next) {
 
 async function obtenerJuntada(req, res, next) {
   try {
-    const juntada = await cargarJuntadaCompleta(req.params.id);
+    let juntada = await cargarJuntadaCompleta(req.params.id);
     if (!juntada) {
       const err = new Error(`Juntada con id "${req.params.id}" no encontrada.`);
       err.status = 404; return next(err);
+    }
+
+    const nombreUsuario = String(req.user?.name || '').trim().toLowerCase();
+    const esParticipante = Boolean(
+      nombreUsuario &&
+      Array.isArray(juntada.participantes) &&
+      juntada.participantes.some((p) => String(p?.nombre || '').trim().toLowerCase() === nombreUsuario)
+    );
+
+    if (!esParticipante) {
+      const err = new Error('No pertenecés a esta juntada.');
+      err.status = 403; return next(err);
+    }
+
+    // Backfill para juntadas legacy sin creador_id.
+    if (!juntada.creadorId) {
+      await pool.query(
+        'UPDATE juntadas SET creador_id = $1 WHERE id = $2 AND creador_id IS NULL',
+        [req.user.id, req.params.id]
+      );
+      juntada = await cargarJuntadaCompleta(req.params.id);
     }
 
     const balance = calcularBalance(juntada);
@@ -130,7 +157,12 @@ async function obtenerJuntada(req, res, next) {
       ...t, aliasDestino: perfilesMap[t.para] || null,
     }));
 
-    res.json({ ok: true, data: { ...juntada, balance } });
+    const esCreador = Boolean(
+      juntada?.creadorId && req.user?.id &&
+      normalizeId(juntada.creadorId) === normalizeId(req.user.id)
+    );
+
+    res.json({ ok: true, data: { ...juntada, balance, esCreador } });
   } catch (err) {
     next(err);
   }
@@ -138,10 +170,36 @@ async function obtenerJuntada(req, res, next) {
 
 async function editarJuntada(req, res, next) {
   try {
-    const { rows: [existing] } = await pool.query('SELECT id FROM juntadas WHERE id = $1', [req.params.id]);
+    const { rows: [existing] } = await pool.query(
+      'SELECT id, nombre, creador_id::text AS "creadorId" FROM juntadas WHERE id = $1',
+      [req.params.id]
+    );
     if (!existing) {
       const err = new Error(`Juntada con id "${req.params.id}" no encontrada.`);
       err.status = 404; return next(err);
+    }
+
+    let creadorId = existing.creadorId;
+    if (!creadorId) {
+      const { rows: [participa] } = await pool.query(
+        `SELECT 1
+         FROM juntada_participantes
+         WHERE juntada_id = $1 AND LOWER(nombre) = LOWER($2)
+         LIMIT 1`,
+        [req.params.id, req.user?.name || '']
+      );
+      if (participa) {
+        await pool.query(
+          'UPDATE juntadas SET creador_id = $1 WHERE id = $2 AND creador_id IS NULL',
+          [req.user.id, req.params.id]
+        );
+        creadorId = req.user.id;
+      }
+    }
+
+    if (!creadorId || normalizeId(creadorId) !== normalizeId(req.user.id)) {
+      const err = new Error('Solo el anfitrión de la juntada puede editar sus datos.');
+      err.status = 403; return next(err);
     }
 
     const { nombre, descripcion, participantes } = req.body;
@@ -202,11 +260,39 @@ async function editarJuntada(req, res, next) {
 
 async function eliminarJuntada(req, res, next) {
   try {
-    const { rowCount } = await pool.query('DELETE FROM juntadas WHERE id = $1', [req.params.id]);
-    if (rowCount === 0) {
+    const { rows: [existing] } = await pool.query(
+      'SELECT id, nombre, creador_id::text AS "creadorId" FROM juntadas WHERE id = $1',
+      [req.params.id]
+    );
+    if (!existing) {
       const err = new Error(`Juntada con id "${req.params.id}" no encontrada.`);
       err.status = 404; return next(err);
     }
+
+    let creadorId = existing.creadorId;
+    if (!creadorId) {
+      const { rows: [participa] } = await pool.query(
+        `SELECT 1
+         FROM juntada_participantes
+         WHERE juntada_id = $1 AND LOWER(nombre) = LOWER($2)
+         LIMIT 1`,
+        [req.params.id, req.user?.name || '']
+      );
+      if (participa) {
+        await pool.query(
+          'UPDATE juntadas SET creador_id = $1 WHERE id = $2 AND creador_id IS NULL',
+          [req.user.id, req.params.id]
+        );
+        creadorId = req.user.id;
+      }
+    }
+
+    if (!creadorId || normalizeId(creadorId) !== normalizeId(req.user.id)) {
+      const err = new Error('Solo el anfitrión de la juntada puede eliminarla.');
+      err.status = 403; return next(err);
+    }
+
+    await pool.query('DELETE FROM juntadas WHERE id = $1', [req.params.id]);
     res.json({ ok: true, mensaje: 'Juntada eliminada correctamente.' });
   } catch (err) {
     next(err);
@@ -427,8 +513,8 @@ const agregarSubgrupo = async (req, res) => {
     const { id } = req.params;
     const { nombre, integrantes } = req.body;
 
-    if (!nombre || !integrantes || integrantes.length < 2)
-      return res.status(400).json({ error: 'El subgrupo debe tener un nombre y al menos 2 integrantes.' });
+    if (!nombre || !integrantes || integrantes.length < 1)
+      return res.status(400).json({ error: 'El subgrupo debe tener un nombre y al menos 1 integrante.' });
 
     const { rows: [juntada] } = await pool.query('SELECT id FROM juntadas WHERE id = $1', [id]);
     if (!juntada) return res.status(404).json({ error: 'Juntada no encontrada' });
@@ -456,8 +542,8 @@ const editarSubgrupo = async (req, res) => {
     const { id, sgid } = req.params;
     const { nombre, integrantes } = req.body;
 
-    if (!nombre || !integrantes || integrantes.length < 2)
-      return res.status(400).json({ error: 'El subgrupo debe tener un nombre y al menos 2 integrantes.' });
+    if (!nombre || !integrantes || integrantes.length < 1)
+      return res.status(400).json({ error: 'El subgrupo debe tener un nombre y al menos 1 integrante.' });
 
     const { rows: [sg] } = await pool.query(
       'SELECT id FROM juntada_subgrupos WHERE id = $1 AND juntada_id = $2', [sgid, id]
@@ -491,10 +577,128 @@ const eliminarSubgrupo = async (req, res) => {
   }
 };
 
+// ── Invitaciones ─────────────────────────────────────────────────────────────
+
+async function generarObtenerInvitacion(req, res, next) {
+  try {
+    const juntadaId = req.params.id;
+    const { rows: [juntada] } = await pool.query('SELECT id, nombre FROM juntadas WHERE id = $1', [juntadaId]);
+    if (!juntada) {
+      const err = new Error(`Juntada con id "${juntadaId}" no encontrada.`);
+      err.status = 404; return next(err);
+    }
+
+    // Reutilizar token existente no expirado
+    const { rows: [existing] } = await pool.query(
+      `SELECT token::text FROM invitation_tokens
+       WHERE recurso_id = $1 AND tipo = 'juntada' AND expira_en > NOW()
+       ORDER BY creado_en DESC LIMIT 1`,
+      [juntadaId]
+    );
+
+    let token;
+    if (existing) {
+      token = existing.token;
+    } else {
+      token = uuidv4();
+      await pool.query(
+        `INSERT INTO invitation_tokens (token, tipo, recurso_id, creado_por, expira_en)
+         VALUES ($1, 'juntada', $2, $3, NOW() + INTERVAL '7 days')`,
+        [token, juntadaId, req.user?.id || null]
+      );
+    }
+
+    res.json({
+      ok: true,
+      data: {
+        token,
+        deepLink: `mitimiti://join/${token}`,
+        juntadaNombre: juntada.nombre,
+        expiraEn: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+      },
+    });
+  } catch (err) {
+    next(err);
+  }
+}
+
+async function unirseViaToken(req, res, next) {
+  try {
+    const { token } = req.params;
+    const usuarioId = req.user.id;
+
+    // Validar token
+    const { rows: [inv] } = await pool.query(
+      `SELECT token, tipo, recurso_id::text FROM invitation_tokens
+       WHERE token = $1 AND expira_en > NOW()`,
+      [token]
+    );
+    if (!inv) {
+      const err = new Error('Enlace de invitación inválido o expirado.'); err.status = 404; return next(err);
+    }
+
+    // Obtener info del usuario
+    const { rows: [usuario] } = await pool.query(
+      'SELECT name, iniciales FROM usuarios WHERE id = $1', [usuarioId]
+    );
+    if (!usuario) {
+      const err = new Error('Usuario no encontrado.'); err.status = 404; return next(err);
+    }
+
+    if (inv.tipo === 'juntada') {
+      const juntadaId = inv.recurso_id;
+
+      // Verificar si ya es participante
+      const { rows: yaParticipante } = await pool.query(
+        'SELECT id FROM juntada_participantes WHERE juntada_id = $1 AND LOWER(nombre) = LOWER($2)',
+        [juntadaId, usuario.name]
+      );
+      if (yaParticipante.length > 0) {
+        const juntada = await cargarJuntadaCompleta(juntadaId);
+        return res.json({ ok: true, data: { juntada, yaMiembro: true } });
+      }
+
+      // Agregar como participante
+      const { rows: [countRow] } = await pool.query(
+        'SELECT COUNT(*)::int AS c FROM juntada_participantes WHERE juntada_id = $1', [juntadaId]
+      );
+      const pid = uuidv4();
+      const color = COLORES_DISPONIBLES[countRow.c % COLORES_DISPONIBLES.length];
+
+      await pool.query(
+        `INSERT INTO juntada_participantes (id, juntada_id, nombre, iniciales, color)
+         VALUES ($1, $2, $3, $4, $5)`,
+        [pid, juntadaId, usuario.name, usuario.iniciales || getIniciales(usuario.name), color]
+      );
+
+      const juntada = await cargarJuntadaCompleta(juntadaId);
+
+      // Notificar a los demás participantes
+      const otros = juntada.participantes
+        .map(p => p.nombre)
+        .filter(n => n.toLowerCase() !== usuario.name.toLowerCase());
+      if (otros.length > 0) {
+        notifyUsersByName(otros, {
+          title: 'Nuevo integrante en la juntada',
+          body: `${usuario.name} se unió a "${juntada.nombre}"`,
+          data: { type: 'juntada_invite', juntadaId, juntadaNombre: juntada.nombre },
+        }, { category: NOTIFICATION_CATEGORIES.NUEVAS_JUNTADAS }).catch(() => {});
+      }
+
+      return res.status(201).json({ ok: true, data: { juntada, yaMiembro: false } });
+    }
+
+    const err = new Error('Tipo de invitación no soportado.'); err.status = 400; return next(err);
+  } catch (err) {
+    next(err);
+  }
+}
+
 module.exports = {
   listarJuntadas, crearJuntada, editarJuntada, obtenerJuntada, eliminarJuntada,
   agregarParticipante, quitarParticipante,
   agregarGasto, eliminarGasto,
   obtenerBalance, obtenerBalanceGlobal,
   agregarSubgrupo, editarSubgrupo, eliminarSubgrupo,
+  generarObtenerInvitacion, unirseViaToken,
 };

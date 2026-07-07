@@ -3,6 +3,7 @@
     "name": "mitimiti",
     "slug": "mitimiti",
     "version": "1.0.0",
+    "scheme": "mitimiti",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",

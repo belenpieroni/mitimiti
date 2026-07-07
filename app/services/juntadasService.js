@@ -33,3 +33,8 @@ export const editarSubgrupo = (juntadaId, sgid, datos) =>
 
 export const eliminarSubgrupo = (juntadaId, subgrupoId) => 
   api.delete(`/juntadas/${juntadaId}/subgrupos/${subgrupoId}`);
+
+// Invitaciones
+export const obtenerInvitacion  = (juntadaId) => api.get(`/juntadas/${juntadaId}/invitacion`);
+export const generarInvitacion  = (juntadaId) => api.post(`/juntadas/${juntadaId}/invitacion`);
+export const unirseViaToken     = (token)     => api.post(`/juntadas/join/${token}`);

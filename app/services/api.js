@@ -1,5 +1,10 @@
 import { NativeModules, Platform } from 'react-native';
 
+// Módulo de token de autenticación (actualizado desde AppNavigator al iniciar sesión)
+let _authToken = null;
+export function setAuthToken(token) { _authToken = token; }
+export function getAuthToken() { return _authToken; }
+
 function normalizeBaseUrl(baseUrl) {
   return baseUrl.replace(/\/$/, '');
 }
@@ -54,6 +59,9 @@ const API_BASE = getApiBase();
 async function request(endpoint, options = {}) {
   const url = `${API_BASE}${endpoint}`;
   const defaultHeaders = { 'Content-Type': 'application/json' };
+  if (_authToken) {
+    defaultHeaders['Authorization'] = `Bearer ${_authToken}`;
+  }
   const config = {
     ...options,
     headers: {

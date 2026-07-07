@@ -10,7 +10,8 @@ const { pool } = require('../db');
  */
 async function cargarJuntadaCompleta(juntadaId) {
   const { rows: [juntada] } = await pool.query(
-    `SELECT id::text, nombre, descripcion, fecha::text, creada_en AS "creadaEn"
+    `SELECT id::text, nombre, descripcion, fecha::text,
+            creador_id::text AS "creadorId", creada_en AS "creadaEn"
      FROM juntadas WHERE id = $1`,
     [juntadaId]
   );

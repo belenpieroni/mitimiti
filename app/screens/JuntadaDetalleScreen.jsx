@@ -1,13 +1,14 @@
 import { useState, useCallback } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet,
-  ActivityIndicator, TextInput, Modal, Alert, KeyboardAvoidingView, Platform, Image,
+  ActivityIndicator, TextInput, Modal, Alert, KeyboardAvoidingView, Platform, Image, Share,
 } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { colors } from '../theme/colors';
 import api, { API_URL } from '../services/api';
-import { obtenerJuntada, agregarGasto, eliminarGasto, agregarSubgrupo, editarSubgrupo, eliminarSubgrupo } from '../services/juntadasService';
+import { obtenerJuntada, agregarGasto, eliminarGasto, agregarSubgrupo, editarSubgrupo, eliminarSubgrupo, obtenerInvitacion } from '../services/juntadasService';
+import { useAuth } from '../context/AuthContext';
 
 function formatPesos(monto) {
   return '$' + Math.abs(monto).toLocaleString('es-AR');
@@ -15,10 +16,20 @@ function formatPesos(monto) {
 
 const iconosGasto  = ['basket-outline', 'wine-outline', 'flame-outline', 'cart-outline', 'restaurant-outline'];
 const coloresIcono = ['#c084fc', '#526D82', '#42b271', '#473472', '#f97316'];
+const coloresAvatarJuntada = ['#2E7D32', '#E67E22', '#C62828', '#00897B', '#AD1457', '#F9A825'];
+
+function colorAvatarPorIndice(idx) {
+  return coloresAvatarJuntada[idx % coloresAvatarJuntada.length];
+}
+
+function normalizeId(value) {
+  return String(value || '').trim().toLowerCase();
+}
 
 // ── Pantalla principal ────────────────────────────────────────────────────────
 export default function JuntadaDetalleScreen({ route, navigation }) {
   const { juntadaId } = route.params;
+  const { user } = useAuth();
   const [juntada, setJuntada]           = useState(null);
   const [cargando, setCargando]         = useState(true);
   const [error, setError]               = useState(null);
@@ -26,6 +37,7 @@ export default function JuntadaDetalleScreen({ route, navigation }) {
   const [actionsVisible, setActionsVisible]     = useState(false);
   const [confirmEliminar, setConfirmEliminar]   = useState(false);
   const [fotoTicket, setFotoTicket]             = useState(null); // URL de la foto que se está viendo
+  const [miembrosVisible, setMiembrosVisible]   = useState(false);
   
   const cargarJuntada = useCallback(async () => {
     setCargando(true);
@@ -90,6 +102,16 @@ export default function JuntadaDetalleScreen({ route, navigation }) {
     Alert.alert('Alias Copiado', `"${alias}" se copió al portapapeles.`);
   };
 
+  async function handleCompartirInvitacion() {
+    try {
+      const invitacion = await obtenerInvitacion(juntadaId);
+      const mensaje = `¡Te invito a unirte a "${juntada.nombre}" en MitiMiti!\n\nHacé clic acá para sumarte: ${invitacion.deepLink}`;
+      await Share.share({ message: mensaje, title: 'Invitación a juntada' });
+    } catch (e) {
+      Alert.alert('Error', 'No se pudo generar el enlace de invitación.');
+    }
+  }
+
   if (cargando) {
     return (
       <View style={[styles.container, styles.centrado]}>
@@ -111,6 +133,10 @@ export default function JuntadaDetalleScreen({ route, navigation }) {
   }
 
   const totalGastado = juntada.gastos.reduce((a, g) => a + g.monto, 0);
+  const esCreador = Boolean(
+    juntada?.esCreador ||
+    (juntada?.creadorId && user?.id && normalizeId(juntada.creadorId) === normalizeId(user.id))
+  );
 
   return (
     <View style={styles.container}>
@@ -123,9 +149,11 @@ export default function JuntadaDetalleScreen({ route, navigation }) {
           <Text style={styles.headerTitulo}>{juntada.nombre}</Text>
           <Text style={styles.headerSub}>{juntada.participantes.length} participantes · {juntada.fecha}</Text>
         </View>
-        <TouchableOpacity style={styles.btnMenu} onPress={() => setActionsVisible(true)}>
-          <Ionicons name="ellipsis-horizontal" size={22} color={colors.textPrimary} />
-        </TouchableOpacity>
+        {esCreador && (
+          <TouchableOpacity style={styles.btnMenu} onPress={() => setActionsVisible(true)}>
+            <Ionicons name="ellipsis-horizontal" size={22} color={colors.textPrimary} />
+          </TouchableOpacity>
+        )}
       </View>
 
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
@@ -133,14 +161,30 @@ export default function JuntadaDetalleScreen({ route, navigation }) {
         <View style={styles.cardTotal}>
           <Text style={styles.cardTotalLabel}>Total gastado</Text>
           <Text style={styles.cardTotalMonto}>{formatPesos(totalGastado)}</Text>
-          <View style={styles.avatarStack}>
-            {juntada.participantes.map((p, i) => (
-              <View key={i} style={[styles.avatar, { backgroundColor: p.color, marginLeft: i === 0 ? 0 : -8 }]}>
-                <Text style={styles.avatarTexto}>{p.iniciales}</Text>
-              </View>
-            ))}
-          </View>
+          <TouchableOpacity style={styles.integrantesQuick} onPress={() => setMiembrosVisible(true)}>
+            <Text style={styles.integrantesQuickLabel}>Integrantes</Text>
+            <View style={styles.avatarStack}>
+              {juntada.participantes.map((p, i) => (
+                <View key={i} style={[styles.avatar, { backgroundColor: colorAvatarPorIndice(i), marginLeft: i === 0 ? 0 : -8 }]}> 
+                  <Text style={styles.avatarTexto}>{p.iniciales}</Text>
+                </View>
+              ))}
+            </View>
+            <Ionicons name="chevron-forward" size={16} color="rgba(255,255,255,0.78)" />
+          </TouchableOpacity>
         </View>
+
+        {/* Botón Invitar personas */}
+        <TouchableOpacity style={styles.invitarBtn} onPress={handleCompartirInvitacion}>
+          <View style={styles.invitarBtnIcon}>
+            <Ionicons name="person-add-outline" size={18} color="#fff" />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.invitarBtnTitulo}>Invitar personas</Text>
+            <Text style={styles.invitarBtnSub}>Compartir enlace de invitación</Text>
+          </View>
+          <Ionicons name="share-outline" size={18} color={colors.primary} />
+        </TouchableOpacity>
 
         {/* Botón Subgrupos – card ancho completo */}
         <TouchableOpacity
@@ -267,6 +311,7 @@ export default function JuntadaDetalleScreen({ route, navigation }) {
         visible={subgruposVisible}
         juntada={juntada}
         participantes={juntada.participantes}
+        usuarioActualNombre={user?.name || user?.nombre || ''}
         onCerrar={() => setSubgruposVisible(false)}
         onGuardar={handleAgregarSubgrupo}
         onEditar={handleEditarSubgrupo}
@@ -322,6 +367,38 @@ export default function JuntadaDetalleScreen({ route, navigation }) {
             {fotoTicket && (
               <Image source={{ uri: fotoTicket }} style={styles.fotoImagen} resizeMode="contain" />
             )}
+          </View>
+        </View>
+      </Modal>
+
+      {/* Listado de participantes */}
+      <Modal visible={miembrosVisible} transparent animationType="fade" onRequestClose={() => setMiembrosVisible(false)}>
+        <View style={styles.miembrosOverlay}>
+          <TouchableOpacity style={StyleSheet.absoluteFill} activeOpacity={1} onPress={() => setMiembrosVisible(false)} />
+          <View style={styles.miembrosBox}>
+            <View style={styles.miembrosHeader}>
+              <Text style={styles.miembrosTitulo}>Participantes</Text>
+              <TouchableOpacity style={styles.miembrosClose} onPress={() => setMiembrosVisible(false)}>
+                <Ionicons name="close" size={18} color={colors.textSecondary} />
+              </TouchableOpacity>
+            </View>
+            <ScrollView style={{ maxHeight: 340 }} showsVerticalScrollIndicator={false}>
+              {(juntada.participantes || []).map((p, idx) => {
+                const esCreadorParticipante =
+                  p?.id && juntada?.creadorId && normalizeId(p.id) === normalizeId(juntada.creadorId);
+                return (
+                  <View key={p.id || `${p.nombre}-${idx}`} style={styles.miembroItem}>
+                    <View style={[styles.miembroAvatar, { backgroundColor: colorAvatarPorIndice(idx) }]}>
+                      <Text style={styles.miembroAvatarTxt}>{p.iniciales || '??'}</Text>
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.miembroNombre}>{p.nombre}</Text>
+                      {esCreadorParticipante && <Text style={styles.miembroRol}>Creador</Text>}
+                    </View>
+                  </View>
+                );
+              })}
+            </ScrollView>
           </View>
         </View>
       </Modal>
@@ -415,7 +492,7 @@ function ConfirmSheet({ titulo, mensaje, onCancelar, onConfirmar }) {
 }
 
 // ── Bottom Sheet: Subgrupos ──────────────────────────────────────────────────
-function SubgruposSheet({ visible, juntada, participantes, onCerrar, onGuardar, onEditar, onEliminar }) {
+function SubgruposSheet({ visible, juntada, participantes, usuarioActualNombre, onCerrar, onGuardar, onEditar, onEliminar }) {
   const [creando, setCreando]       = useState(false);
   const [editando, setEditando]     = useState(null); // subgrupo que se está editando
   const [nombre, setNombre]         = useState('');
@@ -442,7 +519,7 @@ function SubgruposSheet({ visible, juntada, participantes, onCerrar, onGuardar, 
   }
 
   async function handleGuardar() {
-    if (!nombre.trim() || seleccionados.length < 2) return;
+    if (!nombre.trim() || seleccionados.length < 1) return;
     setGuardando(true);
     try {
       if (editando) {
@@ -466,6 +543,19 @@ function SubgruposSheet({ visible, juntada, participantes, onCerrar, onGuardar, 
   }
 
   const mostrandoForm = creando || !!editando;
+
+  async function handleUnirmeASubgrupo(sg) {
+    if (!usuarioActualNombre) return;
+    if (sg.integrantes.includes(usuarioActualNombre)) return;
+    try {
+      await onEditar(sg.id, {
+        nombre: sg.nombre,
+        integrantes: [...sg.integrantes, usuarioActualNombre],
+      });
+    } catch (e) {
+      Alert.alert('Error', e.message);
+    }
+  }
 
   return (
     <Modal visible={visible} transparent animationType="slide">
@@ -492,7 +582,7 @@ function SubgruposSheet({ visible, juntada, participantes, onCerrar, onGuardar, 
           </View>
 
           <Text style={sg.descripcion}>
-            Agrupá familias o parejas para dividir los gastos por núcleo, no por persona.
+            Armá subgrupos para dividir gastos por núcleo. Podés crearlos con 1 o más integrantes.
           </Text>
 
           <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled" style={{ maxHeight: 320 }}>
@@ -530,9 +620,9 @@ function SubgruposSheet({ visible, juntada, participantes, onCerrar, onGuardar, 
                     <Text style={sg.btnCancelarTxt}>Cancelar</Text>
                   </TouchableOpacity>
                   <TouchableOpacity
-                    style={[sg.btnGuardar, (!nombre.trim() || seleccionados.length < 2) && { opacity: 0.5 }]}
+                    style={[sg.btnGuardar, (!nombre.trim() || seleccionados.length < 1) && { opacity: 0.5 }]}
                     onPress={handleGuardar}
-                    disabled={!nombre.trim() || seleccionados.length < 2 || guardando}
+                    disabled={!nombre.trim() || seleccionados.length < 1 || guardando}
                   >
                     {guardando ? <ActivityIndicator color="white" /> : <Text style={sg.btnGuardarTxt}>{editando ? 'Guardar' : 'Crear'}</Text>}
                   </TouchableOpacity>
@@ -557,6 +647,14 @@ function SubgruposSheet({ visible, juntada, participantes, onCerrar, onGuardar, 
                         <Text style={sg.cardNombre}>{s.nombre}</Text>
                         <Text style={sg.cardIntegrantes}>{s.integrantes.join(' · ')}</Text>
                       </View>
+                      {!!usuarioActualNombre && !s.integrantes.includes(usuarioActualNombre) && (
+                        <TouchableOpacity
+                          style={sg.btnUnirme}
+                          onPress={() => handleUnirmeASubgrupo(s)}
+                        >
+                          <Ionicons name="log-in-outline" size={14} color="#2E7D32" />
+                        </TouchableOpacity>
+                      )}
                       <TouchableOpacity
                         style={sg.btnEdit}
                         onPress={() => abrirEditar(s)}
@@ -657,6 +755,11 @@ const sg = StyleSheet.create({
     backgroundColor: colors.primary + '18', justifyContent: 'center', alignItems: 'center',
     marginRight: 6,
   },
+  btnUnirme: {
+    width: 32, height: 32, borderRadius: 16,
+    backgroundColor: '#E8F5E9', justifyContent: 'center', alignItems: 'center',
+    marginRight: 6,
+  },
   btnDelete: {
     width: 32, height: 32, borderRadius: 16,
     backgroundColor: colors.redGlobal + '12', justifyContent: 'center', alignItems: 'center',
@@ -693,6 +796,16 @@ const styles = StyleSheet.create({
   cardTotalLabel: { color: 'rgba(255,255,255,0.7)', fontSize: 13, marginBottom: 8 },
   cardTotalMonto: { color: 'white', fontSize: 36, fontWeight: 'bold', marginBottom: 16 },
   avatarStack: { flexDirection: 'row' },
+  integrantesQuick: {
+    marginTop: 2,
+    paddingTop: 10,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(255,255,255,0.22)',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  integrantesQuickLabel: { color: 'rgba(255,255,255,0.82)', fontSize: 13, fontWeight: '600' },
   avatar: {
     width: 32, height: 32, borderRadius: 16,
     justifyContent: 'center', alignItems: 'center',
@@ -740,6 +853,30 @@ const styles = StyleSheet.create({
     backgroundColor: 'white', justifyContent: 'center', alignItems: 'center',
   },
   fotoImagen: { width: '100%', height: 420, backgroundColor: '#000' },
+  miembrosOverlay: {
+    flex: 1, justifyContent: 'center', alignItems: 'center',
+    backgroundColor: 'rgba(0,0,0,0.45)', padding: 20,
+  },
+  miembrosBox: {
+    backgroundColor: colors.background, borderRadius: 20,
+    width: '100%', maxWidth: 430, padding: 18,
+  },
+  miembrosHeader: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10,
+  },
+  miembrosTitulo: { fontSize: 18, fontWeight: '700', color: colors.textPrimary },
+  miembrosClose: {
+    width: 32, height: 32, borderRadius: 16, backgroundColor: 'white',
+    justifyContent: 'center', alignItems: 'center',
+  },
+  miembroItem: {
+    flexDirection: 'row', alignItems: 'center', gap: 10,
+    paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: '#EEF2F6',
+  },
+  miembroAvatar: { width: 34, height: 34, borderRadius: 17, justifyContent: 'center', alignItems: 'center' },
+  miembroAvatarTxt: { color: 'white', fontSize: 11, fontWeight: '700' },
+  miembroNombre: { color: colors.textPrimary, fontSize: 14, fontWeight: '600' },
+  miembroRol: { color: colors.textSecondary, fontSize: 12, marginTop: 2 },
   footer: {
     position: 'absolute', bottom: 0, left: 0, right: 0,
     padding: 16, backgroundColor: colors.background,
@@ -754,6 +891,18 @@ const styles = StyleSheet.create({
     paddingHorizontal: 24, paddingVertical: 12,
   },
   btnReintentarTexto: { color: 'white', fontWeight: '600' },
+  // Botón Invitar personas
+  invitarBtn: {
+    flexDirection: 'row', alignItems: 'center', gap: 12,
+    backgroundColor: colors.primary, borderRadius: 16, padding: 14,
+    marginBottom: 12,
+  },
+  invitarBtnIcon: {
+    width: 36, height: 36, borderRadius: 10,
+    backgroundColor: 'rgba(255,255,255,0.2)', justifyContent: 'center', alignItems: 'center',
+  },
+  invitarBtnTitulo: { fontSize: 13, fontWeight: '700', color: 'white' },
+  invitarBtnSub: { fontSize: 11, color: 'rgba(255,255,255,0.8)', marginTop: 2 },
   // Botón Subgrupos en el detalle
   subgruposBtn: {
     flexDirection: 'row', alignItems: 'center', gap: 12,

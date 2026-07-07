@@ -36,9 +36,13 @@ CREATE TABLE IF NOT EXISTS juntadas (
   id UUID PRIMARY KEY,
   nombre TEXT NOT NULL,
   descripcion TEXT NOT NULL DEFAULT '',
+  creador_id UUID REFERENCES usuarios(id) ON DELETE SET NULL,
   fecha DATE NOT NULL,
   creada_en TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+
+ALTER TABLE juntadas
+  ADD COLUMN IF NOT EXISTS creador_id UUID REFERENCES usuarios(id) ON DELETE SET NULL;
 
 CREATE TABLE IF NOT EXISTS juntada_participantes (
   id UUID PRIMARY KEY,
@@ -83,8 +87,23 @@ CREATE TABLE IF NOT EXISTS subgrupo_integrantes (
 );
 
 -- Vivienda
+CREATE TABLE IF NOT EXISTS viviendas (
+  id UUID PRIMARY KEY,
+  nombre TEXT NOT NULL,
+  creador_id UUID NOT NULL REFERENCES usuarios(id) ON DELETE CASCADE,
+  creada_en TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS vivienda_miembros (
+  vivienda_id UUID NOT NULL REFERENCES viviendas(id) ON DELETE CASCADE,
+  usuario_id UUID NOT NULL REFERENCES usuarios(id) ON DELETE CASCADE,
+  unido_en TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  PRIMARY KEY (vivienda_id, usuario_id)
+);
+
 CREATE TABLE IF NOT EXISTS vivienda_gastos (
   id UUID PRIMARY KEY,
+  vivienda_id UUID REFERENCES viviendas(id) ON DELETE CASCADE,
   nombre TEXT NOT NULL,
   monto NUMERIC(12,2) NOT NULL,
   categoria TEXT NOT NULL,
@@ -97,6 +116,7 @@ CREATE TABLE IF NOT EXISTS vivienda_gastos (
 
 CREATE TABLE IF NOT EXISTS vivienda_servicios (
   id UUID PRIMARY KEY,
+  vivienda_id UUID REFERENCES viviendas(id) ON DELETE CASCADE,
   nombre TEXT NOT NULL,
   monto NUMERIC(12,2) NOT NULL,
   periodicidad TEXT NOT NULL,
@@ -105,11 +125,31 @@ CREATE TABLE IF NOT EXISTS vivienda_servicios (
   creado_en TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+-- Tokens de invitación
+CREATE TABLE IF NOT EXISTS invitation_tokens (
+  token UUID PRIMARY KEY,
+  tipo TEXT NOT NULL DEFAULT 'juntada',
+  recurso_id UUID NOT NULL,
+  creado_por UUID REFERENCES usuarios(id) ON DELETE SET NULL,
+  creado_en TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  expira_en TIMESTAMPTZ NOT NULL DEFAULT (NOW() + INTERVAL '7 days')
+);
+
 CREATE TABLE IF NOT EXISTS vivienda_acuerdos (
   id TEXT PRIMARY KEY,
+  vivienda_id UUID REFERENCES viviendas(id) ON DELETE CASCADE,
   nombre TEXT NOT NULL,
   modelo TEXT NOT NULL DEFAULT 'proporcional'
 );
+
+ALTER TABLE vivienda_gastos
+  ADD COLUMN IF NOT EXISTS vivienda_id UUID REFERENCES viviendas(id) ON DELETE CASCADE;
+
+ALTER TABLE vivienda_servicios
+  ADD COLUMN IF NOT EXISTS vivienda_id UUID REFERENCES viviendas(id) ON DELETE CASCADE;
+
+ALTER TABLE vivienda_acuerdos
+  ADD COLUMN IF NOT EXISTS vivienda_id UUID REFERENCES viviendas(id) ON DELETE CASCADE;
 
 CREATE TABLE IF NOT EXISTS acuerdo_participantes (
   acuerdo_id TEXT NOT NULL REFERENCES vivienda_acuerdos(id) ON DELETE CASCADE,
