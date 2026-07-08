@@ -1,6 +1,10 @@
 const fs = require('fs');
 const path = require('path');
 const { randomUUID: uuidv4 } = require('crypto');
+const {
+  notifyUsersByName,
+  NOTIFICATION_CATEGORIES,
+} = require('./pushNotificationService');
 
 const DB_PATH = path.join(__dirname, '../../data/db.json');
 
@@ -11,6 +15,69 @@ function leerDB() {
 
 function escribirDB(data) {
   fs.writeFileSync(DB_PATH, JSON.stringify(data, null, 2), 'utf8');
+}
+
+function asegurarInfraNotificaciones(db) {
+  if (!db.notificaciones || typeof db.notificaciones !== 'object') {
+    db.notificaciones = {};
+  }
+  if (!Array.isArray(db.notificaciones.recordatorios48hEnviados)) {
+    db.notificaciones.recordatorios48hEnviados = [];
+  }
+}
+
+async function procesarRecordatorios48h(db) {
+  if (!db.vivienda || !Array.isArray(db.vivienda.serviciosPeriodicos)) {
+    return false;
+  }
+
+  asegurarInfraNotificaciones(db);
+
+  const ahora = new Date();
+  const dosDiasMs = 48 * 60 * 60 * 1000;
+  const ventanaMs = 24 * 60 * 60 * 1000;
+  let huboCambios = false;
+
+  for (const servicio of db.vivienda.serviciosPeriodicos) {
+    if (!servicio.proximoVencimiento) {
+      continue;
+    }
+
+    const vencimiento = new Date(servicio.proximoVencimiento);
+    const diffMs = vencimiento.getTime() - ahora.getTime();
+
+    const estaEnVentana48h = diffMs <= dosDiasMs && diffMs > dosDiasMs - ventanaMs;
+    if (!estaEnVentana48h) {
+      continue;
+    }
+
+    const recordatorioKey = `${servicio.id || servicio.nombre}|${vencimiento.toISOString().slice(0, 10)}`;
+    if (db.notificaciones.recordatorios48hEnviados.includes(recordatorioKey)) {
+      continue;
+    }
+
+    const destinatarios = Array.isArray(servicio.participantes) ? servicio.participantes : [];
+
+    if (destinatarios.length > 0) {
+      await notifyUsersByName(db, destinatarios, {
+        title: 'Recordatorio de vencimiento',
+        body: `${servicio.nombre} vence en menos de 48 horas.`,
+        data: {
+          type: 'servicio_due_48h',
+          servicioId: String(servicio.id || ''),
+          servicioNombre: String(servicio.nombre || ''),
+          fechaVencimiento: vencimiento.toISOString(),
+        },
+      }, {
+        category: NOTIFICATION_CATEGORIES.RECORDATORIOS_VENCIMIENTO,
+      });
+    }
+
+    db.notificaciones.recordatorios48hEnviados.push(recordatorioKey);
+    huboCambios = true;
+  }
+
+  return huboCambios;
 }
 
 function sumarFrecuencia(fecha, periodicidad) {
@@ -25,7 +92,7 @@ function sumarFrecuencia(fecha, periodicidad) {
   return date.toISOString();
 }
 
-function procesarServiciosPeriodicos() {
+async function procesarServiciosPeriodicos() {
   try {
     const db = leerDB();
     if (!db.vivienda || !db.vivienda.serviciosPeriodicos) return;
@@ -54,9 +121,11 @@ function procesarServiciosPeriodicos() {
       }
     }
 
-    if (modificado) {
+    const recordatoriosNuevos = await procesarRecordatorios48h(db);
+
+    if (modificado || recordatoriosNuevos) {
       escribirDB(db);
-      console.log('Servicios periódicos procesados y gastos generados automáticamente.');
+      console.log('Servicios periodicos procesados y recordatorios evaluados.');
     }
   } catch (error) {
     console.error('Error al procesar servicios periódicos:', error);

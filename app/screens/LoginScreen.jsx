@@ -5,7 +5,9 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { colors } from '../theme/colors';
-import { useAuth } from '../navigation/AppNavigator';
+import { useAuth } from '../context/AuthContext';
+import { loginUser, registerUser } from '../services/authService';
+import { registrarTokenDispositivo } from '../services/notificationsService';
 
 export default function LoginScreen() {
   const { login } = useAuth();
@@ -29,7 +31,12 @@ export default function LoginScreen() {
     setLoading(true);
     try {
       if (activeTab === 'register') {
-        // Registro demo para MVP visual del flujo auth
+        await registerUser({
+          name: name.trim(),
+          email: email.trim(),
+          password,
+        });
+
         Alert.alert('¡Éxito!', 'Cuenta creada. Ahora iniciá sesión.');
         
         // Limpiar formulario
@@ -38,13 +45,21 @@ export default function LoginScreen() {
         setEmail('');        // ✅ CORREGIDO: Se limpia email
         setPassword('');
       } else {
-        // Login demo: habilita el flujo y deja visible el diseño tipo Figma
-        const baseName = name.trim() || email.split('@')[0] || 'Usuario';
-        const userData = {
-          name: baseName.charAt(0).toUpperCase() + baseName.slice(1),
-          email,
-        };
-        login(userData);
+        const authData = await loginUser({
+          email: email.trim(),
+          password,
+        });
+
+        login({
+          user: authData.user,
+          token: authData.token,
+        });
+
+        try {
+          await registrarTokenDispositivo(authData.token);
+        } catch (pushError) {
+          console.warn('[push] No se pudo registrar token de dispositivo:', pushError.message);
+        }
       }
     } catch (error) {
       const errorMsg = error.message || 'Ocurrió un error inesperado';

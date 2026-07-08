@@ -2,6 +2,10 @@ const fs = require('fs');
 const path = require('path');
 const { randomUUID: uuidv4 } = require('crypto');
 const { calcularBalance, calcularBalanceGlobal } = require('../services/balanceService');
+const {
+  notifyUsersByName,
+  NOTIFICATION_CATEGORIES,
+} = require('../services/pushNotificationService');
 
 const DB_PATH = path.join(__dirname, '../../data/db.json');
 
@@ -180,6 +184,7 @@ function editarJuntada(req, res, next) {
 
     // Si vienen participantes, solo agregamos los nuevos por nombre (no eliminamos existentes)
     // para evitar inconsistencias con gastos ya cargados.
+    let nombresNuevos = [];
     if (Array.isArray(participantes)) {
       const nombresActuales = new Set(
         juntada.participantes.map((p) => p.nombre.toLowerCase())
@@ -203,10 +208,28 @@ function editarJuntada(req, res, next) {
           };
         });
 
+      nombresNuevos = nuevos.map((p) => p.nombre);
       juntada.participantes.push(...nuevos);
     }
 
     escribirDB(db);
+
+    if (nombresNuevos.length > 0) {
+      notifyUsersByName(db, nombresNuevos, {
+        title: 'Te agregaron a una juntada',
+        body: `Ahora participas en "${juntada.nombre}"`,
+        data: {
+          type: 'juntada_invite',
+          juntadaId: juntada.id,
+          juntadaNombre: juntada.nombre,
+        },
+      }, {
+        category: NOTIFICATION_CATEGORIES.NUEVAS_JUNTADAS,
+      }).catch((error) => {
+        console.error('[push] Error enviando notificacion de juntada:', error.message);
+      });
+    }
+
     res.json({ ok: true, data: juntada });
   } catch (err) {
     next(err);
@@ -400,6 +423,29 @@ function agregarGasto(req, res, next) {
 
     juntada.gastos.push(nuevo);
     escribirDB(db);
+
+    const receptores = juntada.participantes
+      .map((p) => p.nombre)
+      .filter((nombreParticipante) =>
+        nombreParticipante.trim().toLowerCase() !== pagador.trim().toLowerCase()
+      );
+
+    if (receptores.length > 0) {
+      notifyUsersByName(db, receptores, {
+        title: 'Nuevo gasto en juntada',
+        body: `${pagador.trim()} agrego "${nombre.trim()}" en ${juntada.nombre}.`,
+        data: {
+          type: 'new_expense',
+          juntadaId: juntada.id,
+          juntadaNombre: juntada.nombre,
+          gastoId: nuevo.id,
+        },
+      }, {
+        category: NOTIFICATION_CATEGORIES.NUEVOS_GASTOS,
+      }).catch((error) => {
+        console.error('[push] Error enviando notificacion de nuevo gasto:', error.message);
+      });
+    }
 
     res.status(201).json({ ok: true, data: nuevo });
   } catch (err) {

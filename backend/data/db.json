@@ -436,6 +436,29 @@
       "servicios": 0,
       "viajes": 0,
       "creadoEn": "2026-06-20T20:35:13.636Z"
+    },
+    {
+      "id": "9cf42be4-02c4-4cb5-8004-ee040ddc5a86",
+      "name": "Thiago",
+      "email": "thiago@test.com",
+      "password": "$2b$10$gzgOugmZPfjvqmdFDfy.DOhX7RmuKo3MxIjWS.bbMK5UgOmhzLs5e",
+      "iniciales": "T",
+      "juntadas": 0,
+      "servicios": 0,
+      "viajes": 0,
+      "notificationPreferences": {
+        "nuevosGastos": true,
+        "recordatoriosVencimiento": true,
+        "nuevasJuntadas": true
+      },
+      "creadoEn": "2026-07-05T21:34:16.362Z",
+      "deviceTokens": [
+        {
+          "token": "ExponentPushToken[DL30y8GdE_4JqvCifR0fgJ]",
+          "platform": "ios",
+          "lastSeenAt": "2026-07-05T22:10:06.038Z"
+        }
+      ]
     }
   ],
   "vivienda": {
@@ -492,6 +515,17 @@
           {
             "nombre": "Ana",
             "porcentaje": 0
+          }
+        ]
+      },
+      "agua": {
+        "id": "agua",
+        "nombre": "Agua",
+        "modelo": "partes_iguales",
+        "participantes": [
+          {
+            "nombre": "Martín Alves",
+            "porcentaje": 100
           }
         ]
       }

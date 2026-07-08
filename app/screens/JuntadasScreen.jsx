@@ -4,7 +4,7 @@ import { useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { colors } from '../theme/colors';
 import { listarJuntadas } from '../services/juntadasService';
-import { useAuth } from '../navigation/AppNavigator';
+import { useAuth } from '../context/AuthContext';
 
 // ── Colores disponibles para asignar a participantes ──────────────────────────
 export const coloresDisponibles = [

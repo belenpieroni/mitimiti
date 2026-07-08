@@ -8,7 +8,7 @@ import DateTimePicker from '@react-native-community/datetimepicker';
 import { colors } from '../theme/colors';
 import { getIniciales, coloresDisponibles } from './JuntadasScreen';
 import { crearJuntada as crearJuntadaService, editarJuntada as editarJuntadaService } from '../services/juntadasService';
-import { useAuth } from '../navigation/AppNavigator';
+import { useAuth } from '../context/AuthContext';
 
 function formatFecha(date) {
   return date.toLocaleDateString('es-AR', { day: 'numeric', month: 'short', year: 'numeric' });

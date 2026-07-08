@@ -4,7 +4,7 @@ import { useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { colors } from '../theme/colors';
 import { listarJuntadas, obtenerBalanceGlobal } from '../services/juntadasService';
-import { useAuth } from '../navigation/AppNavigator';
+import { useAuth } from '../context/AuthContext';
 
 const modulos = [
   { id: '1', nombre: 'Juntadas', icono: 'people-outline' },
@@ -86,7 +86,7 @@ export default function HomeScreen({ navigation }) {
           <Text style={styles.nombre}>{nombreUsuario}</Text>
         </View>
         <View style={styles.headerIconos}>
-          <TouchableOpacity style={styles.iconoBtn}>
+          <TouchableOpacity style={styles.iconoBtn} onPress={() => navigation.navigate('Notifications')}>
             <Ionicons name="notifications-outline" size={22} color={colors.textPrimary} />
           </TouchableOpacity>
           <TouchableOpacity

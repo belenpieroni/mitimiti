@@ -1,35 +1,41 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState } from 'react';
 import { getAcuerdosReparto, guardarAcuerdoReparto } from '../services/viviendaService';
 
 const ViviendaContext = createContext();
 
 export function ViviendaProvider({ children }) {
   const [reglas, setReglas] = useState([]);
-  const [cargando, setCargando] = useState(true);
+  const [cargando, setCargando] = useState(false);
 
-  useEffect(() => {
-    cargarAcuerdos();
-  }, []);
-
-const cargarAcuerdos = async () => {
-  try {
-    const data = await getAcuerdosReparto(); // ya es el array directo
-    const normalizado = (Array.isArray(data) ? data : []).map(item => ({
+  const normalizarAcuerdos = (data) =>
+    (Array.isArray(data) ? data : []).map((item) => ({
       id: item.id ?? item.nombre,
       nombre: item.nombre ?? 'Sin nombre',
       modelo: item.modelo ?? 'partes_iguales',
-      participantes: (item.participantes ?? []).map(p => ({
+      participantes: (item.participantes ?? []).map((p) => ({
         nombre: p?.nombre ?? 'Sin nombre',
         porcentaje: Number(p?.porcentaje ?? 0),
       })),
     }));
-    setReglas(normalizado);
-  } catch (e) {
-    console.error('Error cargando acuerdos:', e.message);
-  } finally {
-    setCargando(false);
-  }
-};
+
+  const cargarAcuerdos = async (retryCount = 1) => {
+    setCargando(true);
+    try {
+      const data = await getAcuerdosReparto();
+      setReglas(normalizarAcuerdos(data));
+      return true;
+    } catch (e) {
+      if (retryCount > 0) {
+        await new Promise((resolve) => setTimeout(resolve, 700));
+        return cargarAcuerdos(retryCount - 1);
+      }
+
+      console.error('Error cargando acuerdos:', e.message);
+      return false;
+    } finally {
+      setCargando(false);
+    }
+  };
 
 const agregarRegla = async (nuevaRegla) => {
   try {
