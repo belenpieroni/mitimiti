@@ -110,3 +110,35 @@ export async function enviarNotificacionRemotaPrueba(authToken) {
     }
   );
 }
+
+export async function obtenerNotificaciones(authToken) {
+  return api.get('/auth/notifications', {
+    headers: {
+      Authorization: `Bearer ${authToken}`,
+    },
+  });
+}
+
+export async function marcarNotificacionLeida(authToken, notificationId) {
+  return api.patch(
+    `/auth/notifications/${encodeURIComponent(notificationId)}/read`,
+    {},
+    {
+      headers: {
+        Authorization: `Bearer ${authToken}`,
+      },
+    }
+  );
+}
+
+export async function marcarTodasNotificacionesLeidas(authToken) {
+  return api.patch(
+    '/auth/notifications/read-all',
+    {},
+    {
+      headers: {
+        Authorization: `Bearer ${authToken}`,
+      },
+    }
+  );
+}

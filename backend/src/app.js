@@ -9,7 +9,8 @@ const deudasRoutes = require('./routes/deudas');
 const viviendaRouter = require('./routes/vivienda');
 const uploadsRouter = require('./routes/uploads');
 const { errorHandler, notFound } = require('./middleware/errorHandler');
-const { iniciarCron } = require('./services/cronService');
+const { iniciarCronJobs } = require('./services/cronService');
+const { inicializarDB } = require('./db');
 const authRouter = require('./routes/auth');
 
 const app = express();
@@ -18,7 +19,8 @@ const PORT = process.env.PORT || 3000;
 // ── Middlewares globales ──────────────────────────────────────────────────────
 app.use(cors());                        // Permite peticiones desde la app Expo
 app.use(express.json());                // Parsea body JSON
-app.use('/uploads', express.static(path.join(__dirname, 'uploads'))); // Servir archivos estáticos (mismo dir que multer: src/uploads)
+const uploadsDir = process.env.UPLOADS_DIR || path.join(__dirname, 'uploads');
+app.use('/uploads', express.static(uploadsDir));
 
 // ── Rutas ─────────────────────────────────────────────────────────────────────
 app.get('/', (req, res) => {
@@ -43,10 +45,18 @@ app._router.stack.forEach(r => {
 });
 
 // ── Arranque ──────────────────────────────────────────────────────────────────
-app.listen(PORT, () => {
-  console.log(`    Miti Miti backend escuchando en http://localhost:${PORT}`);
-  console.log(`    Docs de endpoints disponibles en /api/juntadas`);
-  iniciarCron();
+async function start() {
+  await inicializarDB();
+  app.listen(PORT, () => {
+    console.log(`    Miti Miti backend escuchando en http://localhost:${PORT}`);
+    console.log(`    Docs de endpoints disponibles en /api/juntadas`);
+    iniciarCronJobs();
+  });
+}
+
+start().catch((err) => {
+  console.error('[startup] Error fatal al iniciar el servidor:', err);
+  process.exit(1);
 });
 
 module.exports = app;

@@ -17,6 +17,7 @@ function requireAuth(req, res, next) {
     req.user = {
       id: payload.id,
       email: payload.email,
+      name: payload.name,
     };
 
     return next();

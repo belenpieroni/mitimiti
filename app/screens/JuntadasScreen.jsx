@@ -108,13 +108,22 @@ export default function JuntadasScreen({ navigation }) {
           <Text style={styles.subtitulo}>Tus eventos</Text>
           <Text style={styles.titulo}>Juntadas</Text>
         </View>
-        <TouchableOpacity
-          style={styles.btnNueva}
-          onPress={() => navigation.navigate('CrearJuntada')}
-        >
-          <Ionicons name="add" size={16} color="white" />
-          <Text style={styles.btnNuevaTexto}>Nueva</Text>
-        </TouchableOpacity>
+        <View style={styles.headerActions}>
+          <TouchableOpacity
+            style={styles.btnUnirme}
+            onPress={() => navigation.navigate('JoinViaLink')}
+          >
+            <Ionicons name="link-outline" size={16} color={colors.primary} />
+            <Text style={styles.btnUnirmeTexto}>Unirme</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.btnNueva}
+            onPress={() => navigation.navigate('CrearJuntada')}
+          >
+            <Ionicons name="add" size={16} color="white" />
+            <Text style={styles.btnNuevaTexto}>Nueva</Text>
+          </TouchableOpacity>
+        </View>
       </View>
 
       {juntadas.length === 0 ? (
@@ -183,8 +192,15 @@ const styles = StyleSheet.create({
     flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
     paddingHorizontal: 20, paddingTop: 56, paddingBottom: 16,
   },
+  headerActions: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   subtitulo: { fontSize: 13, color: colors.textSecondary },
   titulo: { fontSize: 28, fontWeight: 'bold', color: colors.textPrimary },
+  btnUnirme: {
+    flexDirection: 'row', alignItems: 'center', backgroundColor: '#EEF4FA',
+    paddingHorizontal: 14, paddingVertical: 10, borderRadius: 20, gap: 4,
+    borderWidth: 1, borderColor: '#CAD8E5',
+  },
+  btnUnirmeTexto: { color: colors.primary, fontWeight: '600', fontSize: 14 },
   btnNueva: {
     flexDirection: 'row', alignItems: 'center', backgroundColor: colors.primary,
     paddingHorizontal: 16, paddingVertical: 10, borderRadius: 20, gap: 4,

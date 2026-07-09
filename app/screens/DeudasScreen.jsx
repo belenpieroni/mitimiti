@@ -8,7 +8,6 @@ import {
   LayoutAnimation,
   Platform,
   UIManager,
-  SafeAreaView,
   ActivityIndicator
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
@@ -141,8 +140,12 @@ export default function DeudasScreen() {
   }
 
   return (
-    <SafeAreaView style={styles.safeArea}>
-      <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
+    <View style={styles.safeArea}>
+      <ScrollView
+        style={styles.container}
+        contentContainerStyle={styles.content}
+        showsVerticalScrollIndicator={false}
+      >
         <View style={styles.header}>
           <Text style={styles.subtitle}>Resumen de tus cuentas pendientes</Text>  
           <Text style={styles.title}>Deudas</Text>
@@ -219,15 +222,16 @@ export default function DeudasScreen() {
           </View>
         ))}
       </ScrollView>
-    </SafeAreaView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  safeArea: { flex: 1, backgroundColor: colors.background},
+  safeArea: { flex: 1, backgroundColor: colors.background },
   center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  container: { flex: 1, paddingHorizontal: 20, marginTop: 40 },
-  header: { marginTop: 30, marginBottom: 20 },
+  container: { flex: 1 },
+  content: { paddingHorizontal: 20, paddingTop: 56, paddingBottom: 24 },
+  header: { marginBottom: 20 },
   title: {  fontSize: 28, fontWeight: 'bold', color: colors.textPrimary},
   subtitle: { fontSize: 14, color: '#666', marginTop: 4 },
   balanceCard: { backgroundColor: colors.primary, borderRadius: 24, padding: 25, marginBottom: 30 },

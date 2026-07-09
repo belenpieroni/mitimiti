@@ -2,9 +2,13 @@ import { useMemo, useState } from 'react';
 import { NavigationContainer, useNavigation } from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
-import { View, TouchableOpacity, StyleSheet, Modal, Text, KeyboardAvoidingView, Platform } from 'react-native';
+import { View, TouchableOpacity, StyleSheet, Modal, Text, KeyboardAvoidingView, Platform, Linking } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { colors } from '../theme/colors';
+import { setAuthToken } from '../services/api';
+
+import JoinViaLinkScreen from '../screens/JoinViaLinkScreen';
+import ViviendaJoinViaLinkScreen from '../screens/ViviendaJoinViaLinkScreen';
 
 import DeudasScreen from '../screens/DeudasScreen';
 import HomeScreen from '../screens/HomeScreen';
@@ -35,6 +39,7 @@ function JuntadasStack() {
       <Stack.Screen name="AgregarGasto" component={AgregarGastoScreen} />
       <Stack.Screen name="CrearJuntada" component={CrearJuntadaScreen} />
       <Stack.Screen name="Balance" component={BalanceScreen} />
+      <Stack.Screen name="JoinViaLink" component={JoinViaLinkScreen} />
     </Stack.Navigator>
   );
 }
@@ -58,6 +63,7 @@ function ViviendaStack() {
       <Stack.Screen name="AgregarVivienda" component={AgregarViviendaScreen} />
       <Stack.Screen name="SalidasPorCategoria" component={SalidasPorCategoriaScreen} />
       <Stack.Screen name="CategoriaDetalle" component={CategoriaDetalleScreen} />
+      <Stack.Screen name="ViviendaJoinViaLink" component={ViviendaJoinViaLinkScreen} />
     </Stack.Navigator>
   );
 }
@@ -235,24 +241,41 @@ export default function AppNavigator() {
     isAuthenticated: Boolean(session?.user),
     login: (payload) => {
       if (payload?.user) {
-        setSession({
-          user: payload.user,
-          token: payload.token || null,
-        });
+        setSession({ user: payload.user, token: payload.token || null });
+        setAuthToken(payload.token || null);
         return;
       }
-
-      setSession({
-        user: payload || null,
-        token: null,
-      });
+      setSession({ user: payload || null, token: null });
+      setAuthToken(null);
     },
-    logout: () => setSession(null),
+    logout: () => { setSession(null); setAuthToken(null); },
   }), [session]);
+
+  const linking = {
+    prefixes: ['mitimiti://'],
+    config: {
+      screens: {
+        AppTabs: {
+          screens: {
+            Juntadas: {
+              screens: {
+                JoinViaLink: 'join/:token',
+              },
+            },
+            Vivienda: {
+              screens: {
+                ViviendaJoinViaLink: 'vivienda/join/:token',
+              },
+            },
+          },
+        },
+      },
+    },
+  };
 
   return (
     <AuthContext.Provider value={authValue}>
-      <NavigationContainer>
+      <NavigationContainer linking={linking}>
         <Stack.Navigator screenOptions={{ headerShown: false }}>
           {authValue.isAuthenticated ? (
             <Stack.Screen name="AppTabs" component={RootTabs} />

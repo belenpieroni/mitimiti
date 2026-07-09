@@ -53,6 +53,24 @@ es porque `expo start --tunnel` se está ejecutando sin sesión de Expo en el co
 - elegir `Proceed anonymously` y continuar
 - o configurar `EXPO_TOKEN` en `.env` para evitar el prompt en cada arranque
 
+## Base de datos PostgreSQL
+
+El backend usa PostgreSQL 16. Las tablas se crean automáticamente al iniciar el contenedor (`schema.sql`).
+
+**Primera vez (migración de datos desde db.json):**
+
+```bash
+# 1. Levantá el stack
+bash scripts/dev.sh
+
+# 2. En otra terminal, ejecutá el seed para migrar el db.json existente
+docker compose exec backend npm run seed
+```
+
+El seed es idempotente (`ON CONFLICT DO NOTHING`), podés correrlo varias veces sin problema.
+
+Las imágenes de tickets OCR se guardan en el volumen Docker `uploads` y la URL se persiste en la columna `imagen_url` de `vivienda_gastos`.
+
 ## Flujo Completo
 
 1. Levantá ambos servicios:
@@ -61,7 +79,13 @@ es porque `expo start --tunnel` se está ejecutando sin sesión de Expo en el co
 bash scripts/dev.sh
 ```
 
-2. Si preferís correrlo manualmente:
+2. Si es la primera vez, migrá los datos del `db.json` en otra terminal:
+
+```bash
+docker compose exec backend npm run seed
+```
+
+3. Si preferís correrlo manualmente:
 
 ```bash
 npm install

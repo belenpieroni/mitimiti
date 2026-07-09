@@ -1,7 +1,18 @@
 const { Router } = require('express');
 const ctrl = require('../controllers/viviendaController');
+const { requireAuth } = require('../middleware/authMiddleware');
 
 const router = Router();
+
+router.use(requireAuth);
+
+router.get('/actual', ctrl.obtenerMiVivienda);
+router.post('/crear', ctrl.crearMiVivienda);
+router.patch('/actual', ctrl.editarMiVivienda);
+router.delete('/actual', ctrl.eliminarMiVivienda);
+router.get('/invitacion', ctrl.generarObtenerInvitacion);
+router.post('/invitacion', ctrl.generarObtenerInvitacion);
+router.post('/join/:token', ctrl.unirseViaToken);
 
 router.get('/gastos', ctrl.listarGastos);
 router.post('/gastos', ctrl.crearGasto);

@@ -2,8 +2,8 @@ const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
 
-// Carpeta para almacenar uploads
-const uploadDir = path.join(__dirname, '../uploads');
+// Carpeta para almacenar uploads (usa volumen Docker si está configurado)
+const uploadDir = process.env.UPLOADS_DIR || path.join(__dirname, '../uploads');
 
 // Crear directorio si no existe
 if (!fs.existsSync(uploadDir)) {

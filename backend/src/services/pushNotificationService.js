@@ -1,12 +1,8 @@
-let admin;
-try {
-  admin = require('firebase-admin');
-} catch (error) {
-  admin = null;
-}
+const { Expo } = require('expo-server-sdk');
+const { randomUUID } = require('crypto');
+const { pool } = require('../db');
 
-let firebaseReady = false;
-const EXPO_PUSH_URL = 'https://exp.host/--/api/v2/push/send';
+const expo = new Expo();
 
 const NOTIFICATION_CATEGORIES = {
   NUEVOS_GASTOS: 'nuevos_gastos',
@@ -14,228 +10,125 @@ const NOTIFICATION_CATEGORIES = {
   NUEVAS_JUNTADAS: 'nuevas_juntadas',
 };
 
-const CATEGORY_TO_PREFERENCE_KEY = {
-  [NOTIFICATION_CATEGORIES.NUEVOS_GASTOS]: 'nuevosGastos',
-  [NOTIFICATION_CATEGORIES.RECORDATORIOS_VENCIMIENTO]: 'recordatoriosVencimiento',
-  [NOTIFICATION_CATEGORIES.NUEVAS_JUNTADAS]: 'nuevasJuntadas',
+const PREF_COLUMN_MAP = {
+  [NOTIFICATION_CATEGORIES.NUEVOS_GASTOS]: 'notif_nuevos_gastos',
+  [NOTIFICATION_CATEGORIES.RECORDATORIOS_VENCIMIENTO]: 'notif_recordatorios_vencimiento',
+  [NOTIFICATION_CATEGORIES.NUEVAS_JUNTADAS]: 'notif_nuevas_juntadas',
 };
 
-const DEFAULT_PREFERENCES = {
-  nuevosGastos: true,
-  recordatoriosVencimiento: true,
-  nuevasJuntadas: true,
-};
+/**
+ * Envía una notificación push a usuarios por nombre.
+ * @param {string[]} names - Nombres de los destinatarios.
+ * @param {{ title: string, body: string, data?: object }} payload
+ * @param {{ category?: string }} options
+ */
+async function notifyUsersByName(names, payload, options = {}) {
+  if (!names || names.length === 0) return { sent: 0, failed: 0 };
 
-function getFirebaseConfig() {
-  const projectId = process.env.FIREBASE_PROJECT_ID;
-  const clientEmail = process.env.FIREBASE_CLIENT_EMAIL;
-  const privateKey = process.env.FIREBASE_PRIVATE_KEY
-    ? process.env.FIREBASE_PRIVATE_KEY.replace(/\\n/g, '\n')
-    : null;
+  const normalizedNames = names.map((n) => n.trim().toLowerCase());
+  const { category } = options;
+  const prefColumn = category ? PREF_COLUMN_MAP[category] : null;
 
-  if (!projectId || !clientEmail || !privateKey) {
-    return null;
-  }
+  const usuariosQuery = prefColumn
+    ? `
+      SELECT u.id::text, u.name
+      FROM usuarios u
+      WHERE LOWER(u.name) = ANY($1)
+        AND u.${prefColumn} = TRUE
+    `
+    : `
+      SELECT u.id::text, u.name
+      FROM usuarios u
+      WHERE LOWER(u.name) = ANY($1)
+    `;
 
-  return {
-    credential: admin.credential.cert({
-      projectId,
-      clientEmail,
-      privateKey,
-    }),
-  };
-}
+  const { rows: usuarios } = await pool.query(usuariosQuery, [normalizedNames]);
 
-function getMessagingClient() {
-  if (!admin) {
-    return null;
-  }
+  if (usuarios.length === 0) return { sent: 0, failed: 0 };
 
-  if (!firebaseReady) {
-    const config = getFirebaseConfig();
-    if (!config) {
-      return null;
-    }
+  await guardarNotificacionesEnBD(usuarios, payload, category || 'general');
 
-    if (!admin.apps.length) {
-      admin.initializeApp(config);
-    }
-    firebaseReady = true;
-  }
+  const userIds = usuarios.map((u) => u.id);
+  const { rows: tokenRows } = await pool.query(
+    'SELECT token FROM usuario_device_tokens WHERE usuario_id::text = ANY($1)',
+    [userIds]
+  );
+  const tokens = tokenRows.map((r) => r.token).filter(Boolean);
 
-  return admin.messaging();
-}
-
-function buildMulticastMessage(tokens, payload) {
-  return {
-    tokens,
-    notification: {
-      title: payload.title,
-      body: payload.body,
-    },
-    data: payload.data || {},
-  };
-}
-
-function isExpoPushToken(token = '') {
-  return /^ExponentPushToken\[.+\]$/.test(token) || /^ExpoPushToken\[.+\]$/.test(token);
-}
-
-function chunkArray(items = [], chunkSize = 100) {
-  const chunks = [];
-  for (let i = 0; i < items.length; i += chunkSize) {
-    chunks.push(items.slice(i, i + chunkSize));
-  }
-  return chunks;
-}
-
-async function sendExpoPushToTokens(tokens = [], payload = {}) {
-  const uniqueTokens = [...new Set(tokens.filter(Boolean))];
-  if (!uniqueTokens.length) {
-    return { ok: true, sent: 0, failed: 0 };
-  }
-
-  let sent = 0;
-  let failed = 0;
-  const responses = [];
-  const chunks = chunkArray(uniqueTokens, 100);
-
-  for (const tokenChunk of chunks) {
-    const messages = tokenChunk.map((token) => ({
-      to: token,
-      title: payload.title,
-      body: payload.body,
-      data: payload.data || {},
-      sound: 'default',
-    }));
-
-    const response = await fetch(EXPO_PUSH_URL, {
-      method: 'POST',
-      headers: {
-        Accept: 'application/json',
-        'Accept-encoding': 'gzip, deflate',
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(messages),
-    });
-
-    const json = await response.json();
-    const results = Array.isArray(json?.data) ? json.data : [];
-
-    results.forEach((result) => {
-      if (result?.status === 'ok') {
-        sent += 1;
-      } else {
-        failed += 1;
-      }
-      responses.push(result);
-    });
-  }
-
-  return {
-    ok: failed === 0,
-    sent,
-    failed,
-    responses,
-  };
-}
-
-async function sendPushToTokens(tokens = [], payload = {}) {
-  const uniqueTokens = [...new Set(tokens.filter(Boolean))];
-  if (!uniqueTokens.length) {
-    return { ok: true, sent: 0, failed: 0 };
-  }
-
-  const expoTokens = uniqueTokens.filter(isExpoPushToken);
-  const nativeTokens = uniqueTokens.filter((token) => !isExpoPushToken(token));
-
-  const expoResult = await sendExpoPushToTokens(expoTokens, payload);
-
-  let nativeResult = { ok: true, sent: 0, failed: 0 };
-  if (nativeTokens.length > 0) {
-    const messaging = getMessagingClient();
-    if (!messaging) {
-      console.warn('[push] Firebase no configurado para tokens nativos.');
-      nativeResult = { ok: false, sent: 0, failed: nativeTokens.length, skipped: true };
-    } else {
-      const message = buildMulticastMessage(nativeTokens, payload);
-      const result = await messaging.sendEachForMulticast(message);
-      nativeResult = {
-        ok: result.failureCount === 0,
-        sent: result.successCount,
-        failed: result.failureCount,
-        responses: result.responses,
-      };
-    }
-  }
-
-  return {
-    ok: expoResult.ok && nativeResult.ok,
-    sent: expoResult.sent + nativeResult.sent,
-    failed: expoResult.failed + nativeResult.failed,
-    responses: [
-      ...(expoResult.responses || []),
-      ...(nativeResult.responses || []),
-    ],
-  };
-}
-
-function getUserDeviceTokens(user = {}) {
-  if (!Array.isArray(user.deviceTokens)) {
-    return [];
-  }
-
-  return user.deviceTokens
-    .map((entry) => entry && entry.token)
-    .filter(Boolean);
-}
-
-function getUserPreferences(user = {}) {
-  const incoming = user.notificationPreferences;
-  if (!incoming || typeof incoming !== 'object') {
-    return { ...DEFAULT_PREFERENCES };
-  }
-
-  return {
-    ...DEFAULT_PREFERENCES,
-    ...incoming,
-  };
-}
-
-function isCategoryEnabledForUser(user = {}, category) {
-  if (!category) {
-    return true;
-  }
-
-  const preferenceKey = CATEGORY_TO_PREFERENCE_KEY[category];
-  if (!preferenceKey) {
-    return true;
-  }
-
-  const prefs = getUserPreferences(user);
-  return prefs[preferenceKey] !== false;
-}
-
-async function notifyUsersByName(db, names = [], payload = {}, options = {}) {
-  const normalizedNames = names
-    .map((n) => (n || '').trim().toLowerCase())
-    .filter(Boolean);
-  const category = options.category;
-
-  if (!normalizedNames.length || !Array.isArray(db.usuarios)) {
-    return { ok: true, sent: 0, failed: 0 };
-  }
-
-  const tokens = db.usuarios
-    .filter((u) => normalizedNames.includes((u.name || '').trim().toLowerCase()))
-    .filter((u) => isCategoryEnabledForUser(u, category))
-    .flatMap(getUserDeviceTokens);
+  if (tokens.length === 0) return { sent: 0, failed: 0 };
 
   return sendPushToTokens(tokens, payload);
 }
 
-module.exports = {
-  NOTIFICATION_CATEGORIES,
-  sendPushToTokens,
-  notifyUsersByName,
-};
+async function guardarNotificacionesEnBD(usuarios, payload, categoria) {
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    for (const usuario of usuarios) {
+      await client.query(
+        `INSERT INTO notificaciones_usuario (id, usuario_id, categoria, titulo, cuerpo, payload)
+         VALUES ($1, $2::uuid, $3, $4, $5, $6::jsonb)`,
+        [
+          randomUUID(),
+          usuario.id,
+          categoria,
+          payload.title || 'Notificacion',
+          payload.body || '',
+          JSON.stringify(payload.data || {}),
+        ]
+      );
+    }
+    await client.query('COMMIT');
+  } catch (err) {
+    await client.query('ROLLBACK');
+    throw err;
+  } finally {
+    client.release();
+  }
+}
+
+/**
+ * Envía push a una lista de tokens directamente.
+ * @param {string[]} tokens
+ * @param {{ title: string, body: string, data?: object }} payload
+ */
+async function sendPushToTokens(tokens, payload) {
+  const validTokens = tokens.filter((t) => Expo.isExpoPushToken(t));
+
+  if (validTokens.length === 0) {
+    console.warn('[push] No hay tokens Expo válidos.');
+    return { sent: 0, failed: tokens.length };
+  }
+
+  const messages = validTokens.map((to) => ({
+    to,
+    sound: 'default',
+    title: payload.title,
+    body: payload.body,
+    data: payload.data || {},
+  }));
+
+  let sent = 0;
+  let failed = 0;
+
+  const chunks = expo.chunkPushNotifications(messages);
+  for (const chunk of chunks) {
+    try {
+      const receipts = await expo.sendPushNotificationsAsync(chunk);
+      receipts.forEach((receipt) => {
+        if (receipt.status === 'ok') sent++;
+        else {
+          console.error('[push] Error en receipt:', receipt.message, receipt.details);
+          failed++;
+        }
+      });
+    } catch (err) {
+      console.error('[push] Error enviando chunk:', err.message);
+      failed += chunk.length;
+    }
+  }
+
+  return { sent, failed };
+}
+
+module.exports = { notifyUsersByName, sendPushToTokens, NOTIFICATION_CATEGORIES };

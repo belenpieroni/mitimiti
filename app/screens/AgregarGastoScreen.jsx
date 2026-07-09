@@ -181,7 +181,7 @@ export default function AgregarGastoScreen({ route, navigation }) {
             activeOpacity={0.7}
           >
             <MaterialCommunityIcons 
-              name={adjuntoTicket ? "file-document-check" : "camera-viewfinder"} 
+              name={adjuntoTicket ? "file-document-check" : "camera-outline"} 
               size={22} 
               color={colors.primary} 
             />
@@ -411,10 +411,14 @@ export default function AgregarGastoScreen({ route, navigation }) {
               mode="date"
               display={Platform.OS === 'ios' ? 'spinner' : 'default'}
               onChange={(event, selectedDate) => {
-                if (event.type === 'dismissed' || event.type === 'set') {
+                const tipo = event?.type;
+                if (tipo === 'dismissed' || tipo === 'set') {
                   setMostrarFecha(false);
                 }
-                if (selectedDate) setFecha(selectedDate);
+                if ((tipo === 'set' || !tipo) && selectedDate) {
+                  setFecha(selectedDate);
+                  setMostrarFecha(false);
+                }
               }}
               maximumDate={new Date()}
             />
