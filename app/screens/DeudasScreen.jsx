@@ -14,6 +14,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { colors } from '../theme/colors';
 import { useFocusEffect } from '@react-navigation/native';
 import { useAuth } from '../context/AuthContext';
+import { marcarPagadoVivienda, revertirPagoVivienda } from '../services/viviendaService';
 
 const API_BASE = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3000/api';
 
@@ -39,6 +40,7 @@ export default function DeudasScreen() {
   
   // Estados inicializados vacíos para consumir del backend
   const [pendientes, setPendientes] = useState([]);
+  const [serviciosAPagar, setServiciosAPagar] = useState([]);
   const [pagosRecientes, setPagosRecientes] = useState([]);
 
   // Función para obtener datos del backend
@@ -46,6 +48,7 @@ export default function DeudasScreen() {
     const nombreUsuario = user?.name || user?.nombre;
     if (!nombreUsuario) {
       setPendientes([]);
+      setServiciosAPagar([]);
       setLoading(false);
       return;
     }
@@ -60,10 +63,18 @@ export default function DeudasScreen() {
         throw new Error(data?.error || 'No se pudo conectar al servidor');
       }
 
-      setPendientes(Array.isArray(data.data) ? data.data : []);
+      // Si data.data es un array, es el formato viejo. Si es objeto, es el nuevo.
+      if (Array.isArray(data.data)) {
+        setPendientes(data.data);
+      } else {
+        setPendientes(data.data.acreedores || []);
+        setServiciosAPagar(data.data.serviciosAPagar || []);
+        setPagosRecientes(data.data.pagosRecientes || []);
+      }
     } catch (error) {
       console.error('Error al conectar con el backend:', error);
       setPendientes([]);
+      setServiciosAPagar([]);
     } finally {
       setLoading(false);
     }
@@ -75,61 +86,74 @@ export default function DeudasScreen() {
     }, [user])
   );
 
-  const totalAPagar = pendientes.reduce((acc, a) => acc + a.totalAcreedor, 0);
-  const totalConceptos = pendientes.reduce((acc, a) => acc + a.conceptos.length, 0);
+  const totalAcreedores = pendientes.reduce((acc, a) => acc + a.totalAcreedor, 0);
+  const totalServicios = serviciosAPagar.reduce((acc, s) => acc + (s.monto || 0), 0);
+  const totalAPagar = totalAcreedores + totalServicios;
+  const totalConceptos = pendientes.reduce((acc, a) => acc + a.conceptos.length, 0) + serviciosAPagar.length;
 
   const handleConfirmarPago = async (acreedor, concepto) => {
     try {
-      const response = await fetch(`${API_BASE}/deudas/pagar/${encodeURIComponent(concepto.id)}`, {
-        method: 'PATCH'
-      });
-      const data = await response.json();
-
-      if (!response.ok || !data.ok) {
-        throw new Error(data?.error || 'No se pudo confirmar el pago');
-      }
-
-      LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-
-      setPagosRecientes((prev) => [{ ...concepto, fecha: 'Hoy' }, ...prev]);
-      setPendientes((prev) =>
-        prev
-          .map((a) =>
-            a.id === acreedor.id
-              ? {
-                  ...a,
-                  conceptos: a.conceptos.filter((c) => c.id !== concepto.id),
-                  totalAcreedor: a.totalAcreedor - concepto.monto,
-                }
-              : a
-          )
-          .filter((a) => a.conceptos.length > 0)
-      );
-      setConfirmingId(null);
-    } catch (error) {
-      console.error('Error al confirmar el pago:', error);
-    }
-  };
-
-  const handlePagarTodo = async (acreedor) => {
-    try {
-      for (const concepto of acreedor.conceptos) {
+      if (concepto.esVivienda) {
+        await marcarPagadoVivienda(concepto.tipoVivienda, concepto.id);
+      } else {
         const response = await fetch(`${API_BASE}/deudas/pagar/${encodeURIComponent(concepto.id)}`, {
           method: 'PATCH'
         });
         const data = await response.json();
 
         if (!response.ok || !data.ok) {
-          throw new Error(data?.error || 'No se pudo pagar todo');
+          throw new Error(data?.error || 'No se pudo confirmar el pago');
         }
       }
 
       LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-      setPagosRecientes((prev) => [
-        ...acreedor.conceptos.map((c) => ({ ...c, fecha: 'Hoy' })),
-        ...prev
-      ]);
-      setPendientes((prev) => prev.filter((a) => a.id !== acreedor.id));
+      await cargarDeudas();
+      setConfirmingId(null);
+    } catch (error) {
+      console.error('Error al confirmar el pago:', error);
+    }
+  };
+
+  const handleConfirmarServicio = async (servicio) => {
+    try {
+      await marcarPagadoVivienda('servicios', servicio.id);
+      LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+      await cargarDeudas();
+      setConfirmingId(null);
+    } catch (error) {
+      console.error('Error al confirmar el pago:', error);
+    }
+  };
+
+  const handleRevertirPago = async (pago) => {
+    try {
+      if (!pago.esVivienda) return;
+      await revertirPagoVivienda(pago.tipoVivienda, pago.id);
+      LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+      await cargarDeudas();
+    } catch (error) {
+      console.error('Error al revertir pago:', error);
+    }
+  };
+
+  const handlePagarTodo = async (acreedor) => {
+    try {
+      for (const concepto of acreedor.conceptos) {
+        if (concepto.esVivienda) {
+          await marcarPagadoVivienda(concepto.tipoVivienda, concepto.id);
+        } else {
+          const response = await fetch(`${API_BASE}/deudas/pagar/${encodeURIComponent(concepto.id)}`, {
+            method: 'PATCH'
+          });
+          const data = await response.json();
+          if (!response.ok || !data.ok) {
+            throw new Error(data?.error || 'No se pudo pagar todo');
+          }
+        }
+      }
+
+      LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+      await cargarDeudas();
     } catch (error) {
       console.error('Error al pagar todo:', error);
     }
@@ -156,6 +180,35 @@ export default function DeudasScreen() {
           <Text style={styles.balanceAmount}>${formatPesos(totalAPagar)}</Text>
           <Text style={styles.balanceInfo}>{totalConceptos} deudas pendientes - {pendientes.length} acreedor</Text>
         </View>
+
+        <Text style={styles.sectionHeader}>SERVICIOS A PAGAR</Text>
+        {serviciosAPagar.length === 0 && <Text style={{color: '#999', fontSize: 13, marginBottom: 15, paddingHorizontal: 5}}>No hay servicios pendientes</Text>}
+        {serviciosAPagar.map((servicio) => (
+          <View key={servicio.id} style={[styles.acreedorWrapper, { padding: 15, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }]}>
+            <View style={{flexDirection: 'row', alignItems: 'center'}}>
+              <View style={[styles.avatar, {backgroundColor: '#E65100'}]}><Ionicons name="flash" size={20} color="#FFF" /></View>
+              <View style={styles.userText}>
+                <Text style={styles.userName}>{servicio.titulo}</Text>
+                <Text style={styles.userSub}>{servicio.sub}</Text>
+              </View>
+            </View>
+            <View style={{alignItems: 'flex-end'}}>
+              <Text style={styles.totalAmount}>{servicio.monto != null ? `$${formatPesos(servicio.monto)}` : '$ -'}</Text>
+              {servicio.monto != null && (
+                confirmingId === servicio.id ? (
+                  <View style={{ flexDirection: 'row', gap: 5, marginTop: 5 }}>
+                    <TouchableOpacity style={styles.btnConfirmar} onPress={() => handleConfirmarServicio(servicio)}><Text style={styles.btnConfirmarText}>Confirmar</Text></TouchableOpacity>
+                    <TouchableOpacity style={styles.btnCancelar} onPress={() => setConfirmingId(null)}><Text style={styles.btnCancelarText}>X</Text></TouchableOpacity>
+                  </View>
+                ) : (
+                  <TouchableOpacity style={[styles.btnMarcar, {marginTop: 5}]} onPress={() => setConfirmingId(servicio.id)}>
+                    <Text style={styles.btnMarcarText}>Marcar pagado</Text>
+                  </TouchableOpacity>
+                )
+              )}
+            </View>
+          </View>
+        ))}
 
         <Text style={styles.sectionHeader}>PENDIENTES</Text>
         {pendientes.map((acreedor) => (
@@ -208,6 +261,7 @@ export default function DeudasScreen() {
         ))}
 
         <Text style={styles.sectionHeader}>PAGOS RECIENTES</Text>
+        {pagosRecientes.length === 0 && <Text style={{color: '#999', fontSize: 13, paddingHorizontal: 5}}>No hay pagos recientes</Text>}
         {pagosRecientes.map((pago, index) => (
           <View key={`${pago.id || pago.titulo}-${index}`} style={styles.pagoRecienteCard}>
             <View style={styles.checkIconContainer}><Ionicons name="checkmark" size={18} color="#33b849" /></View>
@@ -217,7 +271,17 @@ export default function DeudasScreen() {
             </View>
             <View style={styles.pagoRight}>
               <Text style={styles.pagoAmount}>${formatPesos(pago.monto)}</Text>
-              <View style={styles.pagoDate}><Ionicons name="time-outline" size={12} color="#999" /><Text style={styles.pagoDateText}>{pago.fecha}</Text></View>
+              {pago.esVivienda ? (
+                <TouchableOpacity style={styles.pagoDate} onPress={() => handleRevertirPago(pago)}>
+                  <Ionicons name="arrow-undo-outline" size={14} color="#666" />
+                  <Text style={[styles.pagoDateText, {color: '#666', fontWeight: 'bold'}]}>Deshacer</Text>
+                </TouchableOpacity>
+              ) : (
+                <View style={styles.pagoDate}>
+                  <Ionicons name="time-outline" size={12} color="#999" />
+                  <Text style={styles.pagoDateText}>{pago.fecha}</Text>
+                </View>
+              )}
             </View>
           </View>
         ))}

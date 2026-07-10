@@ -1,5 +1,35 @@
 const { randomUUID: uuidv4 } = require('crypto');
 const { pool } = require('../db');
+const { notifyUsersByName, NOTIFICATION_CATEGORIES } = require('../services/pushNotificationService');
+
+const limpiarMontoOCR = (montoString) => {
+  if (!montoString) return null;
+
+  // 1. Convertimos a string y eliminamos espacios
+  let valor = montoString.toString().trim();
+
+  // 2. Identificar el último signo de puntuación (asumiendo que es decimal)
+  // Buscamos la última ocurrencia de ',' o '.'
+  const ultimoPunto = valor.lastIndexOf('.');
+  const ultimaComa = valor.lastIndexOf(',');
+  const separadorIndex = Math.max(ultimoPunto, ultimaComa);
+
+  if (separadorIndex !== -1) {
+    // Tenemos separador decimal.
+    // Separamos la parte entera y la decimal
+    let parteEntera = valor.substring(0, separadorIndex);
+    let parteDecimal = valor.substring(separadorIndex + 1);
+
+    // Eliminamos cualquier punto o coma de la parte entera (limpieza de miles)
+    parteEntera = parteEntera.replace(/[.,]/g, '');
+
+    // Unimos con punto decimal estándar de JavaScript
+    return parseFloat(`${parteEntera}.${parteDecimal}`);
+  } else {
+    // Si no hay separador, solo limpiamos los caracteres no numéricos
+    return parseFloat(valor.replace(/[^0-9]/g, ''));
+  }
+};
 
 const slugify = (txt = '') =>
   String(txt)
@@ -245,7 +275,7 @@ async function listarGastos(req, res, next) {
 
     const { rows } = await pool.query(
       `SELECT id::text, nombre, monto::float, categoria, fecha::text, pagador,
-              imagen_url AS "imagenUrl", participantes, creado_en AS "creadoEn"
+              imagen_url AS "imagenUrl", participantes, creado_en AS "creadoEn", status
        FROM vivienda_gastos
        WHERE vivienda_id = $1
        ORDER BY fecha DESC, creado_en DESC`,
@@ -260,23 +290,35 @@ async function listarGastos(req, res, next) {
 async function crearGasto(req, res, next) {
   try {
     const vivienda = await obtenerMiViviendaOrFail(req);
-    const { nombre, monto, categoria, fecha, pagador, participantes = [], imagenUrl } = req.body;
+    let { acuerdoId, nombreServicio, monto, categoria, fecha, pagador, imagenUrl } = req.body;
+    monto = limpiarMontoOCR(monto);
 
-    if (!nombre || !monto || !categoria || !fecha || !pagador) {
+    if (!acuerdoId) {
+      const err = new Error('Debes asociar un acuerdo válido');
+      err.status = 400; return next(err);
+    }
+    if (!nombreServicio || !monto || !categoria || !fecha || !pagador) {
       const err = new Error('Faltan campos obligatorios para crear un gasto.');
       err.status = 400; return next(err);
     }
 
+    // Consultar tabla vivienda_acuerdos (participantes)
+    const { rows: partRows } = await pool.query(
+      'SELECT nombre FROM acuerdo_participantes WHERE acuerdo_id = $1',
+      [acuerdoId]
+    );
+    const participantes = partRows.map(r => r.nombre);
+
     const id = uuidv4();
     await pool.query(
-      `INSERT INTO vivienda_gastos (id, vivienda_id, nombre, monto, categoria, fecha, pagador, imagen_url, participantes)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
-      [id, vivienda.id, nombre, Number(monto), categoria, fecha, pagador, imagenUrl || null, participantes]
+      `INSERT INTO vivienda_gastos (id, vivienda_id, nombre, monto, categoria, fecha, pagador, imagen_url, participantes, acuerdo_id)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
+      [id, vivienda.id, nombreServicio, Number(monto), categoria, fecha, pagador, imagenUrl || null, participantes, acuerdoId]
     );
 
     res.status(201).json({
       ok: true,
-      data: { id, nombre, monto: Number(monto), categoria, fecha, pagador, imagenUrl: imagenUrl || null, participantes },
+      data: { id, nombre: nombreServicio, monto: Number(monto), categoria, fecha, pagador, imagenUrl: imagenUrl || null, participantes, acuerdoId },
     });
   } catch (err) {
     next(err);
@@ -287,13 +329,23 @@ async function editarGasto(req, res, next) {
   try {
     const vivienda = await obtenerMiViviendaOrFail(req);
     const { id } = req.params;
-    const { nombre, monto, categoria, fecha, pagador, participantes, imagenUrl } = req.body;
+    let { nombreServicio, monto, categoria, fecha, pagador, acuerdoId, imagenUrl } = req.body;
+    if (monto !== undefined) monto = limpiarMontoOCR(monto);
 
     const { rows: [existing] } = await pool.query(
       'SELECT id FROM vivienda_gastos WHERE id = $1 AND vivienda_id = $2', [id, vivienda.id]
     );
     if (!existing) {
       const err = new Error('Gasto no encontrado'); err.status = 404; return next(err);
+    }
+
+    let participantesFinales = undefined;
+    if (acuerdoId) {
+      const { rows: partRows } = await pool.query(
+        'SELECT nombre FROM acuerdo_participantes WHERE acuerdo_id = $1',
+        [acuerdoId]
+      );
+      participantesFinales = partRows.map(r => r.nombre);
     }
 
     const { rows: [updated] } = await pool.query(
@@ -304,12 +356,13 @@ async function editarGasto(req, res, next) {
          fecha = COALESCE($4, fecha),
          pagador = COALESCE($5, pagador),
          participantes = COALESCE($6, participantes),
-         imagen_url = COALESCE($7, imagen_url)
-       WHERE id = $8 AND vivienda_id = $9
+         imagen_url = COALESCE($7, imagen_url),
+         acuerdo_id = COALESCE($8, acuerdo_id)
+       WHERE id = $9 AND vivienda_id = $10
        RETURNING id::text, nombre, monto::float, categoria, fecha::text, pagador,
-                 imagen_url AS "imagenUrl", participantes`,
-      [nombre || null, monto != null ? Number(monto) : null, categoria || null,
-       fecha || null, pagador || null, participantes || null, imagenUrl || null, id, vivienda.id]
+                 imagen_url AS "imagenUrl", participantes, acuerdo_id AS "acuerdoId"`,
+      [nombreServicio || null, monto != null ? Number(monto) : null, categoria || null,
+       fecha || null, pagador || null, participantesFinales || null, imagenUrl || null, acuerdoId || null, id, vivienda.id]
     );
 
     res.json({ ok: true, data: updated });
@@ -328,7 +381,8 @@ async function listarServicios(req, res, next) {
     const { rows } = await pool.query(
       `SELECT id::text, nombre, monto::float, periodicidad,
               proximo_vencimiento::text AS "proximoVencimiento",
-              participantes, creado_en AS "creadoEn"
+              participantes, creado_en AS "creadoEn",
+              is_variable AS "isVariable", status
        FROM vivienda_servicios
        WHERE vivienda_id = $1
        ORDER BY proximo_vencimiento`,
@@ -343,23 +397,55 @@ async function listarServicios(req, res, next) {
 async function crearServicio(req, res, next) {
   try {
     const vivienda = await obtenerMiViviendaOrFail(req);
-    const { nombre, monto, periodicidad, proximoVencimiento, participantes = [] } = req.body;
+    let { acuerdoId, nombreServicio, frecuencia, proximoVencimiento, monto, isVariable = false } = req.body;
+    if (monto !== undefined) monto = limpiarMontoOCR(monto);
 
-    if (!nombre || !monto || !periodicidad || !proximoVencimiento) {
+    if (!acuerdoId) {
+      const err = new Error('Debes asociar un acuerdo válido');
+      err.status = 400; return next(err);
+    }
+    if (!nombreServicio || !frecuencia || !proximoVencimiento) {
       const err = new Error('Faltan campos obligatorios para crear un servicio periódico.');
       err.status = 400; return next(err);
     }
+    if (!isVariable && !monto) {
+      const err = new Error('El monto es obligatorio para servicios de importe fijo.');
+      err.status = 400; return next(err);
+    }
 
-    const id = uuidv4();
-    await pool.query(
-      `INSERT INTO vivienda_servicios (id, vivienda_id, nombre, monto, periodicidad, proximo_vencimiento, participantes)
-       VALUES ($1, $2, $3, $4, $5, $6, $7)`,
-      [id, vivienda.id, nombre, Number(monto), periodicidad, proximoVencimiento, participantes]
+    // Consultar tabla vivienda_acuerdos (participantes)
+    const { rows: partRows } = await pool.query(
+      'SELECT nombre FROM acuerdo_participantes WHERE acuerdo_id = $1',
+      [acuerdoId]
     );
+    const participantes = partRows.map(r => r.nombre);
+
+    const montoFinal = isVariable ? null : Number(monto);
+    const statusFinal = isVariable ? 'PENDIENTE' : 'PROCESADO';
+    const id = uuidv4();
+
+    await pool.query(
+      `INSERT INTO vivienda_servicios (id, vivienda_id, nombre, monto, periodicidad, proximo_vencimiento, participantes, is_variable, status, acuerdo_id)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
+      [id, vivienda.id, nombreServicio, montoFinal, frecuencia.toLowerCase(), proximoVencimiento, participantes, isVariable, statusFinal, acuerdoId]
+    );
+
+    // Si es variable, notificar a participantes que deben cargar el monto
+    if (isVariable && participantes.length > 0) {
+      await notifyUsersByName(
+        participantes,
+        {
+          title: 'Nuevo servicio variable',
+          body: `Servicio "${nombreServicio}" requiere actualización: ingrese el monto`,
+          data: { type: 'variable_service_pending', servicioId: id },
+        },
+        { category: NOTIFICATION_CATEGORIES.SERVICIO_VARIABLE }
+      );
+    }
 
     res.status(201).json({
       ok: true,
-      data: { id, nombre, monto: Number(monto), periodicidad, proximoVencimiento, participantes },
+      data: { id, nombre: nombreServicio, monto: montoFinal, periodicidad: frecuencia, proximoVencimiento, participantes, isVariable, status: statusFinal, acuerdoId },
     });
   } catch (err) {
     next(err);
@@ -370,27 +456,45 @@ async function editarServicio(req, res, next) {
   try {
     const vivienda = await obtenerMiViviendaOrFail(req);
     const { id } = req.params;
-    const { nombre, monto, periodicidad, proximoVencimiento, participantes } = req.body;
+    let { nombreServicio, monto, frecuencia, proximoVencimiento, isVariable, acuerdoId } = req.body;
+    if (monto !== undefined) monto = limpiarMontoOCR(monto);
 
     const { rows: [existing] } = await pool.query(
-      'SELECT id FROM vivienda_servicios WHERE id = $1 AND vivienda_id = $2', [id, vivienda.id]
+      'SELECT id, status FROM vivienda_servicios WHERE id = $1 AND vivienda_id = $2', [id, vivienda.id]
     );
     if (!existing) {
       const err = new Error('Servicio no encontrado'); err.status = 404; return next(err);
     }
 
+    let participantesFinales = undefined;
+    if (acuerdoId) {
+      const { rows: partRows } = await pool.query(
+        'SELECT nombre FROM acuerdo_participantes WHERE acuerdo_id = $1',
+        [acuerdoId]
+      );
+      participantesFinales = partRows.map(r => r.nombre);
+    }
+
+    // Si cambia isVariable, quizás deberíamos actualizar status, pero mantenemos simple por ahora
+    const montoFinal = (isVariable === true) ? null : (monto != null ? Number(monto) : null);
+
     const { rows: [updated] } = await pool.query(
       `UPDATE vivienda_servicios SET
          nombre = COALESCE($1, nombre),
-         monto = COALESCE($2, monto),
+         monto = $2,
          periodicidad = COALESCE($3, periodicidad),
          proximo_vencimiento = COALESCE($4, proximo_vencimiento),
-         participantes = COALESCE($5, participantes)
-       WHERE id = $6 AND vivienda_id = $7
+         participantes = COALESCE($5, participantes),
+         is_variable = COALESCE($6, is_variable),
+         acuerdo_id = COALESCE($7, acuerdo_id)
+       WHERE id = $8 AND vivienda_id = $9
        RETURNING id::text, nombre, monto::float, periodicidad,
-                 proximo_vencimiento::text AS "proximoVencimiento", participantes`,
-      [nombre || null, monto != null ? Number(monto) : null, periodicidad || null,
-       proximoVencimiento || null, participantes || null, id, vivienda.id]
+                 proximo_vencimiento::text AS "proximoVencimiento", participantes,
+                 is_variable AS "isVariable", status`,
+      [nombreServicio || null, montoFinal, frecuencia?.toLowerCase() || null,
+       proximoVencimiento || null, participantesFinales || null, 
+       isVariable !== undefined ? isVariable : null, 
+       acuerdoId || null, id, vivienda.id]
     );
 
     res.json({ ok: true, data: updated });
@@ -419,6 +523,88 @@ async function eliminarServicio(req, res, next) {
   }
 }
 
+// ── Liquidar servicio variable ────────────────────────────────────────────────
+
+async function liquidarServicio(req, res, next) {
+  const client = await pool.connect();
+  try {
+    const vivienda = await obtenerMiViviendaOrFail(req);
+    const { id } = req.params;
+    let { monto, imagenUrl } = req.body;
+    monto = limpiarMontoOCR(monto);
+
+    // Validación server-side: monto debe ser un número positivo
+    if (monto == null || typeof Number(monto) !== 'number' || isNaN(Number(monto)) || Number(monto) <= 0) {
+      const err = new Error('El monto debe ser un número positivo.');
+      err.status = 400; return next(err);
+    }
+    const montoReal = Number(monto);
+
+    const { rows: [servicio] } = await client.query(
+      `SELECT id, nombre, is_variable, status, participantes, periodicidad
+       FROM vivienda_servicios
+       WHERE id = $1 AND vivienda_id = $2`,
+      [id, vivienda.id]
+    );
+
+    if (!servicio) {
+      const err = new Error('Servicio no encontrado'); err.status = 404; return next(err);
+    }
+    if (!servicio.is_variable) {
+      const err = new Error('Este servicio no es de importe variable.'); err.status = 400; return next(err);
+    }
+    if (servicio.status === 'PROCESADO' || servicio.status === 'PAGADO') {
+      const err = new Error('Este servicio ya fue procesado en el ciclo actual.'); err.status = 409; return next(err);
+    }
+
+    // Transacción: actualizar servicio + crear gasto puntual
+    await client.query('BEGIN');
+
+    // 1. Actualizar el servicio a PROCESADO
+    const { rows: [updated] } = await client.query(
+      `UPDATE vivienda_servicios SET monto = $1, status = 'PROCESADO'
+       WHERE id = $2
+       RETURNING id::text, nombre, monto::float, periodicidad,
+                 proximo_vencimiento::text AS "proximoVencimiento",
+                 participantes, is_variable AS "isVariable", status`,
+      [montoReal, id]
+    );
+
+    // 2. Crear un gasto puntual vinculado (impacto en balance/totalMes)
+    const gastoId = uuidv4();
+    const participantes = Array.isArray(servicio.participantes) ? servicio.participantes : [];
+    const pagador = participantes[0] || 'Vivienda';
+    await client.query(
+      `INSERT INTO vivienda_gastos (id, vivienda_id, nombre, monto, categoria, fecha, pagador, imagen_url, participantes)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+      [gastoId, vivienda.id, `Liquidación: ${servicio.nombre}`, montoReal, 'Suscripciones',
+       new Date().toISOString().split('T')[0], pagador, imagenUrl || null, participantes]
+    );
+
+    await client.query('COMMIT');
+
+    // 3. Notificar a participantes
+    if (participantes.length > 0) {
+      await notifyUsersByName(
+        participantes,
+        {
+          title: 'Servicio liquidado',
+          body: `"${servicio.nombre}" fue liquidado por $${montoReal.toLocaleString('es-AR')}`,
+          data: { type: 'variable_service_settled', servicioId: id, gastoId },
+        },
+        { category: NOTIFICATION_CATEGORIES.SERVICIO_VARIABLE }
+      );
+    }
+
+    res.json({ ok: true, data: updated });
+  } catch (err) {
+    await client.query('ROLLBACK').catch(() => {});
+    next(err);
+  } finally {
+    client.release();
+  }
+}
+
 // ── Acuerdos de reparto ───────────────────────────────────────────────────────
 
 async function listarAcuerdos(req, res, next) {
@@ -442,6 +628,59 @@ async function listarAcuerdos(req, res, next) {
     );
 
     res.json({ ok: true, data: resultado });
+  } catch (err) {
+    next(err);
+  }
+}
+
+async function marcarComoPagado(req, res, next) {
+  try {
+    const vivienda = await obtenerMiViviendaOrFail(req);
+    const { tipo, id } = req.params;
+
+    if (!['gastos', 'servicios'].includes(tipo)) {
+      const err = new Error('Tipo no válido'); err.status = 400; return next(err);
+    }
+
+    const tabla = tipo === 'gastos' ? 'vivienda_gastos' : 'vivienda_servicios';
+    
+    const { rows: [updated] } = await pool.query(
+      `UPDATE ${tabla} SET status = 'PAGADO', fecha_pago = NOW() WHERE id::text = $1 AND vivienda_id = $2 RETURNING id::text`,
+      [id, vivienda.id]
+    );
+
+    if (!updated) {
+      const err = new Error('Registro no encontrado'); err.status = 404; return next(err);
+    }
+
+    res.json({ ok: true, message: 'Marcado como pagado' });
+  } catch (err) {
+    next(err);
+  }
+}
+
+async function revertirPago(req, res, next) {
+  try {
+    const vivienda = await obtenerMiViviendaOrFail(req);
+    const { tipo, id } = req.params;
+
+    if (!['gastos', 'servicios'].includes(tipo)) {
+      const err = new Error('Tipo no válido'); err.status = 400; return next(err);
+    }
+
+    const tabla = tipo === 'gastos' ? 'vivienda_gastos' : 'vivienda_servicios';
+    
+    // Al revertir, el estado vuelve a 'PROCESADO' y limpiamos la fecha de pago
+    const { rows: [updated] } = await pool.query(
+      `UPDATE ${tabla} SET status = 'PROCESADO', fecha_pago = NULL WHERE id::text = $1 AND vivienda_id = $2 RETURNING id::text`,
+      [id, vivienda.id]
+    );
+
+    if (!updated) {
+      const err = new Error('Registro no encontrado'); err.status = 404; return next(err);
+    }
+
+    res.json({ ok: true, message: 'Pago revertido' });
   } catch (err) {
     next(err);
   }
@@ -501,6 +740,7 @@ module.exports = {
   generarObtenerInvitacion,
   unirseViaToken,
   listarGastos, crearGasto, editarGasto,
-  listarServicios, crearServicio, editarServicio, eliminarServicio,
+  listarServicios, crearServicio, editarServicio, eliminarServicio, liquidarServicio,
   listarAcuerdos, guardarAcuerdo, eliminarAcuerdo,
+  marcarComoPagado, revertirPago,
 };

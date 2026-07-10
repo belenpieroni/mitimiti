@@ -34,6 +34,8 @@ function getVisualByCategory(category) {
       return { icon: 'cash-outline', iconBg: '#E8F8EF', iconColor: '#2E7D5C' };
     case 'nuevas_juntadas':
       return { icon: 'people-outline', iconBg: '#EEE9FA', iconColor: colors.primary };
+    case 'servicio_variable':
+      return { icon: 'alert-circle-outline', iconBg: '#FFF3E0', iconColor: '#E65100' };
     default:
       return { icon: 'notifications-outline', iconBg: '#F2F4F6', iconColor: colors.textSecondary };
   }
