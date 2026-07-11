@@ -1,7 +1,69 @@
 import api from './api';
 
-export const listarJuntadas      = (nombre)   => api.get(`/juntadas?usuario=${encodeURIComponent(nombre)}`);
-export const crearJuntada        = (datos)   => api.post('/juntadas', datos);
+let localJuntadas = [];
+let localListeners = [];
+
+export const getLocalJuntadas = () => localJuntadas;
+
+export const setLocalJuntadas = (list) => {
+  localJuntadas = list;
+  localListeners.forEach(fn => fn(localJuntadas));
+};
+
+export const subscribeLocalJuntadas = (fn) => {
+  localListeners.push(fn);
+  fn(localJuntadas);
+  return () => {
+    localListeners = localListeners.filter(x => x !== fn);
+  };
+};
+
+const pendingCreations = new Map();
+const pendingListeners = new Map();
+
+export const registerPendingCreation = (tempId, promise) => {
+  pendingCreations.set(tempId, promise);
+  promise.then(
+    (result) => {
+      pendingCreations.delete(tempId);
+      const listener = pendingListeners.get(tempId);
+      if (listener) {
+        listener({ success: true, result });
+        pendingListeners.delete(tempId);
+      }
+    },
+    (error) => {
+      pendingCreations.delete(tempId);
+      const listener = pendingListeners.get(tempId);
+      if (listener) {
+        listener({ success: false, error });
+        pendingListeners.delete(tempId);
+      }
+    }
+  );
+};
+
+export const subscribePendingCreation = (tempId, callback) => {
+  pendingListeners.set(tempId, callback);
+  return () => {
+    pendingListeners.delete(tempId);
+  };
+};
+
+export const listarJuntadas = async (nombre) => {
+  const response = await api.get(`/juntadas?usuario=${encodeURIComponent(nombre)}`);
+  const data = response?.data?.data || response?.data || response;
+  const list = Array.isArray(data) ? data : [];
+  
+  // Fusionar con optimistas locales que sigan pendientes
+  const optimisticItems = localJuntadas.filter(j => String(j.id).startsWith('temp-'));
+  const filteredRemote = list.filter(remoteJ => !optimisticItems.some(opt => opt.nombre === remoteJ.nombre));
+  
+  setLocalJuntadas([...optimisticItems, ...filteredRemote]);
+  return response;
+};
+
+export const crearJuntada = (datos) => api.post('/juntadas', datos);
 export const editarJuntada       = (id, datos) => api.patch(`/juntadas/${id}`, datos);
 export const obtenerJuntada      = (id)      => api.get(`/juntadas/${id}`);
 export const eliminarJuntada     = (id)      => api.delete(`/juntadas/${id}`);

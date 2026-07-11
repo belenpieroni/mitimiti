@@ -182,9 +182,17 @@ export default function ViviendaDashboard({ navigation }) {
     }
   };
 
-  const totalMes = (gastos || [])
-    .filter(g => g.status === 'PAGADO')
-    .reduce((sum, g) => sum + (g.monto || 0), 0);
+  const totalMes = [...(gastos || []), ...(servicios || [])]
+    .reduce((sum, item) => sum + (item.monto || 0), 0);
+
+  const tuPartePendiente = [...(gastos || []), ...(servicios || [])]
+    .filter(item => item.status !== 'PAGADO')
+    .reduce((sum, item) => sum + (item.monto_responsabilidad_usuario || 0), 0);
+
+  const yaPagado = [...(gastos || []), ...(servicios || [])]
+    .filter(item => item.status === 'PAGADO')
+    .reduce((sum, item) => sum + (item.monto_responsabilidad_usuario || 0), 0);
+
   const nombreHeader = getPrimerNombre(user?.name || user?.nombre || '') || 'Vivienda';
 
   const renderDiasParaVencer = (isoDate) => {
@@ -335,11 +343,11 @@ export default function ViviendaDashboard({ navigation }) {
           <View style={styles.badgesRow}>
             <View style={styles.badge}>
               <Text style={styles.badgeLabel}>Tu parte pendiente</Text>
-              <Text style={styles.badgeValue}>$0</Text>
+              <Text style={styles.badgeValue}>${tuPartePendiente.toLocaleString('es-AR')}</Text>
             </View>
             <View style={styles.badge}>
               <Text style={styles.badgeLabel}>Ya pagado</Text>
-              <Text style={[styles.badgeValue, { color: colors.greenGlobal }]}>$0</Text>
+              <Text style={[styles.badgeValue, { color: colors.greenGlobal }]}>${yaPagado.toLocaleString('es-AR')}</Text>
             </View>
           </View>
 
@@ -376,14 +384,21 @@ export default function ViviendaDashboard({ navigation }) {
         </Text>
 
         {vistaActiva === 'servicios' ? (servicios || []).filter(s => s.status !== 'PAGADO').map(srv => {
-          const isUrgente = new Date(srv.proximoVencimiento) - new Date() <= 5 * 24 * 60 * 60 * 1000;
+          const targetDate = new Date(srv.proximoVencimiento);
+          const today = new Date();
+          const targetMidnight = new Date(targetDate.getFullYear(), targetDate.getMonth(), targetDate.getDate());
+          const todayMidnight = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+          const diffDays = Math.round((targetMidnight - todayMidnight) / (1000 * 60 * 60 * 24));
+          const isVencido = diffDays < 0;
+          const isUrgente = diffDays >= 0 && diffDays <= 3;
+
           const iconName = ICONS_MAP[srv.nombre] || 'receipt-outline';
           const montoSafe = srv.monto != null ? srv.monto : 0;
-          const tuParte = montoSafe / (srv.participantes?.length || 1);
+          const tuParte = srv.monto_responsabilidad_usuario || 0;
           return (
             <TouchableOpacity key={srv.id} style={styles.servicioCard} onPress={() => setServicioSeleccionado(srv)}>
-              <View style={[styles.servicioIcon, isUrgente ? {} : { backgroundColor: '#F0F4F8' }]}>
-                <Ionicons name={iconName} size={24} color={isUrgente ? colors.redGlobal : colors.textSecondary} />
+              <View style={[styles.servicioIcon, (isUrgente || isVencido) ? {} : { backgroundColor: '#F0F4F8' }]}>
+                <Ionicons name={iconName} size={24} color={(isUrgente || isVencido) ? colors.redGlobal : colors.textSecondary} />
               </View>
               <View style={styles.servicioInfo}>
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, paddingRight: 4 }}>
@@ -393,8 +408,8 @@ export default function ViviendaDashboard({ navigation }) {
                     <Text style={styles.badgePeriodoText}>{srv.periodicidad}</Text>
                   </View>
                 </View>
-                <Text style={[styles.servicioDate, isUrgente && { color: colors.redGlobal }]}>
-                  {renderDiasParaVencer(srv.proximoVencimiento)}
+                <Text style={[styles.servicioDate, (isUrgente || isVencido) && { color: colors.redGlobal, fontWeight: isVencido ? 'bold' : 'normal' }]}>
+                  {isVencido ? 'Venció el' : 'Vence:'} {targetDate.toLocaleDateString('es-AR', { day: 'numeric', month: 'long' })}
                 </Text>
                 <Text style={styles.servicioTuParte}>Tu parte: {srv.monto != null ? `$${tuParte.toLocaleString('es-AR')}` : '$ –'}</Text>
                 <View style={{ marginTop: 6 }}>
@@ -476,19 +491,38 @@ export default function ViviendaDashboard({ navigation }) {
             </TouchableOpacity>
           );
         }) : (gastos || []).filter(gasto => gasto.status !== 'PAGADO').map(gasto => {
+          const targetDate = new Date(gasto.fecha);
+          const today = new Date();
+          const targetMidnight = new Date(targetDate.getFullYear(), targetDate.getMonth(), targetDate.getDate());
+          const todayMidnight = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+          const diffDays = Math.round((targetMidnight - todayMidnight) / (1000 * 60 * 60 * 24));
+          const isVencido = diffDays < 0;
+          const isUrgente = diffDays >= 0 && diffDays <= 3;
+          
           const iconName = GASTO_ICONS_MAP[gasto.categoria] || 'receipt-outline';
           return (
             <View key={gasto.id} style={styles.servicioCard}>
               <View style={[styles.servicioIcon, { backgroundColor: '#F0F4F8' }]}>
-                <Ionicons name={iconName} size={24} color={colors.textSecondary} />
+                <Ionicons name={iconName} size={24} color={(isUrgente || isVencido) ? colors.redGlobal : colors.textSecondary} />
               </View>
               <View style={styles.servicioInfo}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 2 }}>
+                  <Text style={[styles.servicioDate, { marginBottom: 0, textTransform: 'uppercase', fontWeight: 'bold', fontSize: 10, color: colors.primary }]}>
+                    {gasto.categoria}
+                  </Text>
+                </View>
                 <Text style={styles.servicioName}>{gasto.nombre}</Text>
-                <Text style={styles.servicioDate}>{gasto.categoria}</Text>
-                <Text style={styles.servicioTuParte}>
-                  {new Date(gasto.fecha).toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric' })}
+                <Text style={[styles.servicioDate, (isUrgente || isVencido) && { color: colors.redGlobal, fontWeight: isVencido ? 'bold' : 'normal' }]}>
+                  {isVencido ? 'Venció el' : 'Vence:'} {targetDate.toLocaleDateString('es-AR', { day: 'numeric', month: 'long' })}
                 </Text>
-                <Text style={styles.servicioTuParte}>Pagó: {gasto.pagador}</Text>
+                <Text style={styles.servicioDate}>
+                  Pagó: <Text style={{fontWeight: '600', color: colors.textPrimary}}>{gasto.pagador}</Text>
+                </Text>
+                <Text style={[styles.servicioTuParte, { fontSize: 13, marginTop: 4 }]}>
+                  Tu parte: <Text style={{ fontWeight: 'bold', color: '#E65100' }}>
+                    ${(gasto.monto_responsabilidad_usuario || 0).toLocaleString('es-AR')}
+                  </Text>
+                </Text>
               </View>
               <View style={styles.servicioRight}>
                 <Text style={styles.servicioAmount}>${(gasto.monto || 0).toLocaleString('es-AR')}</Text>
@@ -517,33 +551,40 @@ export default function ViviendaDashboard({ navigation }) {
                 )}
 
                 {/* 👇 NUEVO: botón eliminar Gasto */}
-                <TouchableOpacity
-                  style={[styles.btnTick, { borderColor: '#ec6c6a', marginTop: 6 }]}
-                  onPress={(e) => {
-                    e.stopPropagation();
-                    Alert.alert(
-                      'Eliminar gasto',
-                      `¿Querés eliminar "${gasto.nombre}"?`,
-                      [
-                        { text: 'Cancelar', style: 'cancel' },
-                        {
-                          text: 'Eliminar',
-                          style: 'destructive',
-                          onPress: async () => {
-                            try {
-                              await eliminarGastoVivienda(gasto.id);
-                              await cargarData();
-                            } catch (error) {
-                              Alert.alert('Error', error?.message || 'No se pudo eliminar el gasto');
-                            }
+                {gasto.pagador === integranteInicial && (
+                  <TouchableOpacity
+                    style={[styles.btnTick, { borderColor: '#ec6c6a', marginTop: 6 }]}
+                    onPress={(e) => {
+                      e.stopPropagation();
+                      if (gasto.status === 'PAGADO') {
+                        Alert.alert('Acción denegada', 'No podés eliminar un gasto que ya figura como PAGADO. Revertí el pago primero para poder borrarlo.');
+                        return;
+                      }
+                      Alert.alert(
+                        'Eliminar gasto',
+                        `¿Querés eliminar "${gasto.nombre}"?`,
+                        [
+                          { text: 'Cancelar', style: 'cancel' },
+                          {
+                            text: 'Eliminar',
+                            style: 'destructive',
+                            onPress: async () => {
+                              try {
+                                await eliminarGastoVivienda(gasto.id);
+                                await cargarData();
+                              } catch (error) {
+                                console.log('Error al eliminar gasto:', error);
+                                Alert.alert('Error', error?.message || 'No se pudo eliminar el gasto');
+                              }
+                            },
                           },
-                        },
-                      ]
-                    );
-                  }}
-                >
-                  <Ionicons name="trash-outline" size={18} color="#ec6c6a" />
-                </TouchableOpacity>
+                        ]
+                      );
+                    }}
+                  >
+                    <Ionicons name="trash-outline" size={18} color="#ec6c6a" />
+                  </TouchableOpacity>
+                )}
               </View>
             </View>
           );
@@ -623,8 +664,8 @@ export default function ViviendaDashboard({ navigation }) {
                 <View style={{ flexDirection: 'row', gap: 16, marginBottom: 8 }}>
                   <Text style={{ fontSize: 14, color: colors.textSecondary }}>
                     Tu parte: <Text style={{ fontWeight: 'bold' }}>
-                      {servicioSeleccionado.monto != null
-                        ? `$${(servicioSeleccionado.monto / (servicioSeleccionado.participantes?.length || 1)).toLocaleString('es-AR')}`
+                      {servicioSeleccionado.monto_responsabilidad_usuario != null
+                        ? `$${servicioSeleccionado.monto_responsabilidad_usuario.toLocaleString('es-AR')}`
                         : '$ –'}
                     </Text>
                   </Text>

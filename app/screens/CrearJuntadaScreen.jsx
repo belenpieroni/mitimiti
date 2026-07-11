@@ -6,7 +6,14 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { colors } from '../theme/colors';
-import { crearJuntada as crearJuntadaService, editarJuntada as editarJuntadaService, generarInvitacion } from '../services/juntadasService';
+import { 
+  crearJuntada as crearJuntadaService, 
+  editarJuntada as editarJuntadaService, 
+  generarInvitacion,
+  getLocalJuntadas,
+  setLocalJuntadas,
+  registerPendingCreation
+} from '../services/juntadasService';
 import { useAuth } from '../context/AuthContext';
 
 function formatFecha(date) {
@@ -75,13 +82,73 @@ export default function CrearJuntadaScreen({ navigation, route }) {
         });
         navigation.goBack();
       } else {
-        const nuevaJuntada = await crearJuntadaService({
+        const tempId = 'temp-' + Date.now();
+        const pcolor = '#473472';
+        
+        // Objeto optimista para la UI local
+        const optimistic = {
+          id: tempId,
+          nombre: nombre.trim(),
+          descripcion: descripcion.trim(),
+          fecha: fecha.toISOString().split('T')[0],
+          cantidadParticipantes: 1,
+          cantidadGastos: 0,
+          totalGastado: 0,
+          participantes: [{ 
+            id: user?.id, 
+            nombre: user?.name || user?.nombre || 'Usuario', 
+            iniciales: user?.iniciales || 'US', 
+            color: pcolor 
+          }],
+          gastos: [],
+          pagosDeudas: [],
+          subgrupos: [],
+          saldos: [],
+          balance: {
+            totalGastado: 0,
+            parteIgualPorPersona: 0,
+            cantidadParticipantes: 1,
+            saldos: [],
+            transferenciasOriginales: [],
+            transferencias: []
+          },
+          deuda: 0,
+          tipo: 'ninguna',
+          isOptimistic: true,
+        };
+
+        // 1. Agregar localmente al caché para el Dashboard
+        const currentList = getLocalJuntadas();
+        setLocalJuntadas([optimistic, ...currentList]);
+
+        // 2. Disparar creación en background
+        const promise = crearJuntadaService({
           nombre: nombre.trim(),
           descripcion: descripcion.trim(),
         });
-        // Ir al detalle y ofrecer compartir enlace
-        navigation.replace('JuntadaDetalle', { juntadaId: nuevaJuntada.id });
-        setTimeout(() => compartirEnlace(nuevaJuntada.id, nuevaJuntada.nombre), 600);
+        registerPendingCreation(tempId, promise);
+
+        // 3. Ir al detalle optimista
+        navigation.replace('JuntadaDetalle', { juntadaId: tempId, optimisticData: optimistic });
+
+        // 4. Manejo de resolución/reversión
+        promise.then(
+          (nuevaJuntada) => {
+            const dataJ = nuevaJuntada?.data?.data || nuevaJuntada?.data || nuevaJuntada;
+            const updated = getLocalJuntadas().map(j => 
+              j.id === tempId ? { ...j, id: dataJ.id, isOptimistic: false } : j
+            );
+            setLocalJuntadas(updated);
+            // Ejecutar compartir en background tras confirmación del servidor
+            setTimeout(() => compartirEnlace(dataJ.id, dataJ.nombre), 600);
+          },
+          (err) => {
+            console.error('Error creando juntada:', err);
+            // Reversión: Quitar del caché si falla para evitar "juntada fantasma"
+            const updated = getLocalJuntadas().filter(j => j.id !== tempId);
+            setLocalJuntadas(updated);
+          }
+        );
       }
     } catch (e) {
       Alert.alert('Error', e.message || 'No se pudo guardar la juntada.');

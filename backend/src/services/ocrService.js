@@ -1,5 +1,7 @@
 const { createWorker } = require('tesseract.js');
 const Jimp = require('jimp');
+const fs = require('fs');
+const pdfjsLib = require('pdfjs-dist');
 
 /**
  * OCR del lado del SERVIDOR (Node).
@@ -41,13 +43,13 @@ async function preprocess(imagePath) {
 // Motor 1: OCR.space (nube)
 // ──────────────────────────────────────────────────────────────────────────
 
-async function ocrSpace(jpegBase64) {
+async function ocrSpace(base64DataUri) {
   if (typeof fetch !== 'function') {
     throw new Error('fetch no disponible (se requiere Node 18+)');
   }
 
   const body = new URLSearchParams();
-  body.append('base64Image', `data:image/jpeg;base64,${jpegBase64}`);
+  body.append('base64Image', base64DataUri);
   body.append('language', 'spa');
   body.append('OCREngine', '2');
   body.append('scale', 'true');
@@ -220,14 +222,59 @@ function extractAmountFromText(text) {
     }
   }
 
-  // ── Decisión: 1 monto → ese; varios → el menor ───────────────────────
+  // ── Extraer fechas para lógica de vencimientos ───────────────────────
+  const allDates = [];
+  const dateRe = /\b(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})\b/g;
+  for (const m of text.matchAll(dateRe)) {
+    const d = parseInt(m[1], 10);
+    const mm = parseInt(m[2], 10) - 1;
+    let y = parseInt(m[3], 10);
+    if (y < 100) y += 2000;
+    if (y >= 2020 && y <= 2030) {
+      allDates.push(new Date(y, mm, d));
+    }
+  }
+
+  const uniqueDates = [];
+  allDates.sort((a, b) => a - b).forEach(d => {
+    if (!uniqueDates.length || uniqueDates[uniqueDates.length - 1].getTime() !== d.getTime()) {
+      uniqueDates.push(d);
+    }
+  });
+
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  // Filtramos fechas muy antiguas (ej. fecha de emisión) para quedarnos con los vencimientos
+  const vtoDates = uniqueDates.filter(d => {
+    const diffTime = today - d;
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    return diffDays < 90;
+  });
+
+  // ── Decisión: 1 monto → ese; varios → el menor o según fecha ─────────
   if (totalAmounts.length === 1) {
     console.log(`[OCR] Un único total encontrado → $${totalAmounts[0]}`);
     return totalAmounts[0];
   }
 
   if (totalAmounts.length > 1) {
-    const resultado = Math.min(...totalAmounts);
+    const minAmount = Math.min(...totalAmounts);
+    const maxAmount = Math.max(...totalAmounts);
+
+    if (vtoDates.length >= 1 && minAmount !== maxAmount) {
+      const firstExpiration = vtoDates[0];
+      
+      if (today > firstExpiration) {
+        console.log(`[OCR] Vencido (hoy > 1er vto: ${firstExpiration.toLocaleDateString()}). Tomando monto recargo: $${maxAmount}`);
+        return maxAmount;
+      } else {
+        console.log(`[OCR] Al día (hoy <= 1er vto: ${firstExpiration.toLocaleDateString()}). Tomando monto base: $${minAmount}`);
+        return minAmount;
+      }
+    }
+
+    const resultado = minAmount;
     console.log(`[OCR] ${totalAmounts.length} totales encontrados [${totalAmounts.join(', ')}] → menor: $${resultado}`);
     return resultado;
   }
@@ -249,6 +296,45 @@ function extractAmountFromText(text) {
 // ──────────────────────────────────────────────────────────────────────────
 
 async function extractTextFromImage(imagePath) {
+  if (imagePath.toLowerCase().endsWith('.pdf')) {
+    try {
+      const dataBuffer = await fs.promises.readFile(imagePath);
+      const uint8Array = new Uint8Array(dataBuffer);
+
+      // Extraer texto digital del PDF con pdfjs-dist
+      const loadingTask = pdfjsLib.getDocument({ data: uint8Array });
+      const pdf = await loadingTask.promise;
+
+      let fullText = '';
+      for (let i = 1; i <= pdf.numPages; i++) {
+        const page = await pdf.getPage(i);
+        const content = await page.getTextContent();
+        const pageText = content.items.map(item => item.str).join(' ');
+        fullText += pageText + '\n';
+      }
+
+      if (fullText.trim().length > 50) {
+        console.log('[OCR] PDF parseado nativamente con pdfjs-dist');
+        return fullText;
+      }
+
+      // Si el PDF no tiene texto digital → OCR.space como fallback
+      if (process.env.OCR_SPACE_API_KEY) {
+        console.log('[OCR] PDF sin texto digital, enviando a OCR.space...');
+        const base64 = dataBuffer.toString('base64');
+        const text = await ocrSpace(`data:application/pdf;base64,${base64}`);
+        if (text && text.trim()) return text;
+      }
+
+      console.warn('[OCR] No se pudo extraer texto del PDF.');
+      return '';
+    } catch (err) {
+      console.error('[OCR] Error procesando PDF:', err);
+      return '';
+    }
+  }
+
+  // Si no es PDF, fluye normal como imagen
   const { png, jpegBase64 } = await preprocess(imagePath);
 
   if (process.env.OCR_SPACE_API_KEY) {

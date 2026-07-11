@@ -1,6 +1,6 @@
 const { randomUUID: uuidv4 } = require('crypto');
 const { pool } = require('../db');
-const { cargarJuntadaCompleta } = require('../helpers/juntadaHelpers');
+const { cargarJuntadaCompleta, cargarJuntadasCompletas } = require('../helpers/juntadaHelpers');
 const { calcularBalance, calcularBalanceGlobal } = require('../services/balanceService');
 const { notifyUsersByName, NOTIFICATION_CATEGORIES } = require('../services/pushNotificationService');
 
@@ -36,16 +36,23 @@ async function listarJuntadas(req, res, next) {
       [usuario]
     );
 
-    const juntadas = await Promise.all(ids.map(({ id }) => cargarJuntadaCompleta(id)));
+    const idsArray = ids.map(({ id }) => id);
+    const juntadas = await cargarJuntadasCompletas(idsArray);
 
     const resultado = juntadas.map((juntada) => {
       const balance = calcularBalance(juntada);
+
       const saldoUsuario = balance.saldos.find(
-        (s) => s.nombre.toLowerCase() === usuario.toLowerCase()
+        (s) => s.nombre.trim().toLowerCase() === usuario.trim().toLowerCase()
       );
-      const saldoNeto = saldoUsuario
-        ? (typeof saldoUsuario.saldoPendiente === 'number' ? saldoUsuario.saldoPendiente : saldoUsuario.saldo)
-        : 0;
+
+      // ── Usamos SIEMPRE el saldo bruto (pagado - corresponde) ──
+      // saldoPendiente refleja liquidaciones internas parciales de la juntada
+      // y puede silenciar deudas reales cuando hay pagos registrados pero la
+      // deuda original sigue vigente (ej: muestra $500 en vez de $2500).
+      // El Home debe mostrar cuánto aportó el usuario vs. lo que le corresponde,
+      // independientemente del proceso interno de saldos.
+      const saldoBruto = saldoUsuario ? (saldoUsuario.saldo ?? 0) : 0;
 
       return {
         id: juntada.id,
@@ -56,10 +63,10 @@ async function listarJuntadas(req, res, next) {
         cantidadGastos: juntada.gastos.length,
         totalGastado: balance.totalGastado,
         participantes: juntada.participantes,
-        deuda: Math.abs(saldoNeto),
-        tipo: saldoUsuario
-          ? saldoNeto > 0.01 ? 'cobrar' : saldoNeto < -0.01 ? 'pagar' : 'ninguna'
-          : 'ninguna',
+        deuda: Math.abs(saldoBruto),
+        tipo: saldoBruto > 0.01  ? 'cobrar'
+            : saldoBruto < -0.01 ? 'pagar'
+            : 'ninguna',
       };
     });
 
@@ -385,8 +392,12 @@ async function agregarGasto(req, res, next) {
 
     const {
       nombre, pagador, monto,
-      splitMode = 'equal', splitSubgroups = [], beneficiarios = [], ticketPhoto = null,
+      splitMode = 'equal', splitSubgroups = [], beneficiarios = [], dividirEntre = [], ticketPhoto = null,
     } = req.body;
+
+    const finalBeneficiarios = (Array.isArray(beneficiarios) && beneficiarios.length > 0)
+      ? beneficiarios
+      : (Array.isArray(dividirEntre) ? dividirEntre : []);
 
     if (!nombre || nombre.trim() === '') {
       const err = new Error('El campo "nombre" del gasto es requerido.'); err.status = 400; return next(err);
@@ -406,9 +417,9 @@ async function agregarGasto(req, res, next) {
       err.status = 422; return next(err);
     }
 
-    if (beneficiarios.length > 0) {
+    if (finalBeneficiarios.length > 0) {
       const nombresValidos = juntada.participantes.map((p) => p.nombre.toLowerCase());
-      const invalidos = beneficiarios.filter((b) => !nombresValidos.includes(b.trim().toLowerCase()));
+      const invalidos = finalBeneficiarios.filter((b) => !nombresValidos.includes(b.trim().toLowerCase()));
       if (invalidos.length > 0) {
         const err = new Error(`Los siguientes beneficiarios no pertenecen a la juntada: ${invalidos.join(', ')}`);
         err.status = 422; return next(err);
@@ -423,7 +434,7 @@ async function agregarGasto(req, res, next) {
          (id, juntada_id, nombre, pagador, monto, split_mode, split_subgroups, beneficiarios, ticket_photo)
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
       [id, req.params.id, nombre.trim(), pagador.trim(), montoRedondeado,
-       splitMode, splitSubgroups, beneficiarios.map((b) => b.trim()), ticketPhoto]
+       splitMode, splitSubgroups, finalBeneficiarios.map((b) => b.trim()), ticketPhoto]
     );
 
     const nuevo = {
@@ -498,7 +509,8 @@ async function obtenerBalanceGlobal(req, res, next) {
        WHERE LOWER(p.nombre) = LOWER($1)`,
       [nombre]
     );
-    const juntadas = await Promise.all(ids.map(({ id }) => cargarJuntadaCompleta(id)));
+    const idsArray = ids.map(({ id }) => id);
+    const juntadas = await cargarJuntadasCompletas(idsArray);
     const balance = calcularBalanceGlobal(nombre, juntadas);
     res.json({ ok: true, data: balance });
   } catch (err) {

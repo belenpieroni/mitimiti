@@ -17,6 +17,7 @@ router.post('/join/:token', ctrl.unirseViaToken);
 router.get('/gastos', ctrl.listarGastos);
 router.post('/gastos', ctrl.crearGasto);
 router.put('/gastos/:id', ctrl.editarGasto);
+router.delete('/gastos/:id', ctrl.eliminarGasto);
 
 router.get('/servicios', ctrl.listarServicios);
 router.post('/servicios', ctrl.crearServicio);

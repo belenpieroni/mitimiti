@@ -11,6 +11,7 @@ import JoinViaLinkScreen from '../screens/JoinViaLinkScreen';
 import ViviendaJoinViaLinkScreen from '../screens/ViviendaJoinViaLinkScreen';
 
 import DeudasScreen from '../screens/DeudasScreen';
+import HistorialCompletoScreen from '../screens/HistorialCompletoScreen';
 import HomeScreen from '../screens/HomeScreen';
 import JuntadasScreen from '../screens/JuntadasScreen';
 import JuntadaDetalleScreen from '../screens/JuntadaDetalleScreen';
@@ -64,6 +65,15 @@ function ViviendaStack() {
       <Stack.Screen name="SalidasPorCategoria" component={SalidasPorCategoriaScreen} />
       <Stack.Screen name="CategoriaDetalle" component={CategoriaDetalleScreen} />
       <Stack.Screen name="ViviendaJoinViaLink" component={ViviendaJoinViaLinkScreen} />
+    </Stack.Navigator>
+  );
+}
+
+function DeudasStack() {
+  return (
+    <Stack.Navigator screenOptions={{ headerShown: false }}>
+      <Stack.Screen name="DeudasMain" component={DeudasScreen} />
+      <Stack.Screen name="HistorialCompleto" component={HistorialCompletoScreen} />
     </Stack.Navigator>
   );
 }
@@ -158,7 +168,7 @@ function RootTabs() {
         />
         <Tab.Screen 
           name="Deudas" 
-          component={DeudasScreen}
+          component={DeudasStack}
           options={{
             tabBarLabel: 'Deudas',
             tabBarIcon: ({ color, size }) => (

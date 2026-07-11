@@ -7,6 +7,7 @@ import { Ionicons } from '@expo/vector-icons';
 import * as DocumentPicker from 'expo-document-picker';
 import { colors } from '../theme/colors';
 import { liquidarServicioVivienda } from '../services/viviendaService';
+import { scanTicket } from '../services/ocrService';
 import CaptureTicketModal from './CaptureTicketModal';
 
 export default function LiquidarServicioModal({ visible, servicio, onClose, onLiquidado }) {
@@ -42,8 +43,27 @@ export default function LiquidarServicioModal({ visible, servicio, onClose, onLi
 
       if (!result.canceled && result.assets?.[0]) {
         const asset = result.assets[0];
-        setImagenUrl(asset.uri);
-        Alert.alert('Archivo adjunto', `Se adjuntó: ${asset.name}`);
+        
+        setCargando(true);
+        try {
+          // Procesar con OCR igual que el escaneo por cámara
+          const { amount, ticketUrl } = await scanTicket(asset.uri);
+          handleOCRResult({ amount, ticketUrl });
+          
+          if (amount) {
+            Alert.alert('✅ Archivo procesado', `Se detectó un monto de $${Math.round(amount).toLocaleString('es-AR')}`);
+          } else {
+            Alert.alert('Archivo adjunto', 'No se detectó un monto automáticamente. Por favor ingresalo manual.');
+            // Aún guardamos el archivo aunque no se detecte monto
+            setImagenUrl(ticketUrl || asset.uri);
+          }
+        } catch (error) {
+          console.error('Error OCR archivo:', error);
+          Alert.alert('Aviso', 'Se adjuntó el archivo pero no se pudo leer el monto. Podés ingresarlo manualmente.');
+          setImagenUrl(asset.uri);
+        } finally {
+          setCargando(false);
+        }
       }
     } catch (error) {
       Alert.alert('Error', 'No se pudo seleccionar el archivo.');

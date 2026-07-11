@@ -273,15 +273,35 @@ async function listarGastos(req, res, next) {
     const vivienda = await obtenerMiViviendaBase(req.user.id);
     if (!vivienda) return res.json({ ok: true, data: [] });
 
+    const { rows: [usuario] } = await pool.query('SELECT name FROM usuarios WHERE id = $1', [req.user.id]);
+    const userName = usuario ? usuario.name : '';
+
     const { rows } = await pool.query(
-      `SELECT id::text, nombre, monto::float, categoria, fecha::text, pagador,
-              imagen_url AS "imagenUrl", participantes, creado_en AS "creadoEn", status
-       FROM vivienda_gastos
-       WHERE vivienda_id = $1
-       ORDER BY fecha DESC, creado_en DESC`,
-      [vivienda.id]
+      `SELECT g.id::text, g.nombre, g.monto::float, g.categoria, g.fecha::text, g.pagador,
+              g.imagen_url AS "imagenUrl", g.participantes, g.creado_en AS "creadoEn", g.status,
+              g.acuerdo_id AS "acuerdoId",
+              COALESCE(ap.porcentaje, 0)::float AS "miPorcentaje"
+       FROM vivienda_gastos g
+       LEFT JOIN acuerdo_participantes ap ON ap.acuerdo_id = g.acuerdo_id AND LOWER(ap.nombre) = LOWER($2)
+       WHERE g.vivienda_id = $1
+       ORDER BY g.fecha DESC, g.creado_en DESC`,
+      [vivienda.id, userName]
     );
-    res.json({ ok: true, data: rows });
+
+    const data = rows.map(r => {
+      let miPorcentaje = r.miPorcentaje;
+      // Fallback para gastos viejos sin acuerdo_id
+      if (!r.acuerdoId && Array.isArray(r.participantes)) {
+        const found = r.participantes.find(p => p.toLowerCase() === userName.toLowerCase());
+        if (found) miPorcentaje = 100 / (r.participantes.length || 1);
+      }
+      return {
+        ...r,
+        monto_responsabilidad_usuario: r.monto ? (r.monto * miPorcentaje / 100) : 0
+      };
+    });
+
+    res.json({ ok: true, data });
   } catch (err) {
     next(err);
   }
@@ -304,7 +324,7 @@ async function crearGasto(req, res, next) {
 
     // Consultar tabla vivienda_acuerdos (participantes)
     const { rows: partRows } = await pool.query(
-      'SELECT nombre FROM acuerdo_participantes WHERE acuerdo_id = $1',
+      'SELECT nombre, porcentaje FROM acuerdo_participantes WHERE acuerdo_id = $1',
       [acuerdoId]
     );
     const participantes = partRows.map(r => r.nombre);
@@ -316,9 +336,32 @@ async function crearGasto(req, res, next) {
       [id, vivienda.id, nombreServicio, Number(monto), categoria, fecha, pagador, imagenUrl || null, participantes, acuerdoId]
     );
 
+    const { rows: [usuario] } = await pool.query('SELECT name FROM usuarios WHERE id = $1', [req.user.id]);
+    const creatorName = usuario ? usuario.name : '';
+
+    const montoFloat = Number(monto) || 0;
+    if (montoFloat > 0) {
+      partRows.forEach(part => {
+        if (part.nombre.toLowerCase() !== creatorName.toLowerCase()) {
+          const monto_individual = (montoFloat * (part.porcentaje || 0)) / 100;
+          if (monto_individual > 0) {
+            notifyUsersByName(
+              [part.nombre],
+              {
+                title: '💸 Nuevo gasto puntual',
+                body: `Se cargó ${nombreServicio}. Debes abonar $${monto_individual.toLocaleString('es-AR')} a ${pagador}.`,
+                data: { type: 'nuevo_gasto', gastoId: id, url: 'mitimiti://deudas' }
+              },
+              { category: NOTIFICATION_CATEGORIES.NUEVOS_GASTOS }
+            ).catch(e => console.error('Error al notificar nuevo gasto:', e));
+          }
+        }
+      });
+    }
+
     res.status(201).json({
       ok: true,
-      data: { id, nombre: nombreServicio, monto: Number(monto), categoria, fecha, pagador, imagenUrl: imagenUrl || null, participantes, acuerdoId },
+      data: { id, nombre: nombreServicio, monto: montoFloat, categoria, fecha, pagador, imagenUrl: imagenUrl || null, participantes, acuerdoId },
     });
   } catch (err) {
     next(err);
@@ -371,6 +414,32 @@ async function editarGasto(req, res, next) {
   }
 }
 
+async function eliminarGasto(req, res, next) {
+  try {
+    const vivienda = await obtenerMiViviendaOrFail(req);
+    const { id } = req.params;
+
+    const { rows: [gasto] } = await pool.query(
+      'SELECT id, status FROM vivienda_gastos WHERE id::text = $1 AND vivienda_id = $2', [id, vivienda.id]
+    );
+
+    if (!gasto) {
+      const err = new Error('Gasto no encontrado'); err.status = 404; return next(err);
+    }
+
+    if (gasto.status === 'PAGADO') {
+      const err = new Error('No podés eliminar un gasto que ya figura como PAGADO. Revertí el pago primero para poder borrarlo.'); 
+      err.status = 409; 
+      return next(err);
+    }
+
+    await pool.query('DELETE FROM vivienda_gastos WHERE id = $1 AND vivienda_id = $2', [gasto.id, vivienda.id]);
+    res.json({ ok: true, data: { deleted: true } });
+  } catch (err) {
+    next(err);
+  }
+}
+
 // ── Servicios periódicos ──────────────────────────────────────────────────────
 
 async function listarServicios(req, res, next) {
@@ -378,17 +447,37 @@ async function listarServicios(req, res, next) {
     const vivienda = await obtenerMiViviendaBase(req.user.id);
     if (!vivienda) return res.json({ ok: true, data: [] });
 
+    const { rows: [usuario] } = await pool.query('SELECT name FROM usuarios WHERE id = $1', [req.user.id]);
+    const userName = usuario ? usuario.name : '';
+
     const { rows } = await pool.query(
-      `SELECT id::text, nombre, monto::float, periodicidad,
-              proximo_vencimiento::text AS "proximoVencimiento",
-              participantes, creado_en AS "creadoEn",
-              is_variable AS "isVariable", status
-       FROM vivienda_servicios
-       WHERE vivienda_id = $1
-       ORDER BY proximo_vencimiento`,
-      [vivienda.id]
+      `SELECT s.id::text, s.nombre, s.monto::float, s.periodicidad,
+              s.proximo_vencimiento::text AS "proximoVencimiento",
+              s.participantes, s.creado_en AS "creadoEn",
+              s.is_variable AS "isVariable", s.status,
+              s.acuerdo_id AS "acuerdoId",
+              COALESCE(ap.porcentaje, 0)::float AS "miPorcentaje"
+       FROM vivienda_servicios s
+       LEFT JOIN acuerdo_participantes ap ON ap.acuerdo_id = s.acuerdo_id AND LOWER(ap.nombre) = LOWER($2)
+       WHERE s.vivienda_id = $1
+       ORDER BY s.proximo_vencimiento`,
+      [vivienda.id, userName]
     );
-    res.json({ ok: true, data: rows });
+
+    const data = rows.map(r => {
+      let miPorcentaje = r.miPorcentaje;
+      // Fallback para servicios viejos sin acuerdo_id
+      if (!r.acuerdoId && Array.isArray(r.participantes)) {
+        const found = r.participantes.find(p => p.toLowerCase() === userName.toLowerCase());
+        if (found) miPorcentaje = 100 / (r.participantes.length || 1);
+      }
+      return {
+        ...r,
+        monto_responsabilidad_usuario: r.monto ? (r.monto * miPorcentaje / 100) : 0
+      };
+    });
+
+    res.json({ ok: true, data });
   } catch (err) {
     next(err);
   }
@@ -415,7 +504,7 @@ async function crearServicio(req, res, next) {
 
     // Consultar tabla vivienda_acuerdos (participantes)
     const { rows: partRows } = await pool.query(
-      'SELECT nombre FROM acuerdo_participantes WHERE acuerdo_id = $1',
+      'SELECT nombre, porcentaje FROM acuerdo_participantes WHERE acuerdo_id = $1',
       [acuerdoId]
     );
     const participantes = partRows.map(r => r.nombre);
@@ -430,17 +519,39 @@ async function crearServicio(req, res, next) {
       [id, vivienda.id, nombreServicio, montoFinal, frecuencia.toLowerCase(), proximoVencimiento, participantes, isVariable, statusFinal, acuerdoId]
     );
 
-    // Si es variable, notificar a participantes que deben cargar el monto
+    const { rows: [usuario] } = await pool.query('SELECT name FROM usuarios WHERE id = $1', [req.user.id]);
+    const creatorName = usuario ? usuario.name : '';
+
+    // Si es variable, notificamos para carga de monto (usamos .catch para no bloquear)
     if (isVariable && participantes.length > 0) {
-      await notifyUsersByName(
+      notifyUsersByName(
         participantes,
         {
           title: 'Nuevo servicio variable',
           body: `Servicio "${nombreServicio}" requiere actualización: ingrese el monto`,
-          data: { type: 'variable_service_pending', servicioId: id },
+          data: { type: 'variable_service_pending', servicioId: id, url: 'mitimiti://deudas' },
         },
         { category: NOTIFICATION_CATEGORIES.SERVICIO_VARIABLE }
-      );
+      ).catch(e => console.error('Error al notificar servicio variable:', e));
+    } else {
+      // Notificación estándar asíncrona para participantes excluyendo al creador
+      const fechaObj = new Date(proximoVencimiento);
+      const formateador = new Intl.DateTimeFormat('es-AR', { day: 'numeric', month: 'long', timeZone: 'UTC' });
+      const fechaLegible = formateador.format(fechaObj);
+
+      partRows.forEach(part => {
+        if (part.nombre.toLowerCase() !== creatorName.toLowerCase()) {
+          notifyUsersByName(
+            [part.nombre],
+            {
+              title: '🏠 Nuevo servicio en la vivienda',
+              body: `Se ha creado ${nombreServicio}. La fecha límite de pago es el ${fechaLegible}.`,
+              data: { type: 'nuevo_servicio', servicioId: id, url: 'mitimiti://deudas' }
+            },
+            { category: NOTIFICATION_CATEGORIES.NUEVOS_GASTOS }
+          ).catch(e => console.error('Error al notificar nuevo servicio:', e));
+        }
+      });
     }
 
     res.status(201).json({
@@ -645,12 +756,53 @@ async function marcarComoPagado(req, res, next) {
     const tabla = tipo === 'gastos' ? 'vivienda_gastos' : 'vivienda_servicios';
     
     const { rows: [updated] } = await pool.query(
-      `UPDATE ${tabla} SET status = 'PAGADO', fecha_pago = NOW() WHERE id::text = $1 AND vivienda_id = $2 RETURNING id::text`,
+      `UPDATE ${tabla} SET status = 'PAGADO', fecha_pago = NOW() WHERE id::text = $1 AND vivienda_id = $2 RETURNING *`,
       [id, vivienda.id]
     );
 
     if (!updated) {
       const err = new Error('Registro no encontrado'); err.status = 404; return next(err);
+    }
+
+    const { rows: [usuario] } = await pool.query('SELECT name FROM usuarios WHERE id = $1', [req.user.id]);
+    const deudorName = usuario ? usuario.name : 'Un usuario';
+
+    if (tipo === 'gastos') {
+      if (updated.pagador && updated.pagador.toLowerCase() !== deudorName.toLowerCase()) {
+        notifyUsersByName(
+          [updated.pagador],
+          {
+            title: '✅ Pago recibido',
+            body: `${deudorName} ha marcado el gasto "${updated.nombre}" como pagado. ¡La deuda ha sido liquidada!`,
+            data: { type: 'pago_recibido', gastoId: id, url: 'mitimiti://deudas' }
+          },
+          { category: NOTIFICATION_CATEGORIES.NUEVOS_GASTOS }
+        ).catch(e => console.error('Error enviando push de liquidación:', e));
+      }
+    } else if (tipo === 'servicios') {
+      const { rows: [{ creador_id }] } = await pool.query('SELECT creador_id FROM viviendas WHERE id = $1', [vivienda.id]);
+      const { rows: creador } = await pool.query('SELECT name FROM usuarios WHERE id = $1', [creador_id]);
+      
+      let destinatarios = [];
+      if (creador.length > 0 && creador[0].name.toLowerCase() !== deudorName.toLowerCase()) {
+        destinatarios.push(creador[0].name);
+      } else {
+        destinatarios = Array.isArray(updated.participantes) 
+          ? updated.participantes.filter(p => p.toLowerCase() !== deudorName.toLowerCase()) 
+          : [];
+      }
+
+      if (destinatarios.length > 0) {
+        notifyUsersByName(
+          destinatarios,
+          {
+            title: '✅ Pago recibido',
+            body: `${deudorName} ha marcado el servicio "${updated.nombre}" como pagado. ¡La deuda ha sido liquidada!`,
+            data: { type: 'pago_recibido', servicioId: id, url: 'mitimiti://deudas' }
+          },
+          { category: NOTIFICATION_CATEGORIES.NUEVOS_GASTOS }
+        ).catch(e => console.error('Error enviando push de liquidación:', e));
+      }
     }
 
     res.json({ ok: true, message: 'Marcado como pagado' });
@@ -739,7 +891,7 @@ module.exports = {
   eliminarMiVivienda,
   generarObtenerInvitacion,
   unirseViaToken,
-  listarGastos, crearGasto, editarGasto,
+  listarGastos, crearGasto, editarGasto, eliminarGasto,
   listarServicios, crearServicio, editarServicio, eliminarServicio, liquidarServicio,
   listarAcuerdos, guardarAcuerdo, eliminarAcuerdo,
   marcarComoPagado, revertirPago,

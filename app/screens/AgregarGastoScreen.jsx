@@ -12,6 +12,7 @@ import { colors } from '../theme/colors';
 import { obtenerJuntada, agregarGasto } from '../services/juntadasService';
 import { uploadTicketPhoto } from '../services/uploadService';
 import CaptureTicketModal from '../components/CaptureTicketModal';
+import { calcularParte } from '../utils/mathUtils';
 
 export default function AgregarGastoScreen({ route, navigation }) {
   const { juntadaId } = route.params;
@@ -101,8 +102,9 @@ export default function AgregarGastoScreen({ route, navigation }) {
         datosGasto.splitSubgroups = juntada.subgrupos.map(sg => sg.id);
       }
 
-      if (splitMode === 'equal' && seleccionados.length > 0) {
+       if (splitMode === 'equal' && seleccionados.length > 0) {
         datosGasto.dividirEntre = seleccionados;
+        datosGasto.beneficiarios = seleccionados;
       }
 
       if (adjuntoTicket) {
@@ -383,7 +385,7 @@ export default function AgregarGastoScreen({ route, navigation }) {
               {montoNum > 0 && seleccionados.length > 0 && (
                 <Text style={styles.calcularDiv}>
                   Cada uno paga <Text style={{ fontWeight: '800', color: colors.primary }}>
-                    ${Math.round(montoNum / seleccionados.length).toLocaleString('es-AR')}
+                    ${calcularParte(montoNum, seleccionados.length).toLocaleString('es-AR')}
                   </Text>
                 </Text>
               )}
