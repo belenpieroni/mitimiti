@@ -5,6 +5,9 @@ WORKDIR /app
 COPY package*.json ./
 RUN npm install --legacy-peer-deps
 
+COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
+RUN chmod +x /usr/local/bin/docker-entrypoint.sh
+
 EXPOSE 8081 19000 19001 19002
 
-CMD ["npm", "run", "start:tunnel"]
+ENTRYPOINT ["/usr/local/bin/docker-entrypoint.sh"]
