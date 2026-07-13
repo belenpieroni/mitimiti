@@ -7,6 +7,7 @@
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
+    "sdkVersion": "52",
     "newArchEnabled": true,
     "splash": {
       "image": "./assets/splash-icon.png",

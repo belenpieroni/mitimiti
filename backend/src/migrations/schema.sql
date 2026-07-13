@@ -77,13 +77,8 @@ CREATE TABLE IF NOT EXISTS juntada_pagos_deudas (
 CREATE TABLE IF NOT EXISTS juntada_subgrupos (
   id UUID PRIMARY KEY,
   juntada_id UUID NOT NULL REFERENCES juntadas(id) ON DELETE CASCADE,
-  nombre TEXT NOT NULL
-);
-
-CREATE TABLE IF NOT EXISTS subgrupo_integrantes (
-  subgrupo_id UUID NOT NULL REFERENCES juntada_subgrupos(id) ON DELETE CASCADE,
   nombre TEXT NOT NULL,
-  PRIMARY KEY (subgrupo_id, nombre)
+  integrantes UUID[] NOT NULL DEFAULT '{}'
 );
 
 -- Vivienda
@@ -181,3 +176,10 @@ CREATE TABLE IF NOT EXISTS notificaciones_usuario (
 
 CREATE INDEX IF NOT EXISTS idx_notificaciones_usuario_usuario_creada
   ON notificaciones_usuario (usuario_id, creada_en DESC);
+
+-- Agrega la columna de integrantes
+ALTER TABLE juntada_subgrupos 
+  ADD COLUMN IF NOT EXISTS integrantes UUID[] NOT NULL DEFAULT '{}';
+
+-- Elimina la tabla intermedia vieja
+DROP TABLE IF EXISTS subgrupo_integrantes;

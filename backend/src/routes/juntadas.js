@@ -19,6 +19,8 @@
  * │ DELETE /api/juntadas/:id/gastos/:gid                │ Eliminar gasto               │
  * │ GET    /api/juntadas/:id/balance                    │ Balance de una juntada       │
  * │ GET    /api/juntadas/balance/global/:nombre         │ Balance global del usuario   │
+ * │ POST   /api/juntadas/:id/subgrupos/:sgid/unirse     │ Unirse a un subgrupo         │
+ * │ POST   /api/juntadas/:id/subgrupos/:sgid/salir      │ Salir de un subgrupo         │
  * └─────────────────────────────────────────────────────┴──────────────────────────────┘
  */
 
@@ -53,6 +55,10 @@ router.delete('/:id/gastos/:gid', ctrl.eliminarGasto);
 router.post('/:id/subgrupos', ctrl.agregarSubgrupo);
 router.patch('/:id/subgrupos/:sgid', ctrl.editarSubgrupo);
 router.delete('/:id/subgrupos/:sgid', ctrl.eliminarSubgrupo);
+
+// Métodos del Refactor (Array dinámico)
+router.post('/:id/subgrupos/:sgid/unirse', requireAuth, ctrl.unirseSubgrupo);
+router.post('/:id/subgrupos/:sgid/salir',  requireAuth, ctrl.salirSubgrupo);
 
 // ── Balance de juntada ────────────────────────────────────────────────────────
 router.get('/:id/balance', ctrl.obtenerBalance);

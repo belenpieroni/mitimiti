@@ -1,7 +1,7 @@
 /**
  * balanceService.js
  * ─────────────────
- * Lógica de negocio central de Miti Miti (Versión Familiar por Consumo)
+ * Lógica de negocio central de Miti Miti (Versión Familiar por Consumo + Subgrupos Variables)
  */
  
 /**
@@ -65,21 +65,41 @@ function calcularBalance(juntada) {
     correspondePor[p.nombre] = 0;
   });
 
-  // 1. PROCESAR CADA GASTO SEGÚN CONSUMO REAL (Checklist de beneficiarios)
+  // 1. PROCESAR CADA GASTO SEGÚN CONSUMO REAL (CA3: Soporte para Subgrupos Dinámicos)
   gastos.forEach((g) => {
     // Acreditar el pago a la persona física que puso la plata
     if (pagadoPor[g.pagador] !== undefined) {
       pagadoPor[g.pagador] = redondear(pagadoPor[g.pagador] + g.monto);
     }
 
-    // Sistema de Checklist: si viene el array 'beneficiarios' con gente tildada, se usa.
-    // Si no viene (gastos viejos o división total), cae en el fallback de dividir entre todos.
-    const consumidores = g.beneficiarios && g.beneficiarios.length > 0 
-      ? g.beneficiarios 
-      : participantes.map(p => p.nombre);
+    let consumidores = [];
+
+    // GASTO POR SUBGRUPOS (Criterio de Aceptación 3)
+    if (g.tipoDivision === 'subgrupos' && g.subgruposIds && g.subgruposIds.length > 0) {
+      const setIntegrantesUnicos = new Set();
       
+      // Buscamos los subgrupos seleccionados en este gasto dentro del array de la juntada
+      const sgAsignados = subgrupos.filter(sg => g.subgruposIds.includes(sg.id));
+      
+      sgAsignados.forEach(sg => {
+        const integrantesActivos = sg.integrantes || [];
+        // Se extraen los usuarios reales en este preciso instante
+        integrantesActivos.forEach(nombre => setIntegrantesUnicos.add(nombre));
+      });
+
+      consumidores = Array.from(setIntegrantesUnicos);
+
+    } else if (g.beneficiarios && g.beneficiarios.length > 0) {
+      // Sistema clásico de Checklist individual
+      consumidores = g.beneficiarios;
+    } else {
+      // Fallback: división general entre todos
+      consumidores = participantes.map(p => p.nombre);
+    }
+      
+    // VALIDACIÓN MATEMÁTICA CRÍTICA (CA3): Si el subgrupo está vacío en este instante, 
+    // su length es 0. Al validar > 0 evitamos la división por cero (monto / 0 = Infinity/NaN)
     if (consumidores.length > 0) {
-      // Costo por cabeza real que consumió este ítem específico
       const cuotaPorCabeza = g.monto / consumidores.length;
       
       consumidores.forEach(nombreConsumidor => {
@@ -90,18 +110,18 @@ function calcularBalance(juntada) {
     }
   });
 
-  // 2. CONSOLIDACIÓN FAMILIAR (El truco mágico)
-  // Para evitar deudas internas, sumamos todo lo pagado y consumido del núcleo 
-  // y se lo asignamos a un "Representante" (el que más pagó). Los demás miembros quedan en 0.
+  // 2. CONSOLIDACIÓN FAMILIAR (Filtrado de seguridad)
   const pagadoConsolidado = { ...pagadoPor };
   const correspondeConsolidado = { ...correspondePor };
 
   subgrupos.forEach(sg => {
+    // REGLA DE SEGURIDAD: Solo consolidamos si el subgrupo está marcado explícitamente como familiar/núcleo.
+    // Si es un subgrupo de consumo variable (asado, bebidas), saltamos la consolidación.
+    if (sg.tipo !== 'familiar') return; 
+    
     const integrantes = sg.integrantes || [];
-    if (integrantes.length <= 1) return; // Si es un colado solo, no hay nada que consolidar
+    if (integrantes.length <= 1) return;
 
-    // Elegimos al representante de la familia: el que haya puesto más plata físicamente.
-    // Si nadie puso un peso todavía, elegimos al primero de la lista por defecto.
     let representante = integrantes[0];
     let maxPagado = -1;
     integrantes.forEach(nombre => {
@@ -114,19 +134,16 @@ function calcularBalance(juntada) {
     let grupoTotalPagado = 0;
     let grupoTotalCorresponde = 0;
 
-    // Sumamos los totales del núcleo familiar
     integrantes.forEach(nombre => {
       grupoTotalPagado += pagadoPor[nombre] || 0;
       grupoTotalCorresponde += correspondePor[nombre] || 0;
       
-      // Limpiamos la cuenta de los demás integrantes para que no figuren con deudas
       if (nombre !== representante) {
         pagadoConsolidado[nombre] = 0;
         correspondeConsolidado[nombre] = 0;
       }
     });
 
-    // El representante absorbe la economía entera de su familia para la liquidación
     pagadoConsolidado[representante] = grupoTotalPagado;
     correspondeConsolidado[representante] = grupoTotalCorresponde;
   });
@@ -143,7 +160,7 @@ function calcularBalance(juntada) {
       color: p.color,
       pagado,
       corresponde,
-      saldo, // positivo -> acreedor, negativo -> deudor, cero -> al día con su familia
+      saldo,
     };
   });
  
@@ -173,17 +190,14 @@ function calcularBalance(juntada) {
 
   return {
     totalGastado,
-    parteIgualPorPersona: parteIgual, // Queda como dato informativo general
-    cantidadParticipantes: n,
+    parteIgualPorPersona: parteIgual,
+    cantidadParticipantes: juntada.participantes.length,
     saldos: saldosConPendiente,
     transferenciasOriginales,
     transferencias,
   };
 }
  
-/**
- * Algoritmo greedy de liquidación eficiente (Se mantiene intacto y funcional)
- */
 function calcularLiquidacion(saldos) {
   const balances = saldos.map((s) => ({
     nombre: s.nombre,
@@ -210,16 +224,13 @@ function calcularLiquidacion(saldos) {
     });
  
     deudor.saldo = redondear(deudor.saldo + monto);
+    acreedor.saldo = redondear-acreedor.saldo - monto;
     acreedor.saldo = redondear(acreedor.saldo - monto);
   }
  
   return transferencias;
 }
  
-/**
- * Calcula el saldo global de un participante. Al usar la misma función consolidada,
- * mantiene el historial impecable sin falsas deudas globales en el Home.
- */
 function calcularBalanceGlobal(nombreParticipante, juntadas) {
   let porCobrar = 0;
   let porPagar = 0;
