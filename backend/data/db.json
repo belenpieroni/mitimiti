@@ -1,0 +1,557 @@
+{
+  "juntadas": [
+    {
+      "id": "358afc6e-29dd-43be-89d7-675cb6c72c4b",
+      "nombre": "asado",
+      "descripcion": "pepe",
+      "fecha": "2026-06-23",
+      "creadaEn": "2026-06-23T20:40:54.962Z",
+      "participantes": [
+        {
+          "id": "02b4df0f-e12a-4c5c-91c7-b500dbc242d4",
+          "nombre": "Martín",
+          "iniciales": "MR",
+          "color": "#473472"
+        }
+      ],
+      "gastos": [],
+      "subgrupos": []
+    },
+    {
+      "id": "f8742d46-4ad0-4aab-928e-f506f90196a2",
+      "nombre": "asa",
+      "descripcion": "sasas",
+      "fecha": "2026-06-23",
+      "creadaEn": "2026-06-23T06:11:32.106Z",
+      "participantes": [
+        {
+          "id": "7bc2d6ee-605d-47f2-9d5d-ae670d4cd5b9",
+          "nombre": "Martín",
+          "iniciales": "MR",
+          "color": "#473472"
+        }
+      ],
+      "gastos": [],
+      "subgrupos": []
+    },
+    {
+      "id": "ec16fb22-242d-4724-86d2-8640c8d6e257",
+      "nombre": "saas",
+      "descripcion": "sa",
+      "fecha": "2026-06-23",
+      "creadaEn": "2026-06-23T06:09:30.963Z",
+      "participantes": [
+        {
+          "id": "0f762414-5690-449f-9595-94ca683902c8",
+          "nombre": "Martín",
+          "iniciales": "MR",
+          "color": "#473472"
+        },
+        {
+          "id": "2c17cee4-a38d-4a07-9b6b-89caf8437056",
+          "nombre": "gfgfg",
+          "iniciales": "GF",
+          "color": "#526D82"
+        }
+      ],
+      "gastos": [],
+      "subgrupos": []
+    },
+    {
+      "id": "3fb8ec8a-2486-4d4a-beba-6cee39e0efbf",
+      "nombre": "asaso",
+      "descripcion": "martin",
+      "fecha": "2026-06-23",
+      "creadaEn": "2026-06-23T06:07:52.924Z",
+      "participantes": [
+        {
+          "id": "9a4c4390-2a5b-48e7-bb9b-34c95ef892d3",
+          "nombre": "Martín",
+          "iniciales": "MR",
+          "color": "#473472"
+        }
+      ],
+      "gastos": [],
+      "subgrupos": []
+    },
+    {
+      "id": "5ecae5c0-fe1b-4fb3-afce-f406a392321e",
+      "nombre": "Cumpleaños",
+      "descripcion": "Random",
+      "fecha": "2026-06-23",
+      "creadaEn": "2026-06-23T21:33:22.620Z",
+      "participantes": [
+        {
+          "id": "f7667c8a-56bf-4b09-b7c7-d442e8574c23",
+          "nombre": "Thiago",
+          "iniciales": "TH",
+          "color": "#473472"
+        },
+        {
+          "id": "413b438e-27d4-40e7-9dd6-7c9138d4ab60",
+          "nombre": "Ivo",
+          "iniciales": "IV",
+          "color": "#526D82"
+        },
+        {
+          "id": "ce5b18bc-a98e-4544-a998-214feafce48a",
+          "nombre": "Belen",
+          "iniciales": "BE",
+          "color": "#9DB2BF"
+        }
+      ],
+      "gastos": [
+        {
+          "id": "14035dce-bbb8-4427-86c8-1af981983f7f",
+          "nombre": "Asado",
+          "pagador": "Ivo",
+          "splitMode": "equal",
+          "splitSubgroups": [],
+          "beneficiarios": [],
+          "monto": 15000,
+          "ticketPhoto": null,
+          "creadoEn": "2026-06-23T21:33:39.790Z"
+        }
+      ],
+      "subgrupos": [],
+      "pagosDeudas": [
+        {
+          "id": "26750fbf-2607-4c51-a5ac-2aeaef7faab5",
+          "de": "Thiago",
+          "para": "Ivo",
+          "monto": 5000,
+          "creadoEn": "2026-06-23T21:41:09.909Z"
+        }
+      ]
+    },
+    {
+      "id": "9fe984b2-4e75-4f41-9e3a-63841db2a2dc",
+      "nombre": "asado",
+      "descripcion": "",
+      "fecha": "2026-06-23",
+      "creadaEn": "2026-06-23T06:07:33.523Z",
+      "participantes": [
+        {
+          "id": "5e74052a-390e-4049-b9b6-6c7c1b69d467",
+          "nombre": "Martín",
+          "iniciales": "MR",
+          "color": "#473472"
+        },
+        {
+          "id": "44e976f0-7dfc-42b4-ad08-e0e601617416",
+          "nombre": "juan",
+          "iniciales": "JU",
+          "color": "#526D82"
+        }
+      ],
+      "gastos": [],
+      "subgrupos": []
+    },
+    {
+      "id": "cfaff7d9-f5a6-4671-a365-5fdd5337734d",
+      "nombre": "asadu",
+      "descripcion": "sas",
+      "fecha": "2026-06-20",
+      "creadaEn": "2026-06-20T22:54:06.149Z",
+      "participantes": [
+        {
+          "id": "f2889525-639f-429e-92e0-d5fdba056370",
+          "nombre": "Martín",
+          "iniciales": "MR",
+          "color": "#473472"
+        },
+        {
+          "id": "3c879aae-7371-45cb-84c6-7e27c9b7ef4c",
+          "nombre": "Martin",
+          "iniciales": "MA",
+          "color": "#526D82"
+        }
+      ],
+      "gastos": [
+        {
+          "id": "410c8917-9008-428d-b558-fbd52176ee44",
+          "nombre": "asado",
+          "pagador": "Martin",
+          "monto": 19999,
+          "creadoEn": "2026-06-20T22:55:30.916Z"
+        }
+      ]
+    },
+    {
+      "id": "8992f22b-7123-4430-b415-27aa664507d8",
+      "nombre": "Noche de Tacos",
+      "descripcion": "Alta noches de tacos",
+      "fecha": "2026-06-21",
+      "creadaEn": "2026-06-21T00:59:01.065Z",
+      "participantes": [
+        {
+          "id": "065eec4f-14a6-4ed0-a1ce-54e500555be1",
+          "nombre": "Martín",
+          "iniciales": "MR",
+          "color": "#473472"
+        },
+        {
+          "id": "d8e49ccb-7e69-4ef3-8bd3-47128af7c6fd",
+          "nombre": "Thiago",
+          "iniciales": "TH",
+          "color": "#526D82"
+        },
+        {
+          "id": "6f1b5fea-4018-4e39-818f-38a479dc422c",
+          "nombre": "Belen",
+          "iniciales": "BE",
+          "color": "#9DB2BF"
+        },
+        {
+          "id": "eb190779-b369-4892-ba5f-b1f3af0882af",
+          "nombre": "Conra",
+          "iniciales": "CO",
+          "color": "#42b271"
+        },
+        {
+          "id": "5d366827-a23f-4149-b40e-ec79680cb01a",
+          "nombre": "Ori",
+          "iniciales": "OR",
+          "color": "#c084fc"
+        },
+        {
+          "id": "274d7290-abaf-4f58-a681-b2d759f24681",
+          "nombre": "Ivo",
+          "iniciales": "IV",
+          "color": "#f97316"
+        }
+      ],
+      "gastos": [
+        {
+          "id": "05c7ec9b-7615-404b-8ce5-4b209eaaa569",
+          "nombre": "Compras del súper",
+          "pagador": "Martín",
+          "splitMode": "subgroups",
+          "splitSubgroups": [
+            "0690d1ee-4cd9-482c-a7c4-e1b85b9154f4"
+          ],
+          "monto": 118700,
+          "ticketPhoto": "/uploads/ticket-1782003608827-82282510.jpg",
+          "creadoEn": "2026-06-21T01:00:25.209Z"
+        }
+      ],
+      "subgrupos": [
+        {
+          "id": "0690d1ee-4cd9-482c-a7c4-e1b85b9154f4",
+          "nombre": "Pareja 🫶🏻",
+          "integrantes": [
+            "Ivo",
+            "Belen"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "5ed6472e-1067-4a60-a37b-6372b45f4526",
+      "nombre": "Noche de Bowling 🎳",
+      "descripcion": "Festejamos la aprobación de la entrega 1",
+      "fecha": "2026-05-20",
+      "creadaEn": "2026-05-20T19:11:58.196Z",
+      "participantes": [
+        {
+          "id": "9c2996a2-3924-4593-b521-02351946b9e8",
+          "nombre": "Martín",
+          "iniciales": "MR",
+          "color": "#473472"
+        },
+        {
+          "id": "eb46bbcf-a297-4470-85ed-baac612850b4",
+          "nombre": "Thiago",
+          "iniciales": "TH",
+          "color": "#526D82"
+        },
+        {
+          "id": "7666c71a-e33b-4edb-b428-7275ea96627f",
+          "nombre": "Ori",
+          "iniciales": "OR",
+          "color": "#9DB2BF"
+        },
+        {
+          "id": "ba661444-9ddd-4c3f-9cfc-3e45bccb0b17",
+          "nombre": "Belen",
+          "iniciales": "BE",
+          "color": "#42b271"
+        },
+        {
+          "id": "04a3944c-b9f3-49ed-9a3e-1f940a9d5ed4",
+          "nombre": "Ivo",
+          "iniciales": "IV",
+          "color": "#c084fc"
+        },
+        {
+          "id": "c471a70d-55d9-440a-a853-c934bd2e167a",
+          "nombre": "Conrado",
+          "iniciales": "CO",
+          "color": "#f97316"
+        }
+      ],
+      "gastos": [
+        {
+          "id": "89feeb45-1c89-42e1-a01c-d9e6240afffd",
+          "nombre": "Pizza",
+          "pagador": "Belen",
+          "monto": 12500,
+          "creadoEn": "2026-05-20T19:12:22.149Z"
+        },
+        {
+          "id": "93e31a77-c80d-4232-8f05-a8812b9ae850",
+          "nombre": "Gaseosa",
+          "pagador": "Thiago",
+          "monto": 12000,
+          "creadoEn": "2026-05-20T19:12:31.590Z"
+        },
+        {
+          "id": "860c9633-d1b4-4978-af6e-e99002988b13",
+          "nombre": "Pizza 🍕",
+          "pagador": "Martín",
+          "splitMode": "equal",
+          "splitSubgroups": [],
+          "monto": 10000,
+          "creadoEn": "2026-06-20T18:39:49.456Z"
+        },
+        {
+          "id": "047cb93e-d2dd-411c-b2b5-e6db3cd64894",
+          "nombre": "Restaurante",
+          "pagador": "Thiago",
+          "splitMode": "equal",
+          "splitSubgroups": [],
+          "monto": 2628,
+          "ticketPhoto": "/uploads/ticket-1781992868028-407866012.jpg",
+          "creadoEn": "2026-06-20T22:01:27.290Z"
+        }
+      ],
+      "subgrupos": [
+        {
+          "id": "71506ab9-5845-4a6e-b3af-234cf64e8990",
+          "nombre": "Familia",
+          "integrantes": [
+            "Conrado",
+            "Ivo"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "1",
+      "nombre": "Asado del sábado",
+      "descripcion": "",
+      "fecha": "2026-04-28",
+      "creadaEn": "2026-04-28T10:00:00.000Z",
+      "participantes": [
+        {
+          "id": "p1",
+          "nombre": "Martín",
+          "iniciales": "MR",
+          "color": "#473472"
+        },
+        {
+          "id": "p2",
+          "nombre": "Jorge",
+          "iniciales": "JL",
+          "color": "#526D82"
+        },
+        {
+          "id": "p3",
+          "nombre": "Sofía",
+          "iniciales": "SO",
+          "color": "#9DB2BF"
+        },
+        {
+          "id": "p4",
+          "nombre": "Alan",
+          "iniciales": "AL",
+          "color": "#42b271"
+        }
+      ],
+      "gastos": [
+        {
+          "id": "g1",
+          "nombre": "Carne y verduras",
+          "pagador": "Martín",
+          "monto": 7200,
+          "creadoEn": "2026-04-28T12:00:00.000Z"
+        },
+        {
+          "id": "g2",
+          "nombre": "Bebidas",
+          "pagador": "Jorge",
+          "monto": 3400,
+          "creadoEn": "2026-04-28T12:01:00.000Z"
+        },
+        {
+          "id": "g3",
+          "nombre": "Carbón y leña",
+          "pagador": "Sofía",
+          "monto": 1900,
+          "creadoEn": "2026-04-28T12:02:00.000Z"
+        },
+        {
+          "id": "d46af825-8cd4-4f81-b186-4dfa4cbd7ddd",
+          "nombre": "Verduras",
+          "pagador": "Sofía",
+          "monto": 10000,
+          "creadoEn": "2026-06-20T08:41:05.170Z"
+        }
+      ]
+    }
+  ],
+  "perfiles": {
+    "Martín": {
+      "alias": "ggggggg"
+    },
+    "Thiago": {
+      "alias": "thiago.pago.mp"
+    },
+    "Belen": {
+      "alias": "belen.dinero.1"
+    },
+    "Jorge": {
+      "alias": "3840200500000028844555"
+    }
+  },
+  "usuarios": [
+    {
+      "id": "0ecd1224-18eb-467a-b01a-69ea079bf214",
+      "name": "Belen Pieroni",
+      "email": "belen@email.com",
+      "password": "$2a$10$yoW9uljztOksbsNFInyFHu1fGXIPlR9I3NDBV1Sl0cQuj1yTJD9Qq",
+      "iniciales": "BP",
+      "juntadas": 0,
+      "servicios": 0,
+      "viajes": 0,
+      "creadoEn": "2026-06-20T18:57:47.209Z"
+    },
+    {
+      "id": "252bd50a-1b48-4198-9c39-0b1eec29518d",
+      "name": "Ivo Balduzzi",
+      "email": "ivo@email.com",
+      "password": "$2a$10$PdrccBJPDQODhoTRAWBFCOJrvNd3uBuo3Te.B/QU4lnPWSwYknpNy",
+      "iniciales": "IB",
+      "juntadas": 0,
+      "servicios": 0,
+      "viajes": 0,
+      "creadoEn": "2026-06-20T20:35:13.636Z"
+    },
+    {
+      "id": "9cf42be4-02c4-4cb5-8004-ee040ddc5a86",
+      "name": "Thiago",
+      "email": "thiago@test.com",
+      "password": "$2b$10$gzgOugmZPfjvqmdFDfy.DOhX7RmuKo3MxIjWS.bbMK5UgOmhzLs5e",
+      "iniciales": "T",
+      "juntadas": 0,
+      "servicios": 0,
+      "viajes": 0,
+      "notificationPreferences": {
+        "nuevosGastos": true,
+        "recordatoriosVencimiento": true,
+        "nuevasJuntadas": true
+      },
+      "creadoEn": "2026-07-05T21:34:16.362Z",
+      "deviceTokens": [
+        {
+          "token": "ExponentPushToken[DL30y8GdE_4JqvCifR0fgJ]",
+          "platform": "ios",
+          "lastSeenAt": "2026-07-05T22:10:06.038Z"
+        }
+      ]
+    }
+  ],
+  "vivienda": {
+    "serviciosPeriodicos": [
+      {
+        "id": "sv1",
+        "nombre": "Factura de Luz",
+        "monto": 45000,
+        "periodicidad": "mensual",
+        "proximoVencimiento": "2026-07-23T00:00:00.000Z",
+        "participantes": [
+          "Martín",
+          "Jorge",
+          "Sofía"
+        ]
+      },
+      {
+        "id": "de161cb8-28e1-4627-bf37-1490bb667284",
+        "nombre": "Internet / Fibra",
+        "monto": 200,
+        "periodicidad": "mensual",
+        "proximoVencimiento": "2026-07-23T21:48:08.297Z",
+        "participantes": [
+          "Valentina Ortiz",
+          "Martín Alves"
+        ]
+      }
+    ],
+    "acuerdosReparto": {
+      "internet / fibra": {
+        "id": "internet / fibra",
+        "nombre": "Internet / Fibra",
+        "modelo": "proporcional",
+        "participantes": [
+          {
+            "nombre": "Valentina Ortiz",
+            "porcentaje": 50
+          },
+          {
+            "nombre": "Martín Alves",
+            "porcentaje": 50
+          }
+        ]
+      },
+      "netflix": {
+        "id": "netflix",
+        "nombre": "Netflix",
+        "modelo": "proporcional",
+        "participantes": [
+          {
+            "nombre": "Martín Alves",
+            "porcentaje": 0
+          },
+          {
+            "nombre": "Ana",
+            "porcentaje": 0
+          }
+        ]
+      },
+      "agua": {
+        "id": "agua",
+        "nombre": "Agua",
+        "modelo": "partes_iguales",
+        "participantes": [
+          {
+            "nombre": "Martín Alves",
+            "porcentaje": 100
+          }
+        ]
+      }
+    },
+    "gastos": [
+      {
+        "id": "e825ef3f-c3de-4fca-93cb-10234c4acb3f",
+        "nombre": "Super",
+        "monto": 20000,
+        "categoria": "Supermercado",
+        "fecha": "2026-06-23",
+        "pagador": "Thiago",
+        "participantes": []
+      },
+      {
+        "id": "2365b1ea-46c7-4c65-b5fe-a64fd422e809",
+        "nombre": "Internet / Fibra",
+        "monto": 200,
+        "categoria": "Hogar",
+        "fecha": "2026-06-23T22:26:06.588Z",
+        "pagador": "Martín",
+        "participantes": [
+          "Valentina Ortiz",
+          "Martín Alves"
+        ]
+      }
+    ]
+  }
+}
