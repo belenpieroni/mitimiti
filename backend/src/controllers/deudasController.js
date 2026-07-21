@@ -1,5 +1,6 @@
 const { randomUUID: uuidv4 } = require('crypto');
 const { pool } = require('../db');
+const { notifyUsersByName } = require('../services/pushNotificationService');
 const { cargarJuntadaCompleta } = require('../helpers/juntadaHelpers');
 const { calcularBalance } = require('../services/balanceService');
 
@@ -40,41 +41,245 @@ async function getConsolidado(req, res, next) {
       [usuario]
     );
 
-    // Mapa: acreedor -> { nombre, totalAcreedor, conceptos[] }
+    // 1. Cargar Juntadas (Pendientes y Pagos de juntada)
     const acreedoresMap = new Map();
+    const pagosRecientes = [];
+
+    // Traer pagos donde el usuario fue el que pagó (de) O el que recibió (para).
+    // Con LOWER() en ambos lados para garantizar consistencia de mayúsculas.
+    const { rows: juntadasPagos } = await pool.query(
+      `SELECT pd.id, j.nombre as titulo, pd.monto, pd.creado_en, pd.de, pd.para
+       FROM juntada_pagos_deudas pd
+       JOIN juntadas j ON j.id = pd.juntada_id
+       WHERE LOWER(pd.de) = LOWER($1) OR LOWER(pd.para) = LOWER($1)`,
+      [usuario]
+    );
+
+    for (const p of juntadasPagos) {
+      const elUsuarioPago = p.de.toLowerCase() === usuario.toLowerCase();
+      const contraparte   = elUsuarioPago ? p.para : p.de;
+      const subLabel      = elUsuarioPago
+        ? `Juntada - Pagaste a ${contraparte}`
+        : `Juntada - ${p.de} te pagó`;
+
+      pagosRecientes.push({
+        id: p.id,
+        titulo: p.titulo,
+        sub: subLabel,
+        tipo: 'Juntada',
+        monto: Number(p.monto),
+        fechaDate: new Date(p.creado_en),
+        esVivienda: false,
+        isCompensacion: false
+      });
+    }
 
     for (const { id } of ids) {
       const juntada = await cargarJuntadaCompleta(id);
       const balance = calcularBalance(juntada);
 
-      for (const t of balance.transferencias) {
-        // Solo incluir deudas donde el usuario ES el deudor (t.de)
-        if (t.de.toLowerCase() !== usuario.toLowerCase()) continue;
+      // Usamos transferenciasOriginales para mostrar el monto bruto correcto
+      // (antes de descontar pagos parciales que reducirían el valor mostrado).
+      for (const t of balance.transferenciasOriginales) {
+        const isDeudor   = t.de.toLowerCase()   === usuario.toLowerCase();
+        const isAcreedor = t.para.toLowerCase()  === usuario.toLowerCase();
+        if (!isDeudor && !isAcreedor) continue;
 
-        const acreedorKey = t.para.toLowerCase();
-        if (!acreedoresMap.has(acreedorKey)) {
-          acreedoresMap.set(acreedorKey, {
-            id: acreedorKey,
-            nombre: t.para,
-            avatar: getIniciales(t.para),
+        const contraparteKey    = isDeudor ? t.para.toLowerCase() : t.de.toLowerCase();
+        const contraparteNombre = isDeudor ? t.para : t.de;
+
+        if (!acreedoresMap.has(contraparteKey)) {
+          acreedoresMap.set(contraparteKey, {
+            id: contraparteKey,
+            nombre: contraparteNombre,
+            avatar: getIniciales(contraparteNombre),
             totalAcreedor: 0,
             conceptos: [],
           });
         }
 
-        const acreedor = acreedoresMap.get(acreedorKey);
-        acreedor.totalAcreedor = Math.round((acreedor.totalAcreedor + t.monto) * 100) / 100;
-        acreedor.conceptos.push({
+        const contraparte  = acreedoresMap.get(contraparteKey);
+        const amountSign   = isDeudor ? 1 : -1;
+
+        contraparte.totalAcreedor = Math.round((contraparte.totalAcreedor + t.monto * amountSign) * 100) / 100;
+        contraparte.conceptos.push({
           id: encodeConceptoId(juntada.id, t.de, t.para, t.monto),
           titulo: juntada.nombre,
           sub: 'Juntada',
           tipo: 'Juntada',
           monto: t.monto,
+          tipoOperacion: isDeudor ? 'suma' : 'resta',
         });
       }
     }
 
-    res.json({ ok: true, data: Array.from(acreedoresMap.values()) });
+    // 2. Cargar Gastos y Servicios de Vivienda
+    const serviciosAPagar = [];
+
+    const { rows: [userRow] } = await pool.query(
+      'SELECT id FROM usuarios WHERE LOWER(name) = LOWER($1)',
+      [usuario]
+    );
+
+    if (userRow) {
+      const { rows: [vm] } = await pool.query(
+        'SELECT vivienda_id FROM vivienda_miembros WHERE usuario_id = $1 LIMIT 1',
+        [userRow.id]
+      );
+
+      if (vm) {
+        // Gastos
+        const { rows: gastos } = await pool.query(
+          'SELECT id, nombre, pagador, monto, status, fecha_pago, participantes FROM vivienda_gastos WHERE vivienda_id = $1 AND (status = $2 OR status = $3)',
+          [vm.vivienda_id, 'PROCESADO', 'PAGADO']
+        );
+
+        for (const g of gastos) {
+          const isParticipante = g.participantes && g.participantes.some(p => p.toLowerCase() === usuario.toLowerCase());
+          const isPagador = g.pagador && g.pagador.toLowerCase() === usuario.toLowerCase();
+          if (!isParticipante && !isPagador) continue;
+
+          const tuParte = g.monto / (g.participantes.length || 1);
+          
+          if (g.status === 'PROCESADO') {
+            if (isParticipante && !isPagador) {
+              const contraparteKey = g.pagador.toLowerCase();
+              if (!acreedoresMap.has(contraparteKey)) {
+                acreedoresMap.set(contraparteKey, {
+                  id: contraparteKey, nombre: g.pagador, avatar: getIniciales(g.pagador),
+                  totalAcreedor: 0, conceptos: [],
+                });
+              }
+              const contraparte = acreedoresMap.get(contraparteKey);
+              contraparte.totalAcreedor = Math.round((contraparte.totalAcreedor + tuParte) * 100) / 100;
+              contraparte.conceptos.push({
+                id: g.id, titulo: g.nombre, sub: 'Vivienda - Gasto', tipo: 'Vivienda',
+                monto: Math.round(tuParte * 100) / 100, esVivienda: true, tipoVivienda: 'gastos',
+                tipoOperacion: 'suma'
+              });
+            } else if (isPagador) {
+              for (const p of g.participantes) {
+                if (p.toLowerCase() === usuario.toLowerCase()) continue;
+                const contraparteKey = p.toLowerCase();
+                if (!acreedoresMap.has(contraparteKey)) {
+                  acreedoresMap.set(contraparteKey, {
+                    id: contraparteKey, nombre: p, avatar: getIniciales(p),
+                    totalAcreedor: 0, conceptos: [],
+                  });
+                }
+                const contraparte = acreedoresMap.get(contraparteKey);
+                contraparte.totalAcreedor = Math.round((contraparte.totalAcreedor - tuParte) * 100) / 100;
+                contraparte.conceptos.push({
+                  id: g.id, titulo: g.nombre, sub: 'Vivienda - Gasto', tipo: 'Vivienda',
+                  monto: Math.round(tuParte * 100) / 100, esVivienda: true, tipoVivienda: 'gastos',
+                  tipoOperacion: 'resta'
+                });
+              }
+            }
+          } else if (g.status === 'PAGADO') {
+            pagosRecientes.push({
+              id: g.id,
+              titulo: g.nombre,
+              sub: 'Vivienda - Gasto',
+              tipo: 'Vivienda',
+              monto: Math.round(tuParte * 100) / 100,
+              fechaDate: g.fecha_pago ? new Date(g.fecha_pago) : new Date(),
+              esVivienda: true,
+              isCompensacion: false
+            });
+          }
+        }
+
+        // Servicios
+        const { rows: servicios } = await pool.query(
+          'SELECT id, nombre, monto, status, is_variable, participantes, fecha_pago FROM vivienda_servicios WHERE vivienda_id = $1 AND (status = $2 OR status = $3 OR status = $4)',
+          [vm.vivienda_id, 'PENDIENTE', 'PROCESADO', 'PAGADO']
+        );
+
+        for (const s of servicios) {
+          const isParticipante = s.participantes && s.participantes.some(p => p.toLowerCase() === usuario.toLowerCase());
+          if (!isParticipante) continue;
+
+          const montoTotal = s.monto || 0;
+          const tuParte = montoTotal / (s.participantes.length || 1);
+
+          if (s.status === 'PROCESADO' || s.status === 'PENDIENTE') {
+            serviciosAPagar.push({
+              id: s.id,
+              titulo: s.nombre,
+              sub: s.status === 'PENDIENTE' ? 'Vivienda (Esperando factura)' : 'Vivienda - Servicio',
+              tipo: 'Vivienda',
+              monto: s.status === 'PENDIENTE' ? null : Math.round(tuParte * 100) / 100,
+              statusOriginal: s.status,
+              esVivienda: true,
+              tipoVivienda: 'servicios',
+              isVariable: s.is_variable
+            });
+          } else if (s.status === 'PAGADO') {
+            pagosRecientes.push({
+              id: s.id,
+              titulo: s.nombre,
+              sub: 'Vivienda - Servicio',
+              tipo: 'Vivienda',
+              monto: Math.round(tuParte * 100) / 100,
+              fechaDate: s.fecha_pago ? new Date(s.fecha_pago) : new Date(),
+              esVivienda: true,
+              isCompensacion: false
+            });
+          }
+        }
+      }
+    }
+
+    // 3. Cargar Compensaciones Históricas desde notificaciones
+    const { rows: compensaciones } = await pool.query(
+      `SELECT n.id::text, n.titulo, n.cuerpo, n.creada_en, n.payload
+       FROM notificaciones_usuario n
+       JOIN usuarios u ON u.id = n.usuario_id
+       WHERE LOWER(u.name) = LOWER($1) AND n.payload->>'type' = 'compensacion'`,
+      [usuario]
+    );
+
+    for (const c of compensaciones) {
+      let pLoad = c.payload;
+      if (typeof pLoad === 'string') {
+        try { pLoad = JSON.parse(pLoad); } catch(e) {}
+      }
+      pagosRecientes.push({
+        id: c.id,
+        titulo: c.titulo,
+        sub: c.cuerpo,
+        tipo: 'Compensacion',
+        monto: pLoad?.neto ? Number(pLoad.neto) : 0,
+        fechaDate: new Date(c.creada_en),
+        esVivienda: false,
+        isCompensacion: true,
+        gastosAFavor: pLoad?.gastosAFavor ? Number(pLoad.gastosAFavor) : 0,
+        gastosEnContra: pLoad?.gastosEnContra ? Number(pLoad.gastosEnContra) : 0,
+        contraparte: pLoad?.contraparte || ''
+      });
+    }
+
+    // Ordenar y formatear pagos recientes
+    pagosRecientes.sort((a, b) => b.fechaDate.getTime() - a.fechaDate.getTime());
+    const pagosRecientesFormateados = pagosRecientes.map(p => {
+      const pad = (n) => n.toString().padStart(2, '0');
+      const formattedDate = `${pad(p.fechaDate.getDate())}/${pad(p.fechaDate.getMonth() + 1)}/${p.fechaDate.getFullYear()}`;
+      const { fechaDate, ...rest } = p;
+      return { ...rest, fecha: formattedDate, fecha_pago: p.fechaDate.toISOString() };
+    });
+
+    // No filtrar por totalAcreedor >= 0 para permitir que el acreedor (con saldo a favor) vea la deuda.
+    const acreedoresFiltrados = Array.from(acreedoresMap.values()).filter(a => a.conceptos.length > 0);
+
+    res.json({ 
+      ok: true, 
+      data: {
+        acreedores: acreedoresFiltrados,
+        serviciosAPagar,
+        pagosRecientes: pagosRecientesFormateados
+      }
+    });
   } catch (err) {
     next(err);
   }
@@ -106,9 +311,9 @@ async function pagarDeuda(req, res, next) {
     const fecha = new Date().toISOString().split('T')[0];
 
     await pool.query(
-      `INSERT INTO juntada_pagos_deudas (id, juntada_id, de, para, monto, fecha)
-       VALUES ($1, $2, $3, $4, $5, $6)`,
-      [id, juntadaId, de, para, Number(monto), fecha]
+      `INSERT INTO juntada_pagos_deudas (id, juntada_id, de, para, monto)
+       VALUES ($1, $2, $3, $4, $5)`,
+      [id, juntadaId, de, para, Number(monto)]
     );
 
     res.status(201).json({ ok: true, data: { id, juntadaId, de, para, monto: Number(monto), fecha } });
@@ -117,4 +322,72 @@ async function pagarDeuda(req, res, next) {
   }
 }
 
-module.exports = { getConsolidado, pagarDeuda };
+async function pagarMultiple(req, res, next) {
+  try {
+    const { items } = req.body;
+    if (!Array.isArray(items)) return res.status(400).json({ ok: false, error: 'items no es un array' });
+
+    for (const item of items) {
+      if (item.esVivienda) {
+        const tabla = item.tipoVivienda === 'gastos' ? 'vivienda_gastos' : 'vivienda_servicios';
+        await pool.query(`UPDATE ${tabla} SET status = 'PAGADO', fecha_pago = NOW() WHERE id::text = $1`, [item.id]);
+      } else {
+        const decoded = decodeConceptoId(item.id);
+        if (decoded) {
+          const { juntadaId, de, para, monto } = decoded;
+          const pid = uuidv4();
+          await pool.query(
+            `INSERT INTO juntada_pagos_deudas (id, juntada_id, de, para, monto) VALUES ($1, $2, $3, $4, $5)`,
+            [pid, juntadaId, de, para, Number(monto)]
+          );
+        }
+      }
+    }
+
+    const { compensacion } = req.body;
+    if (compensacion && compensacion.contraparte) {
+      const deudorNombre = req.user?.name || req.user?.nombre || 'Alguien';
+      const { contraparte, neto, gastosAFavor, gastosEnContra } = compensacion;
+
+      // Notificar a la contraparte (Acreedor)
+      notifyUsersByName(
+        [contraparte],
+        {
+          title: '✅ Recibiste una compensación',
+          body: `${deudorNombre} ha liquidado deudas cruzadas contigo. Saldo neto recibido: $${neto}.`,
+          data: { 
+            type: 'compensacion',
+            neto,
+            contraparte: deudorNombre,
+            gastosAFavor: gastosEnContra ? Number(gastosEnContra) : 0,
+            gastosEnContra: gastosAFavor ? Number(gastosAFavor) : 0
+          }
+        },
+        { category: 'general' }
+      ).catch(console.error);
+
+      // Notificar al deudor (el usuario actual) para el historial
+      notifyUsersByName(
+        [deudorNombre],
+        {
+          title: '🔄 Has reducido tu deuda',
+          body: `Compensación aplicada hoy. Se utilizaron tus gastos para reducir o liquidar tu deuda con ${contraparte}.`,
+          data: { 
+            type: 'compensacion',
+            neto,
+            contraparte,
+            gastosAFavor: gastosAFavor ? Number(gastosAFavor) : 0,
+            gastosEnContra: gastosEnContra ? Number(gastosEnContra) : 0
+          }
+        },
+        { category: 'general' }
+      ).catch(console.error);
+    }
+
+    res.status(201).json({ ok: true, message: 'Pagos procesados' });
+  } catch (err) {
+    next(err);
+  }
+}
+
+module.exports = { getConsolidado, pagarDeuda, pagarMultiple };

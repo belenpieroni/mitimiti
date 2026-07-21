@@ -4,6 +4,8 @@
  * Lógica de negocio central de Miti Miti (Versión Familiar por Consumo)
  */
  
+const { calcularParte } = require('../helpers/mathUtils');
+
 /**
  * Redondea a 2 decimales para evitar errores de punto flotante.
  */
@@ -60,34 +62,61 @@ function calcularBalance(juntada) {
   const pagadoPor = {};
   const correspondePor = {};
 
+  const nombreMap = {};
   participantes.forEach((p) => {
     pagadoPor[p.nombre] = 0;
     correspondePor[p.nombre] = 0;
+    nombreMap[p.nombre.toLowerCase()] = p.nombre;
   });
 
   // 1. PROCESAR CADA GASTO SEGÚN CONSUMO REAL (Checklist de beneficiarios)
   gastos.forEach((g) => {
     // Acreditar el pago a la persona física que puso la plata
-    if (pagadoPor[g.pagador] !== undefined) {
-      pagadoPor[g.pagador] = redondear(pagadoPor[g.pagador] + g.monto);
+    const pagadorNormalizado = g.pagador ? g.pagador.trim().toLowerCase() : '';
+    const pagadorOriginal = nombreMap[pagadorNormalizado];
+    if (pagadorOriginal && pagadoPor[pagadorOriginal] !== undefined) {
+      pagadoPor[pagadorOriginal] = redondear(pagadoPor[pagadorOriginal] + g.monto);
     }
 
     // Sistema de Checklist: si viene el array 'beneficiarios' con gente tildada, se usa.
     // Si no viene (gastos viejos o división total), cae en el fallback de dividir entre todos.
-    const consumidores = g.beneficiarios && g.beneficiarios.length > 0 
+    let consumidores = g.beneficiarios && g.beneficiarios.length > 0 
       ? g.beneficiarios 
       : participantes.map(p => p.nombre);
       
-    if (consumidores.length > 0) {
-      // Costo por cabeza real que consumió este ítem específico
-      const cuotaPorCabeza = g.monto / consumidores.length;
-      
-      consumidores.forEach(nombreConsumidor => {
-        if (correspondePor[nombreConsumidor] !== undefined) {
-          correspondePor[nombreConsumidor] += cuotaPorCabeza;
-        }
-      });
-    }
+    // Normalizar beneficiarios al nombre exacto del participante usando el map (por si difieren en mayúsculas/espacios)
+    consumidores = consumidores
+      .map(c => nombreMap[c ? c.trim().toLowerCase() : ''])
+      .filter(Boolean);
+
+      if (consumidores.length > 0) {
+        // Función segura de división (Evita pérdida de precisión y distribuye centavos)
+        const calcularDivision = (total, cantidad) => {
+          if (cantidad === 0) return [];
+          const totalCentavos = Math.round(total * 100);
+          const cuotaBaseCentavos = Math.floor(totalCentavos / cantidad);
+          let restoCentavos = totalCentavos - (cuotaBaseCentavos * cantidad);
+          
+          const distribucion = [];
+          for (let i = 0; i < cantidad; i++) {
+            let cuota = cuotaBaseCentavos;
+            if (restoCentavos > 0) {
+              cuota += 1;
+              restoCentavos -= 1;
+            }
+            distribucion.push(cuota / 100);
+          }
+          return distribucion;
+        };
+
+        const cuotas = calcularDivision(g.monto, consumidores.length);
+        
+        consumidores.forEach((nombreConsumidor, index) => {
+          if (correspondePor[nombreConsumidor] !== undefined) {
+            correspondePor[nombreConsumidor] += cuotas[index];
+          }
+        });
+      }
   });
 
   // 2. CONSOLIDACIÓN FAMILIAR (El truco mágico)
@@ -169,7 +198,7 @@ function calcularBalance(juntada) {
     saldoPendiente: redondear(saldoPendientePor[s.nombre] || 0),
   }));
  
-  const parteIgual = n > 0 ? redondear(totalGastado / n) : 0;
+  const parteIgual = calcularParte(totalGastado, n);
 
   return {
     totalGastado,
@@ -222,17 +251,23 @@ function calcularLiquidacion(saldos) {
  */
 function calcularBalanceGlobal(nombreParticipante, juntadas) {
   let porCobrar = 0;
-  let porPagar = 0;
+  let porPagar  = 0;
  
   juntadas.forEach((juntada) => {
     const balance = calcularBalance(juntada);
-    const saldo = balance.saldos.find((s) => s.nombre === nombreParticipante);
+    const saldo   = balance.saldos.find((s) => s.nombre.trim().toLowerCase() === nombreParticipante.trim().toLowerCase());
     if (!saldo) return;
 
-    const saldoNeto = typeof saldo.saldoPendiente === 'number' ? saldo.saldoPendiente : saldo.saldo;
- 
-    if (saldoNeto > 0) porCobrar = redondear(porCobrar + saldoNeto);
-    if (saldoNeto < 0) porPagar = redondear(porPagar + Math.abs(saldoNeto));
+    // ✅ Mismo criterio que listarJuntadas: pendiente si existe y != 0, sino bruto.
+    // Evita que saldoPendiente === 0 silencie deudas reales.
+    const saldoPendiente = typeof saldo.saldoPendiente === 'number' ? saldo.saldoPendiente : null;
+    const saldoBruto     = saldo.saldo ?? 0;
+    const saldoNeto      = (saldoPendiente !== null && saldoPendiente !== 0)
+      ? saldoPendiente
+      : saldoBruto;
+
+    if (saldoNeto > 0.01)  porCobrar = redondear(porCobrar + saldoNeto);
+    if (saldoNeto < -0.01) porPagar  = redondear(porPagar  + Math.abs(saldoNeto));
   });
  
   return {

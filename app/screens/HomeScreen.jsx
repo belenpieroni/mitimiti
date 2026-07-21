@@ -1,9 +1,9 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, StyleSheet, ActivityIndicator } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { colors } from '../theme/colors';
-import { listarJuntadas, obtenerBalanceGlobal } from '../services/juntadasService';
+import { listarJuntadas, obtenerBalanceGlobal, subscribeLocalJuntadas } from '../services/juntadasService';
 import { useAuth } from '../context/AuthContext';
 
 const modulos = [
@@ -43,6 +43,13 @@ export default function HomeScreen({ navigation }) {
   const [juntadas, setJuntadas] = useState([]);
   const [cargando, setCargando] = useState(true);
 
+  useEffect(() => {
+    const unsubscribe = subscribeLocalJuntadas((list) => {
+      setJuntadas(list.slice(0, 5));
+    });
+    return unsubscribe;
+  }, []);
+
   const cargarDatos = useCallback(async () => {
     if (!user?.name) return;
     setCargando(true);
@@ -60,9 +67,7 @@ export default function HomeScreen({ navigation }) {
         setBalance(dataBalance);
       }
       
-      if (Array.isArray(dataJuntadas)) {
-        setJuntadas(dataJuntadas.slice(0, 5)); // Top 5 recientes
-      }
+      // Se actualiza a través de la suscripción a subscribeLocalJuntadas
     } catch (err) {
       console.error("Error cargando la Home: ", err);
     } finally {

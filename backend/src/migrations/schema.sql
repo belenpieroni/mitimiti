@@ -148,6 +148,12 @@ ALTER TABLE vivienda_gastos
 ALTER TABLE vivienda_servicios
   ADD COLUMN IF NOT EXISTS vivienda_id UUID REFERENCES viviendas(id) ON DELETE CASCADE;
 
+ALTER TABLE vivienda_gastos
+  ADD COLUMN IF NOT EXISTS acuerdo_id TEXT REFERENCES vivienda_acuerdos(id) ON DELETE SET NULL;
+
+ALTER TABLE vivienda_servicios
+  ADD COLUMN IF NOT EXISTS acuerdo_id TEXT REFERENCES vivienda_acuerdos(id) ON DELETE SET NULL;
+
 ALTER TABLE vivienda_acuerdos
   ADD COLUMN IF NOT EXISTS vivienda_id UUID REFERENCES viviendas(id) ON DELETE CASCADE;
 
@@ -181,3 +187,21 @@ CREATE TABLE IF NOT EXISTS notificaciones_usuario (
 
 CREATE INDEX IF NOT EXISTS idx_notificaciones_usuario_usuario_creada
   ON notificaciones_usuario (usuario_id, creada_en DESC);
+
+-- Servicios con importe variable
+ALTER TABLE vivienda_servicios ALTER COLUMN monto DROP NOT NULL;
+
+ALTER TABLE vivienda_servicios
+  ADD COLUMN IF NOT EXISTS is_variable BOOLEAN NOT NULL DEFAULT FALSE;
+
+ALTER TABLE vivienda_servicios
+  ADD COLUMN IF NOT EXISTS status TEXT NOT NULL DEFAULT 'PROCESADO';
+
+ALTER TABLE vivienda_gastos
+  ADD COLUMN IF NOT EXISTS status TEXT NOT NULL DEFAULT 'PROCESADO';
+
+ALTER TABLE vivienda_gastos
+  ADD COLUMN IF NOT EXISTS fecha_pago TIMESTAMPTZ;
+
+ALTER TABLE vivienda_servicios
+  ADD COLUMN IF NOT EXISTS fecha_pago TIMESTAMPTZ;

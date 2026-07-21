@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet,
   ActivityIndicator, TextInput, Modal, Alert, KeyboardAvoidingView, Platform, Image, Share,
@@ -7,7 +7,7 @@ import { useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { colors } from '../theme/colors';
 import api, { API_URL } from '../services/api';
-import { obtenerJuntada, agregarGasto, eliminarGasto, agregarSubgrupo, editarSubgrupo, eliminarSubgrupo, obtenerInvitacion } from '../services/juntadasService';
+import { obtenerJuntada, agregarGasto, eliminarGasto, agregarSubgrupo, editarSubgrupo, eliminarSubgrupo, obtenerInvitacion, subscribePendingCreation } from '../services/juntadasService';
 import { useAuth } from '../context/AuthContext';
 
 function formatPesos(monto) {
@@ -40,6 +40,13 @@ export default function JuntadaDetalleScreen({ route, navigation }) {
   const [miembrosVisible, setMiembrosVisible]   = useState(false);
   
   const cargarJuntada = useCallback(async () => {
+    if (String(juntadaId).startsWith('temp-')) {
+      if (route.params?.optimisticData) {
+        setJuntada(route.params.optimisticData);
+        setCargando(false);
+      }
+      return;
+    }
     setCargando(true);
     setError(null);
     try {
@@ -49,6 +56,21 @@ export default function JuntadaDetalleScreen({ route, navigation }) {
       setError(e.message);
     } finally {
       setCargando(false);
+    }
+  }, [juntadaId, route.params?.optimisticData]);
+
+  useEffect(() => {
+    if (String(juntadaId).startsWith('temp-')) {
+      const unsubscribe = subscribePendingCreation(juntadaId, (status) => {
+        if (status.success) {
+          const dataJ = status.result?.data?.data || status.result?.data || status.result;
+          navigation.replace('JuntadaDetalle', { juntadaId: dataJ.id });
+        } else {
+          Alert.alert('Error', 'No se pudo crear la juntada en el servidor.');
+          navigation.goBack();
+        }
+      });
+      return unsubscribe;
     }
   }, [juntadaId]);
 
@@ -222,18 +244,19 @@ export default function JuntadaDetalleScreen({ route, navigation }) {
         )}
 
         {/* ── SECCIÓN NUEVA: Saldos Consolidados ─────────────────────────── */}
-        {juntada.saldos && juntada.saldos.length > 0 && (
+        {juntada.balance?.saldos && juntada.balance.saldos.length > 0 && (
           <View style={styles.saldosContainer}>
             <Text style={styles.seccionLabel}>SALDOS CONSOLIDADOS</Text>
             <View style={styles.saldosCard}>
-              {juntada.saldos.map((s, idx) => {
-                const esAFavor = s.monto >= 0; // Arreglado: todo junto
+              {juntada.balance.saldos.map((s, idx) => {
+                const esAFavor = s.saldo >= 0;
+                const montoSaldo = Math.abs(s.saldo);
                 return (
                   <View 
                     key={idx} 
                     style={[
                       styles.saldoRow, 
-                      idx < juntada.saldos.length - 1 && styles.saldoRowBorder
+                      idx < juntada.balance.saldos.length - 1 && styles.saldoRowBorder
                     ]}
                   >
                     <View style={styles.saldoInfoLeft}>
@@ -247,7 +270,7 @@ export default function JuntadaDetalleScreen({ route, navigation }) {
                       <Text style={styles.saldoNombre}>{s.nombre}</Text>
                     </View>
                     <Text style={[styles.saldoMonto, esAFavor ? styles.saldoPositivo : styles.saldoNegativo]}>
-                      {esAFavor ? `A favor: ` : `Debe: `}{formatPesos(s.monto)}
+                      {esAFavor ? `A favor: ` : `Debe: `}{formatPesos(montoSaldo)}
                     </Text>
                   </View>
                 );

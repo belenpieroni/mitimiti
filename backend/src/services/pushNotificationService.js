@@ -8,12 +8,14 @@ const NOTIFICATION_CATEGORIES = {
   NUEVOS_GASTOS: 'nuevos_gastos',
   RECORDATORIOS_VENCIMIENTO: 'recordatorios_vencimiento',
   NUEVAS_JUNTADAS: 'nuevas_juntadas',
+  SERVICIO_VARIABLE: 'servicio_variable',
 };
 
 const PREF_COLUMN_MAP = {
   [NOTIFICATION_CATEGORIES.NUEVOS_GASTOS]: 'notif_nuevos_gastos',
   [NOTIFICATION_CATEGORIES.RECORDATORIOS_VENCIMIENTO]: 'notif_recordatorios_vencimiento',
   [NOTIFICATION_CATEGORIES.NUEVAS_JUNTADAS]: 'notif_nuevas_juntadas',
+  [NOTIFICATION_CATEGORIES.SERVICIO_VARIABLE]: 'notif_recordatorios_vencimiento',
 };
 
 /**

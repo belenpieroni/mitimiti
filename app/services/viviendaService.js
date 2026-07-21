@@ -9,7 +9,9 @@ export const actualizarGastoVivienda = async (id, data) => await api.put(`/vivie
 
 export const getServiciosVivienda = async () => await api.get('/vivienda/servicios');
 export const crearServicioVivienda = async (data) => await api.post('/vivienda/servicios', data);
+export const actualizarServicioVivienda = async (id, data) => await api.put(`/vivienda/servicios/${id}`, data);
 export const eliminarServicioVivienda = async (id) => await api.delete(`/vivienda/servicios/${id}`);
+export const liquidarServicioVivienda = async (id, data) => await api.patch(`/vivienda/servicios/${id}/liquidar`, data);
 
 export const getAcuerdosReparto = async () => await api.get('/vivienda/acuerdos');
 export const guardarAcuerdoReparto = async (data) => await api.post('/vivienda/acuerdos', data);
@@ -20,3 +22,6 @@ export const crearMiVivienda = async (payload = {}) => await api.post('/vivienda
 export const obtenerInvitacionVivienda = async () => await api.get('/vivienda/invitacion');
 export const unirseViviendaViaToken = async (token) => await api.post(`/vivienda/join/${token}`);
 
+export const marcarPagadoVivienda = async (tipo, id) => await api.patch(`/vivienda/${tipo}/${id}/pagar`);
+export const revertirPagoVivienda = async (tipo, id) => await api.patch(`/vivienda/${tipo}/${id}/revertir`);
+export const eliminarGastoVivienda = async (id) => await api.delete(`/vivienda/gastos/${id}`);
