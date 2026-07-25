@@ -10,7 +10,7 @@ services:
     ports:
       - "5432:5432"
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-mitimiti} -d ${DB_NAME:-mitimiti}"]
+      test: [ "CMD-SHELL", "pg_isready -U ${DB_USER:-mitimiti} -d ${DB_NAME:-mitimiti}" ]
       interval: 5s
       timeout: 5s
       retries: 10
@@ -51,6 +51,7 @@ services:
       - backend
     environment:
       EXPO_PUBLIC_API_URL: ${EXPO_PUBLIC_API_URL:-http://localhost:3000/api}
+      REACT_NATIVE_PACKAGER_HOSTNAME: ${REACT_NATIVE_PACKAGER_HOSTNAME:-}
       EXPO_TOKEN: ${EXPO_TOKEN:-}
       EXPO_NO_TELEMETRY: "1"
     ports:

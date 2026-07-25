@@ -7,4 +7,4 @@ if [ ! -d node_modules ] || [ -z "$(ls -A node_modules 2>/dev/null)" ]; then
   npm install --legacy-peer-deps
 fi
 
-exec npm run start:tunnel
+exec npx expo start --lan
