@@ -6,7 +6,7 @@ import api from './api';
 let Notifications = null;
 let notificationHandlerInitialized = false;
 
-function isUnsupportedExpoGoAndroid() {
+export function isExpoGoAndroid() {
   return Constants.appOwnership === 'expo' && Platform.OS === 'android';
 }
 
@@ -15,7 +15,7 @@ export async function getNotificationsModule() {
     return Notifications;
   }
 
-  if (isUnsupportedExpoGoAndroid()) {
+  if (isExpoGoAndroid()) {
     throw new Error(
       'expo-notifications no está disponible en Expo Go Android. Usa un development build o un cliente compatible.'
     );
@@ -43,38 +43,7 @@ export async function getNotificationsModule() {
   return Notifications;
 }
 
-async function getNotificationsModule() {
-  if (Notifications) {
-    return Notifications;
-  }
 
-  if (isUnsupportedExpoGoAndroid()) {
-    throw new Error(
-      'expo-notifications no está disponible en Expo Go Android. Usa un development build o un cliente compatible.'
-    );
-  }
-
-  try {
-    Notifications = await import('expo-notifications');
-  } catch (error) {
-    throw new Error(
-      'No se pudo cargar expo-notifications. Asegurate de usar un development build o un cliente compatible.'
-    );
-  }
-
-  if (!notificationHandlerInitialized) {
-    Notifications.setNotificationHandler({
-      handleNotification: async () => ({
-        shouldShowAlert: true,
-        shouldPlaySound: true,
-        shouldSetBadge: false,
-      }),
-    });
-    notificationHandlerInitialized = true;
-  }
-
-  return Notifications;
-}
 
 function getProjectId() {
   return (
