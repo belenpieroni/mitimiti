@@ -128,9 +128,26 @@ async function getConsolidado(req, res, next) {
       );
 
       if (vm) {
+        // Consultar los porcentajes de todos los acuerdos de esta vivienda
+        const { rows: acuerdosPart } = await pool.query(
+          `SELECT ap.acuerdo_id, ap.nombre, ap.porcentaje
+           FROM acuerdo_participantes ap
+           JOIN vivienda_acuerdos va ON va.id = ap.acuerdo_id
+           WHERE va.vivienda_id = $1`,
+          [vm.vivienda_id]
+        );
+
+        const acuerdoMap = {};
+        for (const ap of acuerdosPart) {
+          if (!acuerdoMap[ap.acuerdo_id]) {
+            acuerdoMap[ap.acuerdo_id] = {};
+          }
+          acuerdoMap[ap.acuerdo_id][ap.nombre.toLowerCase()] = Number(ap.porcentaje);
+        }
+
         // Gastos
         const { rows: gastos } = await pool.query(
-          'SELECT id, nombre, pagador, monto, status, fecha_pago, participantes FROM vivienda_gastos WHERE vivienda_id = $1 AND (status = $2 OR status = $3)',
+          'SELECT id, nombre, pagador, monto, status, fecha_pago, participantes, acuerdo_id FROM vivienda_gastos WHERE vivienda_id = $1 AND (status = $2 OR status = $3)',
           [vm.vivienda_id, 'PROCESADO', 'PAGADO']
         );
 
@@ -139,7 +156,17 @@ async function getConsolidado(req, res, next) {
           const isPagador = g.pagador && g.pagador.toLowerCase() === usuario.toLowerCase();
           if (!isParticipante && !isPagador) continue;
 
-          const tuParte = g.monto / (g.participantes.length || 1);
+          // Helper para obtener la parte correspondiente a un participante dado
+          const getParteGasto = (nombreParticipante) => {
+            if (g.acuerdo_id && acuerdoMap[g.acuerdo_id]) {
+              const pct = acuerdoMap[g.acuerdo_id][nombreParticipante.toLowerCase()] || 0;
+              return (Number(g.monto) * pct) / 100;
+            } else {
+              return Number(g.monto) / (g.participantes.length || 1);
+            }
+          };
+
+          const tuParte = getParteGasto(usuario);
           
           if (g.status === 'PROCESADO') {
             if (isParticipante && !isPagador) {
@@ -167,11 +194,12 @@ async function getConsolidado(req, res, next) {
                     totalAcreedor: 0, conceptos: [],
                   });
                 }
+                const parteDeP = getParteGasto(p);
                 const contraparte = acreedoresMap.get(contraparteKey);
-                contraparte.totalAcreedor = Math.round((contraparte.totalAcreedor - tuParte) * 100) / 100;
+                contraparte.totalAcreedor = Math.round((contraparte.totalAcreedor - parteDeP) * 100) / 100;
                 contraparte.conceptos.push({
                   id: g.id, titulo: g.nombre, sub: 'Vivienda - Gasto', tipo: 'Vivienda',
-                  monto: Math.round(tuParte * 100) / 100, esVivienda: true, tipoVivienda: 'gastos',
+                  monto: Math.round(parteDeP * 100) / 100, esVivienda: true, tipoVivienda: 'gastos',
                   tipoOperacion: 'resta'
                 });
               }
@@ -192,7 +220,7 @@ async function getConsolidado(req, res, next) {
 
         // Servicios
         const { rows: servicios } = await pool.query(
-          'SELECT id, nombre, monto, status, is_variable, participantes, fecha_pago FROM vivienda_servicios WHERE vivienda_id = $1 AND (status = $2 OR status = $3 OR status = $4)',
+          'SELECT id, nombre, monto, status, is_variable, participantes, fecha_pago, acuerdo_id FROM vivienda_servicios WHERE vivienda_id = $1 AND (status = $2 OR status = $3 OR status = $4)',
           [vm.vivienda_id, 'PENDIENTE', 'PROCESADO', 'PAGADO']
         );
 
@@ -201,7 +229,13 @@ async function getConsolidado(req, res, next) {
           if (!isParticipante) continue;
 
           const montoTotal = s.monto || 0;
-          const tuParte = montoTotal / (s.participantes.length || 1);
+          let tuParte = 0;
+          if (s.acuerdo_id && acuerdoMap[s.acuerdo_id]) {
+            const pct = acuerdoMap[s.acuerdo_id][usuario.toLowerCase()] || 0;
+            tuParte = (montoTotal * pct) / 100;
+          } else {
+            tuParte = montoTotal / (s.participantes.length || 1);
+          }
 
           if (s.status === 'PROCESADO' || s.status === 'PENDIENTE') {
             serviciosAPagar.push({

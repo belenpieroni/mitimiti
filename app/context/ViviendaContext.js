@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useCallback } from 'react';
-import { getAcuerdosReparto, guardarAcuerdoReparto } from '../services/viviendaService';
+import { getAcuerdosReparto, guardarAcuerdoReparto, actualizarAcuerdoReparto } from '../services/viviendaService';
 
 const ViviendaContext = createContext();
 
@@ -15,6 +15,7 @@ export function ViviendaProvider({ children }) {
       participantes: (item.participantes ?? []).map((p) => ({
         nombre: p?.nombre ?? 'Sin nombre',
         porcentaje: Number(p?.porcentaje ?? 0),
+        sueldo: p?.sueldo != null ? Number(p.sueldo) : null,
       })),
     })), []);
 
@@ -46,8 +47,17 @@ export function ViviendaProvider({ children }) {
     }
   }, [cargarAcuerdos]);
 
+  const actualizarRegla = useCallback(async (id, nuevaRegla) => {
+    try {
+      await actualizarAcuerdoReparto(id, nuevaRegla);
+      await cargarAcuerdos();
+    } catch (e) {
+      console.error('Error actualizando regla:', e);
+    }
+  }, [cargarAcuerdos]);
+
   return (
-    <ViviendaContext.Provider value={{ reglas, setReglas, cargando, agregarRegla, recargar: cargarAcuerdos }}>
+    <ViviendaContext.Provider value={{ reglas, setReglas, cargando, agregarRegla, actualizarRegla, recargar: cargarAcuerdos }}>
       {children}
     </ViviendaContext.Provider>
   );

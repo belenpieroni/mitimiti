@@ -205,3 +205,15 @@ ALTER TABLE vivienda_gastos
 
 ALTER TABLE vivienda_servicios
   ADD COLUMN IF NOT EXISTS fecha_pago TIMESTAMPTZ;
+
+ALTER TABLE vivienda_acuerdos
+  ADD COLUMN IF NOT EXISTS activo BOOLEAN NOT NULL DEFAULT TRUE;
+
+ALTER TABLE acuerdo_participantes
+  ADD COLUMN IF NOT EXISTS sueldo NUMERIC(12,2);
+
+ALTER TABLE vivienda_servicios
+  ADD COLUMN IF NOT EXISTS imagen_url TEXT;
+
+
+
