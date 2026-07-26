@@ -65,20 +65,16 @@ export default function AgregarGastoScreen({ route, navigation }) {
     }
   }
 
-  // Tildar o destildar un subgrupo familiar entero
   function toggleFamiliaCompleta(integrantes) {
     const todosTildados = integrantes.every(i => seleccionados.includes(i));
     if (todosTildados) {
-      // Si estaban todos, removemos a todos los integrantes de este grupo
       setSeleccionados(seleccionados.filter(n => !integrantes.includes(n)));
     } else {
-      // Si faltaba alguno, agregamos los que no estén seleccionados todavía
       const nuevos = integrantes.filter(i => !seleccionados.includes(i));
       setSeleccionados([...seleccionados, ...nuevos]);
     }
   }
 
-  // Separar los participantes que no tienen familia asignada ("Sueltos")
   const integrantesEnGrupos = (juntada?.subgrupos || []).flatMap(sg => sg.integrantes || []);
   const participantesSueltos = participantes.filter(p => !integrantesEnGrupos.includes(p.nombre));
 
@@ -161,7 +157,6 @@ export default function AgregarGastoScreen({ route, navigation }) {
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
         >
-          {/* Monto Principal */}
           <View style={styles.montoSection}>
             <Text style={styles.montoLabel}>$</Text>
             <TextInput
@@ -175,7 +170,6 @@ export default function AgregarGastoScreen({ route, navigation }) {
             />
           </View>
 
-          {/* Botón Escanear Ticket (OCR) */}
           <TouchableOpacity 
             style={[styles.btnEscanearTicket, adjuntoTicket && styles.btnEscanearTicketActivo]}
             onPress={() => setMostrarOCR(true)}
@@ -195,7 +189,6 @@ export default function AgregarGastoScreen({ route, navigation }) {
             )}
           </TouchableOpacity>
 
-          {/* Concepto */}
           <Text style={styles.label}>CONCEPTO</Text>
           <View style={styles.fieldBox}>
             <TextInput
@@ -208,7 +201,6 @@ export default function AgregarGastoScreen({ route, navigation }) {
             />
           </View>
 
-          {/* Pagado por */}
           <Text style={styles.label}>PAGADO POR</Text>
           <TouchableOpacity
             style={styles.pagadorCard}
@@ -469,7 +461,6 @@ const styles = StyleSheet.create({
     backgroundColor: colors.background,
   },
   
-  // Header Figma Style
   header: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -500,7 +491,6 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
 
-  // Monto (Gigante al centro)
   montoSection: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -524,7 +514,6 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
 
-  // OCR Button
   btnEscanearTicket: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -549,7 +538,6 @@ const styles = StyleSheet.create({
     color: colors.primary,
   },
 
-  // Inputs & Labels genéricos
   label: {
     fontSize: 11,
     fontWeight: '700',
@@ -576,7 +564,6 @@ const styles = StyleSheet.create({
     padding: 0,
   },
 
-  // Pagador
   pagadorCard: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -631,7 +618,6 @@ const styles = StyleSheet.create({
     color: colors.textPrimary,
   },
 
-  // Método de División
   metodosContainer: {
     flexDirection: 'row',
     gap: 12,
@@ -659,7 +645,6 @@ const styles = StyleSheet.create({
     color: colors.textPrimary,
   },
 
-  // Dividir entre...
   dividirEntreHeader: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -672,7 +657,6 @@ const styles = StyleSheet.create({
     color: colors.primary,
   },
   
-  // Agrupación Familiar e Interfaz Checklist
   checklistContainer: {
     gap: 14,
     marginBottom: 12,
@@ -745,7 +729,6 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
 
-  // Subgrupos list (Modo División por Familias puro)
   subgruposListDivision: {
     gap: 12,
     marginBottom: 24,
@@ -780,7 +763,6 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
 
-  // Botón Principal
   btnGuardarGasto: {
     backgroundColor: colors.primary,
     borderRadius: 16,

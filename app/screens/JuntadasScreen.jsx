@@ -6,13 +6,11 @@ import { colors } from '../theme/colors';
 import { listarJuntadas, subscribeLocalJuntadas } from '../services/juntadasService';
 import { useAuth } from '../context/AuthContext';
 
-// ── Colores disponibles para asignar a participantes ──────────────────────────
 export const coloresDisponibles = [
   '#473472', '#526D82', '#9DB2BF', '#42b271',
   '#c084fc', '#f97316', '#ec6c6a', '#38bdf8',
 ];
 
-// ── Helpers ───────────────────────────────────────────────────────────────────
 export function getIniciales(nombre) {
   if (!nombre) return '??';
   const partes = nombre.trim().split(' ');
@@ -44,7 +42,6 @@ function AvatarStack({ personas }) {
   );
 }
 
-// ── Componente ────────────────────────────────────────────────────────────────
 export default function JuntadasScreen({ navigation }) {
   const { user } = useAuth(); 
   const [juntadas, setJuntadas] = useState([]);
@@ -69,8 +66,7 @@ export default function JuntadasScreen({ navigation }) {
     setCargando(true);
     setError(null);
     try {
-      const response = await listarJuntadas(nombreUsuario); 
-      // Se actualiza a través de la suscripción a subscribeLocalJuntadas
+      await listarJuntadas(nombreUsuario); 
     } catch (e) {
       console.error("Error cargando juntadas:", e);
       setError('No se pudo conectar con el servidor.');
@@ -85,7 +81,6 @@ export default function JuntadasScreen({ navigation }) {
     }, [cargarJuntadas])
   );
 
-  // ── Render estados ────────────────────────────────────────────────────────
   if (cargando) {
     return (
       <View style={[styles.container, styles.centrado]}>
@@ -190,7 +185,6 @@ export default function JuntadasScreen({ navigation }) {
   );
 }
 
-// ── Estilos ──────────────────────────────────────────────────────────────────
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background },
   centrado: { flex: 1, justifyContent: 'center', alignItems: 'center', gap: 12, padding: 32 },

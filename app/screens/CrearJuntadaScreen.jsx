@@ -49,7 +49,6 @@ export default function CrearJuntadaScreen({ navigation, route }) {
       return;
     }
 
-    // En iOS algunos builds pueden no informar event.type
     if (!tipo && selectedDate) {
       setFecha(selectedDate);
       setShowPicker(false);
@@ -67,7 +66,6 @@ export default function CrearJuntadaScreen({ navigation, route }) {
       const mensaje = `¡Te invito a unirte a "${juntadaNombre}" en MitiMiti!\n\nHacé clic acá para sumarte: ${invitacion.deepLink}`;
       await Share.share({ message: mensaje, title: 'Invitación a juntada' });
     } catch (e) {
-      // share cancelado o error silencioso
     }
   }
 
@@ -85,7 +83,6 @@ export default function CrearJuntadaScreen({ navigation, route }) {
         const tempId = 'temp-' + Date.now();
         const pcolor = '#473472';
         
-        // Objeto optimista para la UI local
         const optimistic = {
           id: tempId,
           nombre: nombre.trim(),
@@ -117,21 +114,17 @@ export default function CrearJuntadaScreen({ navigation, route }) {
           isOptimistic: true,
         };
 
-        // 1. Agregar localmente al caché para el Dashboard
         const currentList = getLocalJuntadas();
         setLocalJuntadas([optimistic, ...currentList]);
 
-        // 2. Disparar creación en background
         const promise = crearJuntadaService({
           nombre: nombre.trim(),
           descripcion: descripcion.trim(),
         });
         registerPendingCreation(tempId, promise);
 
-        // 3. Ir al detalle optimista
         navigation.replace('JuntadaDetalle', { juntadaId: tempId, optimisticData: optimistic });
 
-        // 4. Manejo de resolución/reversión
         promise.then(
           (nuevaJuntada) => {
             const dataJ = nuevaJuntada?.data?.data || nuevaJuntada?.data || nuevaJuntada;
@@ -139,12 +132,10 @@ export default function CrearJuntadaScreen({ navigation, route }) {
               j.id === tempId ? { ...j, id: dataJ.id, isOptimistic: false } : j
             );
             setLocalJuntadas(updated);
-            // Ejecutar compartir en background tras confirmación del servidor
             setTimeout(() => compartirEnlace(dataJ.id, dataJ.nombre), 600);
           },
           (err) => {
             console.error('Error creando juntada:', err);
-            // Reversión: Quitar del caché si falla para evitar "juntada fantasma"
             const updated = getLocalJuntadas().filter(j => j.id !== tempId);
             setLocalJuntadas(updated);
           }
@@ -164,7 +155,6 @@ export default function CrearJuntadaScreen({ navigation, route }) {
     >
       <View style={styles.container}>
 
-        {/* Header */}
         <View style={styles.header}>
           <TouchableOpacity style={styles.btnVolver} onPress={() => navigation.goBack()}>
             <Ionicons name="chevron-back" size={22} color={colors.textPrimary} />
@@ -212,7 +202,6 @@ export default function CrearJuntadaScreen({ navigation, route }) {
             />
           )}
 
-          {/* Info card sobre el sistema de invitaciones */}
           {!editando && (
             <View style={styles.infoCard}>
               <Ionicons name="link-outline" size={20} color={colors.primary} />

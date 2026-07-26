@@ -20,7 +20,6 @@ import {
   marcarPagadoVivienda,
   eliminarGastoVivienda
 } from '../../services/viviendaService';
-// ─── Colores para Avatares ────────────────────────────────────────────────────
 const coloresDisponibles = [
   '#473472', '#526D82', '#9DB2BF', '#42b271',
   '#c084fc', '#f97316', '#ec6c6a', '#38bdf8',
@@ -66,7 +65,6 @@ function AvatarStack({ personas = [] }) {
   );
 }
 
-// ─── Mapa de íconos por nombre de servicio ────────────────────────────────────
 const ICONS_MAP = {
   'Netflix': 'tv-outline',
   'Spotify': 'musical-notes-outline',
@@ -90,14 +88,12 @@ const GASTO_ICONS_MAP = {
   'Otras categorías': 'pricetag-outline',
 };
 
-// ─── Mapa de modelo (string) → { label, icon } ───────────────────────────────
 const MODELO_MAP = {
   proporcional: { label: 'Proporcional', icon: 'bar-chart-outline' },
   partes_iguales: { label: 'Partes iguales', icon: 'scale-outline' },
   responsable_unico: { label: 'Resp. único', icon: 'person-outline' },
 };
 
-// ─── Opciones del dropdown de categorías ─────────────────────────────────────
 const CATEGORIAS = [
   { label: 'Agua', icon: 'water-outline' },
   { label: 'Factura de Luz', icon: 'flash-outline' },
@@ -107,14 +103,12 @@ const CATEGORIAS = [
   { label: 'Otro', icon: 'receipt-outline' },
 ];
 
-// ─── Modelos de división ──────────────────────────────────────────────────────
 const MODELOS = [
   { label: 'Partes iguales', icon: 'scale-outline', value: 'partes_iguales' },
   { label: 'Proporcional', icon: 'bar-chart-outline', value: 'proporcional' },
   { label: 'Resp. único', icon: 'person-outline', value: 'responsable_unico' },
 ];
 
-// ─── Estado inicial del formulario ────────────────────────────────────────────
 const buildFormInicial = (integrantesIniciales = ['Yo']) => {
   const form = {
     integrantes: [...integrantesIniciales],
@@ -138,13 +132,11 @@ export default function ViviendaDashboard({ navigation }) {
   const [liquidarVisible, setLiquidarVisible] = useState(false);
   const [servicioALiquidar, setServicioALiquidar] = useState(null);
 
-  // Modal Acuerdos
   const [modalAcuerdosVisible, setModalAcuerdosVisible] = useState(false);
   const [vistaFormulario, setVistaFormulario] = useState(false);
   const { reglas, agregarRegla, actualizarRegla, recargar } = useVivienda();
   const [editandoAcuerdoId, setEditandoAcuerdoId] = useState(null);
 
-  // Formulario "Nuevo Acuerdo"
   const [form, setForm] = useState(buildFormInicial([integranteInicial]));
   const [modalInicioViviendaVisible, setModalInicioViviendaVisible] = useState(false);
   const [modalMiembrosVisible, setModalMiembrosVisible] = useState(false);
@@ -153,7 +145,6 @@ export default function ViviendaDashboard({ navigation }) {
 
   const [cargando, setCargando] = useState(true);
 
-  // ── Data ──────────────────────────────────────────────────────────────────
   useFocusEffect(
     React.useCallback(() => {
       cargarData();
@@ -237,7 +228,6 @@ export default function ViviendaDashboard({ navigation }) {
     });
   };
 
-  // ── Handlers: Proporcional ────────────────────────────────────────────────
   const updateProporcional = (nombre, campo, valor) => {
     setForm(f => {
       const nuevoProp = {
@@ -271,7 +261,6 @@ export default function ViviendaDashboard({ navigation }) {
     });
   };
 
-  // ── Handlers: Modal Acuerdos ──────────────────────────────────────────────
   const cerrarModalAcuerdos = () => {
     setModalAcuerdosVisible(false);
     setVistaFormulario(false);
@@ -380,7 +369,6 @@ export default function ViviendaDashboard({ navigation }) {
   };
 
 
-  // ─── Render ───────────────────────────────────────────────────────────────
   return (
     <View style={styles.container}>
       <ScrollView contentContainerStyle={styles.scroll}>
@@ -843,7 +831,6 @@ export default function ViviendaDashboard({ navigation }) {
               </View>
 
               {vistaFormulario ? (
-                /* ── VISTA FORMULARIO ────────────────────────────────────── */
                 <ScrollView
                   showsVerticalScrollIndicator={false}
                   keyboardShouldPersistTaps="handled"
@@ -982,7 +969,6 @@ export default function ViviendaDashboard({ navigation }) {
                 </ScrollView>
 
               ) : (
-                /* ── VISTA LISTA ─────────────────────────────────────────── */
                 <View style={{ width: '100%' }}>
                   {reglas.length === 0 ? (
                     <View style={styles.emptyState}>
@@ -995,7 +981,6 @@ export default function ViviendaDashboard({ navigation }) {
                       style={{ width: '100%', maxHeight: 300 }}
                     >
                       {reglas.map((regla) => {
-                        // Aseguramos valores por defecto para evitar errores de renderizado
                         const modeloKey = regla.modelo ?? 'partes_iguales';
                         const modeloObj = MODELO_MAP[modeloKey] ?? {
                           label: modeloKey,
@@ -1140,7 +1125,6 @@ export default function ViviendaDashboard({ navigation }) {
   );
 }
 
-// ─── Estilos ─────────────────────────────────────────────────────────────────
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background },
   scroll: { padding: 20, paddingTop: 56, paddingBottom: 100 },

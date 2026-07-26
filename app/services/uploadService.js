@@ -23,7 +23,6 @@ export const uploadTicketPhoto = async (imageUri) => {
     const uploadResponse = await fetch(`${API_URL}/api/uploads`, {
       method: 'POST',
       body: formData,
-      // No seteamos Content-Type manualmente: RN arma el boundary solo.
     });
 
     if (!uploadResponse.ok) {

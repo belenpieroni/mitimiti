@@ -63,7 +63,6 @@ export default function SalidasPorCategoriaScreen({ navigation }) {
 
   const total = gastosFiltrados.reduce((sum, g) => sum + g.monto, 0);
 
-  // Donut Chart
   const size = 200;
   const strokeWidth = 30;
   const radius = (size - strokeWidth) / 2;

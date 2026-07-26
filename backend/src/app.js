@@ -16,13 +16,11 @@ const authRouter = require('./routes/auth');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// ── Middlewares globales ──────────────────────────────────────────────────────
-app.use(cors());                        // Permite peticiones desde la app Expo
-app.use(express.json());                // Parsea body JSON
+app.use(cors());
+app.use(express.json());
 const uploadsDir = process.env.UPLOADS_DIR || path.join(__dirname, 'uploads');
 app.use('/uploads', express.static(uploadsDir));
 
-// ── Rutas ─────────────────────────────────────────────────────────────────────
 app.get('/', (req, res) => {
   res.json({ ok: true, mensaje: 'Miti Miti API v1 — Módulo Juntadas' });
 });
@@ -36,7 +34,6 @@ app.use('/api/uploads', uploadsRouter);
 app.use('/api/auth', authRouter);
 app.use('/api/perfiles', perfilesRoutes);
 
-// ── Manejo de errores ─────────────────────────────────────────────────────────
 app.use(notFound);
 app.use(errorHandler);
 
@@ -44,7 +41,6 @@ app._router.stack.forEach(r => {
   if (r.name === 'router') console.log('Router registrado:', r.regexp);
 });
 
-// ── Arranque ──────────────────────────────────────────────────────────────────
 async function start() {
   await inicializarDB();
   app.listen(PORT, () => {

@@ -75,7 +75,6 @@ export default function HistorialCompletoScreen({ navigation, route }) {
     cargarHistorial(false);
   }, [token]);
 
-  // Agrupar por fecha larga
   const gruposPagos = [];
   pagos.forEach(pago => {
     const { fecha } = formatearFechaLarga(pago.fecha_pago);

@@ -1,6 +1,5 @@
 import { NativeModules, Platform } from 'react-native';
 
-// Módulo de token de autenticación (actualizado desde AppNavigator al iniciar sesión)
 let _authToken = null;
 export function setAuthToken(token) { _authToken = token; }
 export function getAuthToken() { return _authToken; }

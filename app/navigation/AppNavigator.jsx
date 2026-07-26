@@ -298,8 +298,6 @@ export default function AppNavigator() {
   );
 }
 
-// ── Estilos ──────────────────────────────────────────────────────────────────
-
 const styles = StyleSheet.create({
   botonMasContainer: {
     flex: 1,

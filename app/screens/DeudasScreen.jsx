@@ -63,13 +63,11 @@ export default function DeudasScreen({ navigation }) {
   const [showFinancialDetail, setShowFinancialDetail] = useState(false);
   const [expandedCompId, setExpandedCompId] = useState(null);
   
-  // Estados inicializados vacíos para consumir del backend
   const [pendientes, setPendientes] = useState([]);
   const [serviciosAPagar, setServiciosAPagar] = useState([]);
   const [pagosRecientes, setPagosRecientes] = useState([]);
   const [uncheckedItems, setUncheckedItems] = useState(new Set());
 
-  // Función para obtener datos del backend
   const cargarDeudas = async () => {
     const nombreUsuario = user?.name || user?.nombre;
     if (!nombreUsuario) {
@@ -89,7 +87,6 @@ export default function DeudasScreen({ navigation }) {
         throw new Error(data?.error || 'No se pudo conectar al servidor');
       }
 
-      // Si data.data es un array, es el formato viejo. Si es objeto, es el nuevo.
       if (Array.isArray(data.data)) {
         setPendientes(data.data);
       } else {

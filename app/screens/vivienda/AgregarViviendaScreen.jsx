@@ -13,7 +13,6 @@ import {
 } from '../../services/viviendaService';
 import { useAuth } from '../../context/AuthContext';
 
-// ─── Constants ────────────────────────────────────────────────────────────────
 
 const FRECUENCIAS = ['Semanal', 'Quincenal', 'Mensual', 'Bimestral', 'Semestral', 'Anual'];
 
@@ -32,7 +31,6 @@ const coloresDisponibles = [
   '#c084fc', '#f97316', '#ec6c6a', '#38bdf8',
 ];
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
 
 function iniciales(nombre = '') {
   return nombre.trim().split(/\s+/).map(n => n[0] ?? '').join('').toUpperCase().slice(0, 2);
@@ -93,7 +91,6 @@ function calcularDivision(total, regla) {
   }));
 }
 
-// ─── Sub-components ───────────────────────────────────────────────────────────
 
 function ReglaCard({ regla, onEditarRegla }) {
   if (!regla) return null;
@@ -195,7 +192,6 @@ function CalculoGastoPuntualEnTiempoReal({ total, participantes }) {
   );
 }
 
-// ─── Selector de fecha cross-platform ────────────────────────────────────────
 
 function FechaVencimientoSelector({ fecha, onChange }) {
   const [mostrarPicker, setMostrarPicker] = useState(false);
@@ -203,18 +199,15 @@ function FechaVencimientoSelector({ fecha, onChange }) {
   const dateValue = (fecha instanceof Date) ? fecha : new Date();
 
 const handleChange = (event, selectedDate) => {
-    // Si el usuario cancela, cerramos y no hacemos nada más
     if (event.type === 'dismissed') {
       setMostrarPicker(false);
       return;
     }
 
-    // 2. Si hay fecha seleccionada, la guardamos
     if (selectedDate) {
       onChange(selectedDate);
     }
 
-    // 3. Cerramos picker solo en Android
     if (Platform.OS === 'android') {
       setMostrarPicker(false);
     }
@@ -306,11 +299,6 @@ export default function AgregarViviendaScreen({ route, navigation }) {
   const [miembrosVivienda, setMiembrosVivienda] = useState([]);
   const [participantesGasto, setParticipantesGasto] = useState([]);
 
-  // ── FECHA DE VENCIMIENTO: estado propio, separado de new Date() ───────────
-  // El bug original usaba siempre new Date() al guardar en lugar del valor
-  // elegido por el usuario. Ahora se inicializa en null y solo se setea
-  // cuando el usuario selecciona una fecha en el picker.
-  // 1. Inicialización
   const [fechaVencimiento, setFechaVencimiento] = useState(new Date());
 
   useEffect(() => {
@@ -320,10 +308,8 @@ export default function AgregarViviendaScreen({ route, navigation }) {
         if (mv && mv.miembros) {
           const names = mv.miembros.map(m => m.name);
           setMiembrosVivienda(names);
-          // For a new Gasto, default to all members participating
           if (!editMode && !esServicio) {
             setParticipantesGasto(names);
-            // Default pagador to current user if they are in the list, or the first member
             const defaultPagador = (user && user.name && names.includes(user.name)) 
               ? user.name 
               : (names[0] || '');
@@ -337,7 +323,6 @@ export default function AgregarViviendaScreen({ route, navigation }) {
     loadVivienda();
   }, [editMode, esServicio, user]);
 
-  // ── Carga en modo edición ──────────────────────────────────────────────────
   useEffect(() => {
     if (editMode && data) {
       setEsServicio(!!data.periodicidad);
@@ -369,7 +354,6 @@ export default function AgregarViviendaScreen({ route, navigation }) {
     }
   }, [editMode, data, reglas]);
 
-  // ── Sincronización de Pagador con Participantes Activos ────────────────────
   useEffect(() => {
     if (!esServicio && pagador && !participantesGasto.includes(pagador)) {
       setPagador('');
@@ -495,7 +479,6 @@ export default function AgregarViviendaScreen({ route, navigation }) {
     }
   };
 
-  // ─── Render ───────────────────────────────────────────────────────────────
   return (
     <KeyboardAvoidingView
       style={{ flex: 1 }}
@@ -737,7 +720,6 @@ export default function AgregarViviendaScreen({ route, navigation }) {
                 <TouchableOpacity
                   key={i}
                   onPress={() => {
-                    // Exclusion control
                     setParticipantesGasto(prev => prev.filter(n => n !== nombre));
                   }}
                   style={styles.avatarWrapper}
@@ -757,7 +739,6 @@ export default function AgregarViviendaScreen({ route, navigation }) {
                   <TouchableOpacity
                     key={`excluido-${i}`}
                     onPress={() => {
-                      // Add participant back
                       setParticipantesGasto(prev => [...prev, nombre]);
                     }}
                     style={styles.avatarWrapper}
@@ -901,7 +882,6 @@ export default function AgregarViviendaScreen({ route, navigation }) {
   );
 }
 
-// ─── Styles ───────────────────────────────────────────────────────────────────
 
 const styles = StyleSheet.create({
   container:        { flex: 1, backgroundColor: colors.background },

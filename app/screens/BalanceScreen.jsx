@@ -10,7 +10,6 @@ function formatPesos(monto) {
   return '$' + Math.abs(monto).toLocaleString('es-AR');
 }
 
-// Toast Component
 const Toast = ({ visible, message, type }) => {
   const translateY = useRef(new Animated.Value(-100)).current;
 
@@ -78,7 +77,6 @@ export default function BalanceScreen({ route, navigation }) {
     ...[useCallback(() => { cargarBalance(); }, [cargarBalance])]
   );
 
-  // Helper para buscar datos del avatar (color e iniciales) de la familia o persona
   const getGrupoInfo = (nombre) => {
     if (!balance || !balance.saldos) return { iniciales: nombre.slice(0, 2).toUpperCase(), color: colors.primary };
     const grupo = balance.saldos.find(s => s.nombre === nombre);
@@ -109,7 +107,6 @@ export default function BalanceScreen({ route, navigation }) {
     <View style={styles.container}>
       <Toast visible={toast.visible} message={toast.message} type={toast.type} />
       
-      {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity style={styles.btnVolver} onPress={() => navigation.goBack()}>
           <Ionicons name="chevron-back" size={20} color={colors.textPrimary} />
@@ -122,7 +119,6 @@ export default function BalanceScreen({ route, navigation }) {
 
       <ScrollView contentContainerStyle={styles.content}>
         
-        {/* Transferencias Pendientes entre Familias/Grupos */}
         <Text style={styles.seccionTituloPrincipal}>TRANSFERENCIAS PENDIENTES</Text>
         {balance.transferencias.length === 0 ? (
           <View style={styles.saldadoCentrado}>
@@ -167,7 +163,6 @@ export default function BalanceScreen({ route, navigation }) {
                   </View>
                 </TouchableOpacity>
 
-                {/* Botón Marcar Pagado */}
                 <TouchableOpacity 
                   style={styles.btnMarcarPagado}
                   onPress={() => mostrarToast('Funcionalidad de pagos en desarrollo', 'success')}
@@ -180,7 +175,6 @@ export default function BalanceScreen({ route, navigation }) {
           })
         )}
 
-        {/* Resumen por Grupo / Familia */}
         <Text style={[styles.seccionTituloPrincipal, { marginTop: 32 }]}>RESUMEN POR FAMILIA / GRUPO</Text>
         <View style={styles.listaSaldos}>
           {balance.saldos.map((s, i) => (
@@ -201,7 +195,6 @@ export default function BalanceScreen({ route, navigation }) {
           ))}
         </View>
 
-        {/* Desplegable de Cálculos Inteligente */}
         <TouchableOpacity 
           style={styles.acordeonHeader} 
           onPress={() => setMostrarDetalle(!mostrarDetalle)}
@@ -242,7 +235,6 @@ export default function BalanceScreen({ route, navigation }) {
             <Text style={styles.formula}>Balance = Total Aportado − Consumo Total del Grupo</Text>
             
             {balance.saldos.map((s, i) => {
-              // Si el backend no envía 's.consumido', lo calculamos como: lo que puso menos su saldo final.
               const consumidoGrupo = s.consumido !== undefined ? s.consumido : (s.pagado - s.saldo);
               return (
                 <View key={i} style={styles.filaExplicacion}>
@@ -315,14 +307,12 @@ const styles = StyleSheet.create({
   avatarGrande: { width: 44, height: 44, borderRadius: 22, justifyContent: 'center', alignItems: 'center' },
   avatarTextoGrande: { color: 'white', fontSize: 14, fontWeight: '700' },
   
-  // Botón "Marcar como pagado"
   btnMarcarPagado: {
     marginTop: 20, backgroundColor: '#E8F4EF', borderRadius: 14, paddingVertical: 14,
     flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 6,
   },
   btnMarcarPagadoTexto: { color: colors.greenGlobal, fontWeight: '700', fontSize: 14 },
 
-  // Resumen Individual
   listaSaldos: { marginBottom: 16 },
   saldoFilaFigma: { 
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',

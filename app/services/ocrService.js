@@ -11,13 +11,8 @@ import { API_URL, getAuthToken } from './api';
  * el server corre el OCR y nos devuelve el importe ya extraído.
  */
 
-/**
- * Arma el objeto de archivo en el formato que React Native espera para
- * FormData ({ uri, name, type }). NO usar fetch(uri).blob() en nativo.
- */
 function buildFilePart(imageUri) {
   const filename = imageUri.split('/').pop() || `ticket-${Date.now()}.jpg`;
-  // Inferir el mime a partir de la extensión
   const match = /\.(\w+)$/.exec(filename);
   const ext = (match ? match[1] : 'jpg').toLowerCase();
   const type = ext === 'pdf' ? 'application/pdf' : ext === 'png' ? 'image/png' : ext === 'webp' ? 'image/webp' : 'image/jpeg';
@@ -47,8 +42,6 @@ export const scanTicket = async (imageUri) => {
       method: 'POST',
       headers,
       body: formData,
-      // OJO: no seteamos 'Content-Type' a mano. fetch/RN ya pone el
-      // multipart/form-data con el boundary correcto.
     });
 
     if (!response.ok) {

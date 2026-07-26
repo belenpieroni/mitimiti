@@ -1,12 +1,4 @@
 /**
- * viviendaHelpers.js
- * Utilidades compartidas para el módulo Vivienda.
- * Renombrar a viviendaHelpers.js al copiar al proyecto.
- */
-
-// ─── Formato numérico ─────────────────────────────────────────────────────────
-
-/**
  * Formatea número con separadores de miles argentinos.
  * formatMontoARS(1000000) → "1.000.000"
  */
@@ -24,15 +16,6 @@ export function parseMontoARS(display) {
   return Number(String(display).replace(/\$/g, '').replace(/\s/g, '').replace(/\./g, '')) || 0;
 }
 
-/**
- * Handler listo para usar en onChangeText de un TextInput de monto.
- * Devuelve { display, numeric } para setear ambos estados.
- *
- * Ejemplo de uso en el componente:
- *   const { display, numeric } = handleMontoInput(text);
- *   setMontoDisplay(display);
- *   setMontoNumerico(numeric);
- */
 export function handleMontoInput(rawText) {
   const stripped = rawText.replace(/^\$\s*/, '');
   const onlyDigits = stripped.replace(/\D/g, '');
@@ -40,8 +23,6 @@ export function handleMontoInput(rawText) {
   const display = onlyDigits ? Number(onlyDigits).toLocaleString('es-AR') : '';
   return { display, numeric };
 }
-
-// ─── Helpers de reglas ────────────────────────────────────────────────────────
 
 /** Devuelve dos iniciales en mayúscula de un nombre completo. */
 export function iniciales(nombre = '') {

@@ -26,7 +26,6 @@ function normalizeId(value) {
   return String(value || '').trim().toLowerCase();
 }
 
-// ── Pantalla principal ────────────────────────────────────────────────────────
 export default function JuntadaDetalleScreen({ route, navigation }) {
   const { juntadaId } = route.params;
   const { user } = useAuth();
@@ -119,7 +118,6 @@ export default function JuntadaDetalleScreen({ route, navigation }) {
     }
   }
 
-  // Simulación de copiado al portapapeles para el Alias
   const copiarAlias = (alias) => {
     Alert.alert('Alias Copiado', `"${alias}" se copió al portapapeles.`);
   };
@@ -460,7 +458,6 @@ const actSheet = StyleSheet.create({
   confirmEliminarTxt: { fontSize: 14, fontWeight: '600', color: 'white' },
 });
 
-// ── Actions Sheet (tres puntos) ──────────────────────────────────────────────
 function ActionsSheet({ visible, titulo, onCerrar, onEditar, onEliminar }) {
   return (
     <Modal visible={visible} transparent animationType="slide">
@@ -514,7 +511,6 @@ function ConfirmSheet({ titulo, mensaje, onCancelar, onConfirmar }) {
   );
 }
 
-// ── Bottom Sheet: Subgrupos ──────────────────────────────────────────────────
 function SubgruposSheet({ visible, juntada, participantes, usuarioActualNombre, onCerrar, onGuardar, onEditar, onEliminar }) {
   const [creando, setCreando]       = useState(false);
   const [editando, setEditando]     = useState(null); // subgrupo que se está editando
@@ -610,7 +606,6 @@ function SubgruposSheet({ visible, juntada, participantes, usuarioActualNombre, 
 
           <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled" style={{ maxHeight: 320 }}>
             {mostrandoForm ? (
-              // ── Formulario crear / editar ──
               <View>
                 <TextInput
                   autoFocus
@@ -652,7 +647,6 @@ function SubgruposSheet({ visible, juntada, participantes, usuarioActualNombre, 
                 </View>
               </View>
             ) : (
-              // ── Lista de subgrupos ──
               <View style={{ gap: 8, marginBottom: 12 }}>
                 {subgrupos.length === 0 ? (
                   <View style={sg.empty}>
@@ -857,7 +851,6 @@ const styles = StyleSheet.create({
     marginLeft: 8,
   },
   btnEliminar: { padding: 4 },
-  // Visor de foto del ticket
   fotoOverlay: {
     flex: 1, justifyContent: 'center', alignItems: 'center',
     backgroundColor: 'rgba(0,0,0,0.75)', padding: 20,
@@ -914,7 +907,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 24, paddingVertical: 12,
   },
   btnReintentarTexto: { color: 'white', fontWeight: '600' },
-  // Botón Invitar personas
   invitarBtn: {
     flexDirection: 'row', alignItems: 'center', gap: 12,
     backgroundColor: colors.primary, borderRadius: 16, padding: 14,
@@ -926,7 +918,6 @@ const styles = StyleSheet.create({
   },
   invitarBtnTitulo: { fontSize: 13, fontWeight: '700', color: 'white' },
   invitarBtnSub: { fontSize: 11, color: 'rgba(255,255,255,0.8)', marginTop: 2 },
-  // Botón Subgrupos en el detalle
   subgruposBtn: {
     flexDirection: 'row', alignItems: 'center', gap: 12,
     backgroundColor: 'white', borderRadius: 16, padding: 14,
@@ -939,7 +930,6 @@ const styles = StyleSheet.create({
   subgruposBtnTitulo: { fontSize: 13, fontWeight: '600', color: colors.textPrimary },
   subgruposBtnSubtitulo: { fontSize: 11, color: colors.textSecondary, marginTop: 2 },
   
-  // Estilos Nuevos: Alias de Transferencia
   aliasCard: {
     flexDirection: 'row', alignItems: 'center', gap: 12,
     backgroundColor: 'white', borderRadius: 16, padding: 14,
@@ -953,7 +943,6 @@ const styles = StyleSheet.create({
   aliasTexto: { fontSize: 14, fontWeight: '700', color: colors.textPrimary, marginTop: 2 },
   btnCopiar: { width: 32, height: 32, borderRadius: 16, justifyContent: 'center', alignItems: 'center' },
 
-  // Estilos Nuevos: Saldos Consolidados Familiares
   seccionLabel: { fontSize: 11, fontWeight: '700', color: colors.textSecondary, letterSpacing: 0.5, marginBottom: 8 },
   saldosContainer: { marginBottom: 16 },
   saldosCard: {

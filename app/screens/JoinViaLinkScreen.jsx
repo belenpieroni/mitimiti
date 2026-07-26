@@ -7,11 +7,6 @@ import { colors } from '../theme/colors';
 import { unirseViaToken } from '../services/juntadasService';
 import { useAuth } from '../context/AuthContext';
 
-/**
- * JoinViaLinkScreen
- * Se invoca cuando la app intercepta un deep link mitimiti://join/<token>.
- * route.params = { token: string }
- */
 export default function JoinViaLinkScreen({ route, navigation }) {
   const { token } = route.params || {};
   const { isAuthenticated } = useAuth();
@@ -24,14 +19,11 @@ export default function JoinViaLinkScreen({ route, navigation }) {
     const txt = String(raw || '').trim();
     if (!txt) return '';
 
-    // Caso 1: pegan solo el token
     if (!txt.includes('/')) return txt;
 
-    // Caso 2: deep link completo, ej. mitimiti://join/<token>
     const match = txt.match(/\/join\/([^/?#]+)/i);
     if (match?.[1]) return match[1];
 
-    // Fallback: último segmento
     const clean = txt.replace(/[?#].*$/, '').replace(/\/+$/, '');
     const parts = clean.split('/').filter(Boolean);
     return parts[parts.length - 1] || '';
@@ -39,8 +31,6 @@ export default function JoinViaLinkScreen({ route, navigation }) {
 
   useEffect(() => {
     if (!isAuthenticated) {
-      // El NavigationContainer ya redirige al login; cuando vuelva se puede manejar
-      // el token desde la misma ruta si se persiste, pero para esta versión mostramos aviso
       setEstado('error');
       setErrorMsg('Debés iniciar sesión para unirte a una juntada.');
     }
@@ -57,7 +47,6 @@ export default function JoinViaLinkScreen({ route, navigation }) {
       const result = await unirseViaToken(tokenFinal);
       setJuntadaNombre(result.juntada?.nombre || '');
       setEstado('ok');
-      // Navegar al detalle después de un breve delay
       setTimeout(() => {
         navigation.replace('JuntadaDetalle', { juntadaId: result.juntada.id });
       }, 1500);
@@ -101,7 +90,6 @@ export default function JoinViaLinkScreen({ route, navigation }) {
     );
   }
 
-  // estado === 'pendiente'
   return (
     <View style={[styles.container, styles.centrado]}>
       <View style={styles.card}>
