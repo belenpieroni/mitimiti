@@ -1,38 +1,13 @@
-/**
- * viviendaHelpers.js
- * Utilidades compartidas para el módulo Vivienda.
- * Renombrar a viviendaHelpers.js al copiar al proyecto.
- */
-
-// ─── Formato numérico ─────────────────────────────────────────────────────────
-
-/**
- * Formatea número con separadores de miles argentinos.
- * formatMontoARS(1000000) → "1.000.000"
- */
 export function formatMontoARS(value) {
   const onlyDigits = String(value ?? '').replace(/\D/g, '');
   if (!onlyDigits) return '';
   return Number(onlyDigits).toLocaleString('es-AR');
 }
 
-/**
- * Parsea un string de display ARS a número.
- * parseMontoARS("$ 1.000.000") → 1000000
- */
 export function parseMontoARS(display) {
   return Number(String(display).replace(/\$/g, '').replace(/\s/g, '').replace(/\./g, '')) || 0;
 }
 
-/**
- * Handler listo para usar en onChangeText de un TextInput de monto.
- * Devuelve { display, numeric } para setear ambos estados.
- *
- * Ejemplo de uso en el componente:
- *   const { display, numeric } = handleMontoInput(text);
- *   setMontoDisplay(display);
- *   setMontoNumerico(numeric);
- */
 export function handleMontoInput(rawText) {
   const stripped = rawText.replace(/^\$\s*/, '');
   const onlyDigits = stripped.replace(/\D/g, '');
@@ -41,14 +16,10 @@ export function handleMontoInput(rawText) {
   return { display, numeric };
 }
 
-// ─── Helpers de reglas ────────────────────────────────────────────────────────
-
-/** Devuelve dos iniciales en mayúscula de un nombre completo. */
 export function iniciales(nombre = '') {
   return nombre.trim().split(/\s+/).map(n => n[0] ?? '').join('').toUpperCase().slice(0, 2);
 }
 
-/** Etiqueta legible para el modelo de división. */
 export function labelModelo(modelo) {
   const map = {
     proporcional: 'Proporcional',
@@ -58,13 +29,6 @@ export function labelModelo(modelo) {
   return map[modelo] ?? modelo;
 }
 
-/**
- * Subtítulo detallado para el ítem de lista de reglas en el dashboard.
- *
- * proporcional      → "Martín 40% · Marta 35% · Sol 25%"
- * partes_iguales    → "Martín · Marta (partes iguales)"
- * responsable_unico → "Martín (100%)"
- */
 export function subtituloRegla(regla) {
   if (!regla?.participantes?.length) return '';
   const { modelo, participantes } = regla;

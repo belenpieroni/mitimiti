@@ -17,10 +17,6 @@ const pdfjsLib = require('pdfjs-dist');
  *  - Fallback       → menor monto >= $100 de todo el texto.
  */
 
-// ──────────────────────────────────────────────────────────────────────────
-// Preprocesado de imagen
-// ──────────────────────────────────────────────────────────────────────────
-
 async function preprocess(imagePath) {
   const image = await Jimp.read(imagePath);
 
@@ -38,10 +34,6 @@ async function preprocess(imagePath) {
   const jpegBuf = await image.getBufferAsync(Jimp.MIME_JPEG);
   return { png, jpegBase64: jpegBuf.toString('base64') };
 }
-
-// ──────────────────────────────────────────────────────────────────────────
-// Motor 1: OCR.space (nube)
-// ──────────────────────────────────────────────────────────────────────────
 
 async function ocrSpace(base64DataUri) {
   if (typeof fetch !== 'function') {
@@ -75,10 +67,6 @@ async function ocrSpace(base64DataUri) {
   return json.ParsedResults?.[0]?.ParsedText || '';
 }
 
-// ──────────────────────────────────────────────────────────────────────────
-// Motor 2: Tesseract.js (local)
-// ──────────────────────────────────────────────────────────────────────────
-
 let workerPromise = null;
 
 function getWorker() {
@@ -107,10 +95,6 @@ async function tesseract(pngBuffer) {
   return result.data.text || '';
 }
 
-// ──────────────────────────────────────────────────────────────────────────
-// Helpers numéricos
-// ──────────────────────────────────────────────────────────────────────────
-
 /**
  * Normaliza un string de monto a número.
  *
@@ -132,36 +116,29 @@ function parseMonto(raw) {
 
   if (tienePunto && tieneComa) {
     if (s.lastIndexOf(',') > s.lastIndexOf('.')) {
-      // AR: 1.234,56 → punto=miles, coma=decimal
       s = s.replace(/\./g, '').replace(',', '.');
     } else {
-      // US: 1,234.56 → coma=miles, punto=decimal
       s = s.replace(/,/g, '');
     }
   } else if (tieneComa && !tienePunto) {
     const parteDecimal = s.split(',')[1];
     if (parteDecimal && parteDecimal.length === 3) {
-      s = s.replace(',', '');       // 46,469 → miles
+      s = s.replace(',', '');
     } else {
-      s = s.replace(',', '.');      // 46,43  → decimal
+      s = s.replace(',', '.');
     }
   } else if (tienePunto && !tieneComa) {
     const parteDecimal = s.split('.')[cantPuntos];
     if (cantPuntos === 1 && parteDecimal && parteDecimal.length === 3) {
-      s = s.replace('.', '');       // 46.469 → miles
+      s = s.replace('.', '');
     } else if (cantPuntos > 1) {
-      s = s.replace(/\./g, '');     // 1.234.567 → quitar todos
+      s = s.replace(/\./g, '');
     }
-    // 46.43 → ya está bien
   }
 
-  const v = parseFloat(s);
+  const v = Number(s);
   return Number.isNaN(v) ? null : v;
 }
-
-// ──────────────────────────────────────────────────────────────────────────
-// Extracción principal
-// ──────────────────────────────────────────────────────────────────────────
 
 /**
  * Recolecta todos los montos de líneas con palabras clave de "total"
@@ -173,7 +150,6 @@ function extractAmountFromText(text) {
 
   const lines = text.split(/\r?\n/);
 
-  // Log de las primeras 20 líneas para debugging
   console.log('[OCR] Texto recibido (primeras 20 líneas):');
   lines.slice(0, 20).forEach((l, i) => console.log(`  ${i + 1}: ${l}`));
 
@@ -195,14 +171,12 @@ function extractAmountFromText(text) {
     return resultados;
   }
 
-  // ── Recolectar todos los montos de líneas con "total" / "a pagar" ────
   const totalAmounts = [];
   const allAmounts = [];
 
   for (let i = 0; i < lines.length; i++) {
     const low = lines[i].toLowerCase();
 
-    // Detectar si la línea habla de un total / importe a pagar
     const esLineaTotal = (
       /total\s*a\s*pagar/.test(low) ||
       /importe\s*a\s*pagar/.test(low) ||
@@ -222,7 +196,6 @@ function extractAmountFromText(text) {
     }
   }
 
-  // ── Extraer fechas para lógica de vencimientos ───────────────────────
   const allDates = [];
   const dateRe = /\b(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})\b/g;
   for (const m of text.matchAll(dateRe)) {
@@ -245,14 +218,12 @@ function extractAmountFromText(text) {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
 
-  // Filtramos fechas muy antiguas (ej. fecha de emisión) para quedarnos con los vencimientos
   const vtoDates = uniqueDates.filter(d => {
     const diffTime = today - d;
     const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
     return diffDays < 90;
   });
 
-  // ── Decisión: 1 monto → ese; varios → el menor o según fecha ─────────
   if (totalAmounts.length === 1) {
     console.log(`[OCR] Un único total encontrado → $${totalAmounts[0]}`);
     return totalAmounts[0];
@@ -279,7 +250,6 @@ function extractAmountFromText(text) {
     return resultado;
   }
 
-  // ── Fallback: menor monto significativo de todo el texto ──────────────
   const montosFiltrados = allAmounts.filter(v => v >= 100);
   if (montosFiltrados.length > 0) {
     const resultado = Math.min(...montosFiltrados);
@@ -291,17 +261,12 @@ function extractAmountFromText(text) {
   return null;
 }
 
-// ──────────────────────────────────────────────────────────────────────────
-// API pública
-// ──────────────────────────────────────────────────────────────────────────
-
 async function extractTextFromImage(imagePath) {
   if (imagePath.toLowerCase().endsWith('.pdf')) {
     try {
       const dataBuffer = await fs.promises.readFile(imagePath);
       const uint8Array = new Uint8Array(dataBuffer);
 
-      // Extraer texto digital del PDF con pdfjs-dist
       const loadingTask = pdfjsLib.getDocument({ data: uint8Array });
       const pdf = await loadingTask.promise;
 
@@ -318,7 +283,6 @@ async function extractTextFromImage(imagePath) {
         return fullText;
       }
 
-      // Si el PDF no tiene texto digital → OCR.space como fallback
       if (process.env.OCR_SPACE_API_KEY) {
         console.log('[OCR] PDF sin texto digital, enviando a OCR.space...');
         const base64 = dataBuffer.toString('base64');
@@ -334,7 +298,6 @@ async function extractTextFromImage(imagePath) {
     }
   }
 
-  // Si no es PDF, fluye normal como imagen
   const { png, jpegBase64 } = await preprocess(imagePath);
 
   if (process.env.OCR_SPACE_API_KEY) {

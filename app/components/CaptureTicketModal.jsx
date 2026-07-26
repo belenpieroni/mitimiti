@@ -46,11 +46,9 @@ export default function CaptureTicketModal({ visible, onClose, onAmountExtracted
 
     setIsProcessing(true);
     try {
-      // El OCR ahora corre en el backend: sube la foto y devuelve el importe.
       const { amount, ticketUrl } = await scanTicket(capturedPhoto);
 
       if (amount) {
-        // Éxito: retorna el importe extraído
         Alert.alert(
           'Importe detectado',
           `Se extrajo: $${amount.toFixed(2)}`,
@@ -63,8 +61,6 @@ export default function CaptureTicketModal({ visible, onClose, onAmountExtracted
             {
               text: 'Usar',
               onPress: () => {
-                // Pasamos también ticketUrl (ya quedó subida en el server)
-                // para no volver a subir la foto al guardar el gasto.
                 onAmountExtracted({ amount, photo: capturedPhoto, ticketUrl });
                 handleClose();
               },
@@ -72,7 +68,6 @@ export default function CaptureTicketModal({ visible, onClose, onAmountExtracted
           ]
         );
       } else {
-        // Falla: no se encontró importe
         Alert.alert(
           'No se detectó importe',
           'El OCR no pudo extraer un número válido del ticket. Por favor, ingresa el importe manualmente.'
@@ -132,7 +127,6 @@ export default function CaptureTicketModal({ visible, onClose, onAmountExtracted
 
       <View style={styles.overlay}>
         <View style={styles.modalContent}>
-          {/* Header */}
           <View style={styles.modalHeader}>
             <Text style={styles.modalTitle}>Escanear ticket</Text>
             <TouchableOpacity onPress={handleClose} style={styles.closeButton}>
@@ -141,7 +135,6 @@ export default function CaptureTicketModal({ visible, onClose, onAmountExtracted
           </View>
 
           {!capturedPhoto ? (
-            // Pantalla de captura
             <ScrollView style={styles.captureContent} showsVerticalScrollIndicator={false}>
               {/* Cámara */}
               <View style={styles.cameraWrapper}>
@@ -167,7 +160,6 @@ export default function CaptureTicketModal({ visible, onClose, onAmountExtracted
               </TouchableOpacity>
             </ScrollView>
           ) : (
-            // Pantalla de preview
             <ScrollView style={styles.previewContent} showsVerticalScrollIndicator={false}>
               <Image
                 source={{ uri: capturedPhoto }}

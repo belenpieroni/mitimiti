@@ -7,8 +7,8 @@ import { API_URL } from './api';
  * archivos (es frágil y suele fallar en nativo). Se usa el objeto
  * { uri, name, type } directamente en el FormData.
  *
- * @param {string} imageUri - URI local de la imagen (file://...)
- * @returns {Promise<Object>} - { filename, url, mimetype, size }
+ * @param {string} imageUri
+ * @returns {Promise<Object>}
  */
 export const uploadTicketPhoto = async (imageUri) => {
   try {
@@ -23,7 +23,6 @@ export const uploadTicketPhoto = async (imageUri) => {
     const uploadResponse = await fetch(`${API_URL}/api/uploads`, {
       method: 'POST',
       body: formData,
-      // No seteamos Content-Type manualmente: RN arma el boundary solo.
     });
 
     if (!uploadResponse.ok) {

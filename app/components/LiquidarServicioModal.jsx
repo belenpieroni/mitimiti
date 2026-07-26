@@ -46,7 +46,6 @@ export default function LiquidarServicioModal({ visible, servicio, onClose, onLi
         
         setCargando(true);
         try {
-          // Procesar con OCR igual que el escaneo por cámara
           const { amount, ticketUrl } = await scanTicket(asset.uri);
           handleOCRResult({ amount, ticketUrl });
           
@@ -54,7 +53,6 @@ export default function LiquidarServicioModal({ visible, servicio, onClose, onLi
             Alert.alert('✅ Archivo procesado', `Se detectó un monto de $${Math.round(amount).toLocaleString('es-AR')}`);
           } else {
             Alert.alert('Archivo adjunto', 'No se detectó un monto automáticamente. Por favor ingresalo manual.');
-            // Aún guardamos el archivo aunque no se detecte monto
             setImagenUrl(ticketUrl || asset.uri);
           }
         } catch (error) {
@@ -129,7 +127,6 @@ export default function LiquidarServicioModal({ visible, servicio, onClose, onLi
                 </View>
               </View>
 
-              {/* Monto */}
               <Text style={styles.label}>MONTO REAL</Text>
               <TextInput
                 style={styles.input}
@@ -140,7 +137,6 @@ export default function LiquidarServicioModal({ visible, servicio, onClose, onLi
                 editable={!cargando}
               />
 
-              {/* Attachment options */}
               <Text style={styles.label}>COMPROBANTE (OPCIONAL)</Text>
               <View style={styles.attachmentRow}>
                 <TouchableOpacity
@@ -174,7 +170,6 @@ export default function LiquidarServicioModal({ visible, servicio, onClose, onLi
                 </View>
               )}
 
-              {/* Confirm */}
               <TouchableOpacity
                 style={[styles.btnConfirm, cargando && { opacity: 0.6 }]}
                 onPress={handleConfirmar}
@@ -191,7 +186,6 @@ export default function LiquidarServicioModal({ visible, servicio, onClose, onLi
         </View>
       </Modal>
 
-      {/* OCR Sub-modal */}
       <CaptureTicketModal
         visible={showOCR}
         onClose={() => setShowOCR(false)}

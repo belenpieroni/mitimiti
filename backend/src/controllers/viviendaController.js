@@ -5,28 +5,19 @@ const { notifyUsersByName, NOTIFICATION_CATEGORIES } = require('../services/push
 const limpiarMontoOCR = (montoString) => {
   if (!montoString) return null;
 
-  // 1. Convertimos a string y eliminamos espacios
   let valor = montoString.toString().trim();
-
-  // 2. Identificar el último signo de puntuación (asumiendo que es decimal)
-  // Buscamos la última ocurrencia de ',' o '.'
   const ultimoPunto = valor.lastIndexOf('.');
   const ultimaComa = valor.lastIndexOf(',');
   const separadorIndex = Math.max(ultimoPunto, ultimaComa);
 
   if (separadorIndex !== -1) {
-    // Tenemos separador decimal.
-    // Separamos la parte entera y la decimal
     let parteEntera = valor.substring(0, separadorIndex);
     let parteDecimal = valor.substring(separadorIndex + 1);
 
-    // Eliminamos cualquier punto o coma de la parte entera (limpieza de miles)
     parteEntera = parteEntera.replace(/[.,]/g, '');
 
-    // Unimos con punto decimal estándar de JavaScript
     return parseFloat(`${parteEntera}.${parteDecimal}`);
   } else {
-    // Si no hay separador, solo limpiamos los caracteres no numéricos
     return parseFloat(valor.replace(/[^0-9]/g, ''));
   }
 };
@@ -290,7 +281,6 @@ async function listarGastos(req, res, next) {
 
     const data = rows.map(r => {
       let miPorcentaje = r.miPorcentaje;
-      // Fallback para gastos viejos sin acuerdo_id
       if (!r.acuerdoId && Array.isArray(r.participantes)) {
         const found = r.participantes.find(p => p.toLowerCase() === userName.toLowerCase());
         if (found) miPorcentaje = 100 / (r.participantes.length || 1);
@@ -324,7 +314,6 @@ async function crearGasto(req, res, next) {
 
     let participantesFinales = [];
     if (acuerdoId) {
-      // Consultar tabla vivienda_acuerdos (participantes)
       const { rows: partRows } = await pool.query(
         'SELECT nombre, porcentaje FROM acuerdo_participantes WHERE acuerdo_id = $1',
         [acuerdoId]
@@ -347,7 +336,6 @@ async function crearGasto(req, res, next) {
     const montoFloat = Number(monto) || 0;
     if (montoFloat > 0) {
       if (acuerdoId) {
-        // Consultar de nuevo con los porcentajes para notificaciones
         const { rows: partRows } = await pool.query(
           'SELECT nombre, porcentaje FROM acuerdo_participantes WHERE acuerdo_id = $1',
           [acuerdoId]
@@ -369,7 +357,6 @@ async function crearGasto(req, res, next) {
           }
         });
       } else {
-        // Miti-miti: partes iguales
         const share = montoFloat / (participantesFinales.length || 1);
         participantesFinales.forEach(nombre => {
           if (nombre.toLowerCase() !== creatorName.toLowerCase()) {
@@ -508,7 +495,6 @@ async function listarServicios(req, res, next) {
 
     const data = rows.map(r => {
       let miPorcentaje = r.miPorcentaje;
-      // Fallback para servicios viejos sin acuerdo_id
       if (!r.acuerdoId && Array.isArray(r.participantes)) {
         const found = r.participantes.find(p => p.toLowerCase() === userName.toLowerCase());
         if (found) miPorcentaje = 100 / (r.participantes.length || 1);
@@ -544,7 +530,6 @@ async function crearServicio(req, res, next) {
       err.status = 400; return next(err);
     }
 
-    // Consultar tabla vivienda_acuerdos (participantes)
     const { rows: partRows } = await pool.query(
       'SELECT nombre, porcentaje FROM acuerdo_participantes WHERE acuerdo_id = $1',
       [acuerdoId]
@@ -564,7 +549,6 @@ async function crearServicio(req, res, next) {
     const { rows: [usuario] } = await pool.query('SELECT name FROM usuarios WHERE id = $1', [req.user.id]);
     const creatorName = usuario ? usuario.name : '';
 
-    // Si es variable, notificamos para carga de monto (usamos .catch para no bloquear)
     if (isVariable && participantes.length > 0) {
       notifyUsersByName(
         participantes,
@@ -576,7 +560,6 @@ async function crearServicio(req, res, next) {
         { category: NOTIFICATION_CATEGORIES.SERVICIO_VARIABLE }
       ).catch(e => console.error('Error al notificar servicio variable:', e));
     } else {
-      // Notificación estándar asíncrona para participantes excluyendo al creador
       const fechaObj = new Date(proximoVencimiento);
       const formateador = new Intl.DateTimeFormat('es-AR', { day: 'numeric', month: 'long', timeZone: 'UTC' });
       const fechaLegible = formateador.format(fechaObj);
@@ -628,7 +611,6 @@ async function editarServicio(req, res, next) {
       participantesFinales = partRows.map(r => r.nombre);
     }
 
-    // Si cambia isVariable, actualizamos status
     const montoFinal = (isVariable === true) ? null : (monto != null ? Number(monto) : null);
     let statusFinal = undefined;
     if (isVariable !== undefined) {
@@ -707,7 +689,6 @@ async function liquidarServicio(req, res, next) {
     let { monto, imagenUrl } = req.body;
     monto = limpiarMontoOCR(monto);
 
-    // Validación server-side: monto debe ser un número positivo
     if (monto == null || typeof Number(monto) !== 'number' || isNaN(Number(monto)) || Number(monto) <= 0) {
       const err = new Error('El monto debe ser un número positivo.');
       err.status = 400; return next(err);
@@ -731,10 +712,8 @@ async function liquidarServicio(req, res, next) {
       const err = new Error('Este servicio ya fue procesado en el ciclo actual.'); err.status = 409; return next(err);
     }
 
-    // Transacción: actualizar servicio + crear gasto puntual
     await client.query('BEGIN');
 
-    // 1. Actualizar el servicio a PROCESADO
     const { rows: [updated] } = await client.query(
       `UPDATE vivienda_servicios SET monto = $1, status = 'PROCESADO'
        WHERE id = $2
@@ -744,7 +723,6 @@ async function liquidarServicio(req, res, next) {
       [montoReal, id]
     );
 
-    // 2. Crear un gasto puntual vinculado (impacto en balance/totalMes)
     const gastoId = uuidv4();
     const participantes = Array.isArray(servicio.participantes) ? servicio.participantes : [];
     const pagador = participantes[0] || 'Vivienda';
@@ -759,7 +737,6 @@ async function liquidarServicio(req, res, next) {
 
     await client.query('COMMIT');
 
-    // 3. Notificar a participantes
     if (participantes.length > 0) {
       await notifyUsersByName(
         participantes,
@@ -887,7 +864,6 @@ async function revertirPago(req, res, next) {
 
     const tabla = tipo === 'gastos' ? 'vivienda_gastos' : 'vivienda_servicios';
 
-    // Al revertir, el estado vuelve a 'PROCESADO' y limpiamos la fecha de pago
     const { rows: [updated] } = await pool.query(
       `UPDATE ${tabla} SET status = 'PROCESADO', fecha_pago = NULL WHERE id::text = $1 AND vivienda_id = $2 RETURNING id::text`,
       [id, vivienda.id]
@@ -936,7 +912,6 @@ async function editarAcuerdo(req, res, next) {
     const { id: oldKey } = req.params;
     const { nombre, modelo, participantes } = req.body;
 
-    // Check if the old agreement exists and belongs to the vivienda
     const { rows: [existing] } = await client.query(
       'SELECT id FROM vivienda_acuerdos WHERE id = $1 AND vivienda_id = $2',
       [oldKey, vivienda.id]
@@ -949,13 +924,11 @@ async function editarAcuerdo(req, res, next) {
 
     await client.query('BEGIN');
 
-    // 1. Mark the old agreement as inactive (soft delete)
     await client.query(
       'UPDATE vivienda_acuerdos SET activo = false WHERE id = $1',
       [oldKey]
     );
 
-    // 2. Create the new agreement with a new unique key
     const newKey = `${vivienda.id}_${slugify(nombre)}_${uuidv4()}`;
 
     await client.query(
@@ -964,7 +937,6 @@ async function editarAcuerdo(req, res, next) {
       [newKey, vivienda.id, nombre, modelo]
     );
 
-    // 3. Insert the new participants and percentages
     if (Array.isArray(participantes)) {
       for (const p of participantes) {
         await client.query(
@@ -974,7 +946,6 @@ async function editarAcuerdo(req, res, next) {
       }
     }
 
-    // 4. Update existing recurring services pointing to the old key
     const participanteNombres = Array.isArray(participantes) ? participantes.map(p => p.nombre) : [];
     await client.query(
       `UPDATE vivienda_servicios

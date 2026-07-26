@@ -7,8 +7,6 @@ const DIAS_AVISO_PREVIO_2 = 1;
 const FRECUENCIA_MORA_SERVICIOS = 3;
 const FRECUENCIA_MORA_GASTOS = 7;
 
-// ── Helpers ──────────────────────────────────────────────────────────────────
-
 function getDiffDays(fechaStr) {
   const targetDate = new Date(fechaStr);
   const today = new Date();
@@ -47,7 +45,6 @@ async function resetServiciosVariables() {
   try {
     const hoyStr = new Date().toISOString().split('T')[0];
 
-    // Buscar servicios variables cuyo ciclo de facturación ya pasó
     const { rows: servicios } = await pool.query(
       `SELECT id::text, nombre, periodicidad, proximo_vencimiento::text AS "proximoVencimiento",
               participantes, vivienda_id::text AS "viviendaId"
@@ -60,7 +57,6 @@ async function resetServiciosVariables() {
     for (const servicio of servicios) {
       const nuevaFecha = calcularProximaFecha(servicio.proximoVencimiento, servicio.periodicidad);
 
-      // Resetear: monto null, status PENDIENTE, avanzar fecha
       await pool.query(
         `UPDATE vivienda_servicios
          SET monto = NULL, status = 'PENDIENTE', proximo_vencimiento = $1
@@ -68,7 +64,6 @@ async function resetServiciosVariables() {
         [nuevaFecha, servicio.id]
       );
 
-      // Notificar a participantes
       const destinatarios = Array.isArray(servicio.participantes)
         ? servicio.participantes
         : [];
@@ -245,7 +240,6 @@ async function checkGastosPendientes() {
 }
 
 function iniciarCronJobs() {
-  // Ejecuta cada día a las 09:00
   cron.schedule('0 9 * * *', async () => {
     await resetServiciosVariables();
     await checkProximosVencimientos();

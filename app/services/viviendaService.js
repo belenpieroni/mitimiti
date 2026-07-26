@@ -1,8 +1,5 @@
 import api from './api';
 
-// Si tu api.js ya tiene un interceptor que hace: response => response.data
-// Entonces NO debes poner { data } = ...
-
 export const getGastosVivienda = async () => await api.get('/vivienda/gastos');
 export const guardarGastoVivienda = async (data, options = {}) => await api.post('/vivienda/gastos', data, options);
 export const actualizarGastoVivienda = async (id, data, options = {}) => await api.put(`/vivienda/gastos/${id}`, data, options);

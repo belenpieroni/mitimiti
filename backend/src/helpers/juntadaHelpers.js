@@ -62,7 +62,6 @@ async function cargarJuntadaCompleta(juntadaId) {
 async function cargarJuntadasCompletas(juntadaIds) {
   if (!juntadaIds || juntadaIds.length === 0) return [];
 
-  // Query 1: Juntadas
   const { rows: juntadas } = await pool.query(
     `SELECT id::text, nombre, descripcion, fecha::text,
             creador_id::text AS "creadorId", creada_en AS "creadaEn"
@@ -72,14 +71,12 @@ async function cargarJuntadasCompletas(juntadaIds) {
 
   if (juntadas.length === 0) return [];
 
-  // Query 2: Participantes
   const { rows: todosParticipantes } = await pool.query(
     `SELECT id::text, juntada_id::text AS "juntadaId", nombre, iniciales, color
      FROM juntada_participantes WHERE juntada_id = ANY($1::uuid[])`,
     [juntadaIds]
   );
 
-  // Query 3: Gastos
   const { rows: todosGastos } = await pool.query(
     `SELECT id::text, juntada_id::text AS "juntadaId", nombre, pagador, monto::float, split_mode AS "splitMode",
             split_subgroups AS "splitSubgroups", beneficiarios,
@@ -88,20 +85,17 @@ async function cargarJuntadasCompletas(juntadaIds) {
     [juntadaIds]
   );
 
-  // Query 4: Pagos deudas
   const { rows: todosPagosDeudas } = await pool.query(
     `SELECT id::text, juntada_id::text AS "juntadaId", de, para, monto::float, creado_en AS "creadoEn"
      FROM juntada_pagos_deudas WHERE juntada_id = ANY($1::uuid[])`,
     [juntadaIds]
   );
 
-  // Query 5: Subgrupos
   const { rows: todosSubgrupos } = await pool.query(
     `SELECT id::text, juntada_id::text AS "juntadaId", nombre FROM juntada_subgrupos WHERE juntada_id = ANY($1::uuid[])`,
     [juntadaIds]
   );
 
-  // Query 6: Integrantes de todos los subgrupos
   const subgrupoIds = todosSubgrupos.map(sg => sg.id);
   let todosIntegrantes = [];
   if (subgrupoIds.length > 0) {
@@ -112,20 +106,17 @@ async function cargarJuntadasCompletas(juntadaIds) {
     todosIntegrantes = rows;
   }
 
-  // Agrupar subgrupo_integrantes por subgrupoId
   const integrantesMap = {};
   todosIntegrantes.forEach(i => {
     if (!integrantesMap[i.subgrupoId]) integrantesMap[i.subgrupoId] = [];
     integrantesMap[i.subgrupoId].push(i.nombre);
   });
 
-  // Reconstruir subgrupos con integrantes
   const subgruposConIntegrantes = todosSubgrupos.map(sg => ({
     ...sg,
     integrantes: integrantesMap[sg.id] || []
   }));
 
-  // Agrupar todo por juntadaId
   const participantesMap = {};
   todosParticipantes.forEach(p => {
     if (!participantesMap[p.juntadaId]) participantesMap[p.juntadaId] = [];
@@ -150,7 +141,6 @@ async function cargarJuntadasCompletas(juntadaIds) {
     subgruposMap[sg.juntadaId].push(sg);
   });
 
-  // Mapear juntadas con sus sub-documentos
   const juntadasMap = {};
   juntadas.forEach(j => {
     juntadasMap[j.id] = {

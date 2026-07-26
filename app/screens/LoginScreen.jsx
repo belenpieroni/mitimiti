@@ -15,12 +15,10 @@ export default function LoginScreen() {
   const [loading, setLoading] = useState(false);
   const [secureText, setSecureText] = useState(true);
 
-  // Estados del Formulario
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
 
-  // Validación dinámica para el color del botón principal
   const isFormValid = activeTab === 'login' 
     ? email.length > 0 && password.length > 0 
     : name.length > 0 && email.length > 0 && password.length > 0;
@@ -39,7 +37,6 @@ export default function LoginScreen() {
 
         Alert.alert('¡Éxito!', 'Cuenta creada. Ahora iniciá sesión.');
         
-        // Limpiar formulario
         setActiveTab('login');
         setName('');
         setEmail('');        // ✅ CORREGIDO: Se limpia email
@@ -231,8 +228,6 @@ export default function LoginScreen() {
     </RootContainer>
   );
 }
-
-// ── Estilos ──────────────────────────────────────────────────────────────────
 
 const styles = StyleSheet.create({
   container: {
