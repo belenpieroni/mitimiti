@@ -7,7 +7,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { colors } from '../theme/colors';
 import { useAuth } from '../context/AuthContext';
 import { loginUser, registerUser } from '../services/authService';
-import { registrarTokenDispositivo } from '../services/notificationsService';
+import { registrarTokenDispositivo, isExpoGoAndroid } from '../services/notificationsService';
 
 export default function LoginScreen() {
   const { login } = useAuth();
@@ -55,10 +55,14 @@ export default function LoginScreen() {
           token: authData.token,
         });
 
-        try {
-          await registrarTokenDispositivo(authData.token);
-        } catch (pushError) {
-          console.warn('[push] No se pudo registrar token de dispositivo:', pushError.message);
+        if (!isExpoGoAndroid()) {
+          try {
+            await registrarTokenDispositivo(authData.token);
+          } catch (pushError) {
+            console.warn('[push] No se pudo registrar token de dispositivo:', pushError.message);
+          }
+        } else {
+          console.warn('[push] Se omitió el registro de token en Expo Go Android. Usa un development build para push.');
         }
       }
     } catch (error) {

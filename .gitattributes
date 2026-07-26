@@ -1,0 +1,4 @@
+# Enforce LF for shell scripts and Docker files to avoid "no such file or directory" in containers
+*.sh text eol=lf
+Dockerfile* text eol=lf
+**/docker-entrypoint.sh text eol=lf

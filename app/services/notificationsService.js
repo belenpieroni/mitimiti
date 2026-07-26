@@ -1,16 +1,49 @@
 import { Platform } from 'react-native';
 import * as Device from 'expo-device';
-import * as Notifications from 'expo-notifications';
 import Constants from 'expo-constants';
 import api from './api';
 
-Notifications.setNotificationHandler({
-  handleNotification: async () => ({
-    shouldShowAlert: true,
-    shouldPlaySound: true,
-    shouldSetBadge: false,
-  }),
-});
+let Notifications = null;
+let notificationHandlerInitialized = false;
+
+export function isExpoGoAndroid() {
+  return Constants.appOwnership === 'expo' && Platform.OS === 'android';
+}
+
+export async function getNotificationsModule() {
+  if (Notifications) {
+    return Notifications;
+  }
+
+  if (isExpoGoAndroid()) {
+    throw new Error(
+      'expo-notifications no está disponible en Expo Go Android. Usa un development build o un cliente compatible.'
+    );
+  }
+
+  try {
+    Notifications = await import('expo-notifications');
+  } catch (error) {
+    throw new Error(
+      'No se pudo cargar expo-notifications. Asegurate de usar un development build o un cliente compatible.'
+    );
+  }
+
+  if (!notificationHandlerInitialized) {
+    Notifications.setNotificationHandler({
+      handleNotification: async () => ({
+        shouldShowAlert: true,
+        shouldPlaySound: true,
+        shouldSetBadge: false,
+      }),
+    });
+    notificationHandlerInitialized = true;
+  }
+
+  return Notifications;
+}
+
+
 
 function getProjectId() {
   return (
@@ -26,6 +59,7 @@ async function requestExpoPushToken() {
     throw new Error('Las notificaciones push requieren un dispositivo fisico.');
   }
 
+  const Notifications = await getNotificationsModule();
   const { status: existingStatus } = await Notifications.getPermissionsAsync();
   let finalStatus = existingStatus;
 
@@ -77,6 +111,7 @@ export async function registrarTokenDispositivo(authToken) {
 }
 
 export async function enviarNotificacionLocalPrueba() {
+  const Notifications = await getNotificationsModule();
   const { status: existingStatus } = await Notifications.getPermissionsAsync();
   let finalStatus = existingStatus;
 

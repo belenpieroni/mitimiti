@@ -1,11 +1,12 @@
 import { useCallback, useMemo, useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Modal, Pressable, Alert } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import * as Notifications from 'expo-notifications';
 import { useFocusEffect } from '@react-navigation/native';
 import { colors } from '../theme/colors';
 import { useAuth } from '../context/AuthContext';
 import {
+  getNotificationsModule,
+  isExpoGoAndroid,
   enviarNotificacionRemotaPrueba,
   marcarNotificacionLeida,
   marcarTodasNotificacionesLeidas,
@@ -124,8 +125,19 @@ export default function NotificationsScreen({ navigation }) {
     }
   };
 
+  const isAndroidExpoGo = isExpoGoAndroid();
+
   const handleTestNotification = async () => {
+    if (isAndroidExpoGo) {
+      Alert.alert(
+        'No disponible en Expo Go Android',
+        'Expo Go Android no admite el módulo de notificaciones completo. Para probar notificaciones usa un development build o un cliente compatible.'
+      );
+      return;
+    }
+
     try {
+      const Notifications = await getNotificationsModule();
       const { status: existingStatus } = await Notifications.getPermissionsAsync();
       let finalStatus = existingStatus;
 
@@ -155,6 +167,14 @@ export default function NotificationsScreen({ navigation }) {
   };
 
   const handleRemotePushTest = async () => {
+    if (isAndroidExpoGo) {
+      Alert.alert(
+        'No disponible en Expo Go Android',
+        'Expo Go Android no admite notificaciones remotas. Usa un development build o un cliente compatible para esta funcionalidad.'
+      );
+      return;
+    }
+
     try {
       if (!token) {
         Alert.alert('Sesion requerida', 'Inicia sesion nuevamente para probar push remoto.');
@@ -212,6 +232,15 @@ export default function NotificationsScreen({ navigation }) {
       </View>
 
       <ScrollView contentContainerStyle={styles.content}>
+        {isAndroidExpoGo ? (
+          <View style={styles.warningBox}>
+            <Ionicons name="warning-outline" size={18} color="#92400E" />
+            <Text style={styles.warningText}>
+              En Expo Go Android las notificaciones no son compatibles. Para probar este flujo, usá un development build o un cliente compatible.
+            </Text>
+          </View>
+        ) : null}
+
         <TouchableOpacity style={styles.testBtn} onPress={handleTestNotification}>
           <Ionicons name="send-outline" size={16} color={colors.primary} />
           <Text style={styles.testBtnText}>Probar notificacion en este celu</Text>
@@ -392,6 +421,23 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
   },
   primaryBtnText: { color: 'white', fontWeight: '700', fontSize: 12 },
+  warningBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FEF3C7',
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: '#FCD34D',
+    padding: 12,
+    marginBottom: 12,
+    gap: 8,
+  },
+  warningText: {
+    flex: 1,
+    color: '#92400E',
+    fontSize: 13,
+    lineHeight: 18,
+  },
   iconWrap: {
     width: 34,
     height: 34,
