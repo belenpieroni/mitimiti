@@ -1,10 +1,10 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, StyleSheet, ActivityIndicator } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { colors } from '../theme/colors';
-import { listarJuntadas, obtenerBalanceGlobal } from '../services/juntadasService';
-import { useAuth } from '../navigation/AppNavigator';
+import { listarJuntadas, obtenerBalanceGlobal, subscribeLocalJuntadas } from '../services/juntadasService';
+import { useAuth } from '../context/AuthContext';
 
 const modulos = [
   { id: '1', nombre: 'Juntadas', icono: 'people-outline' },
@@ -43,6 +43,13 @@ export default function HomeScreen({ navigation }) {
   const [juntadas, setJuntadas] = useState([]);
   const [cargando, setCargando] = useState(true);
 
+  useEffect(() => {
+    const unsubscribe = subscribeLocalJuntadas((list) => {
+      setJuntadas(list.slice(0, 5));
+    });
+    return unsubscribe;
+  }, []);
+
   const cargarDatos = useCallback(async () => {
     if (!user?.name) return;
     setCargando(true);
@@ -52,6 +59,7 @@ export default function HomeScreen({ navigation }) {
         listarJuntadas(nombre),
       ]);
 
+      // Extrae la data de manera segura (maneja tanto axios directo como interceptores personalizados)
       const dataBalance = resGlobal?.data?.data || resGlobal?.data || resGlobal;
       const dataJuntadas = resJuntadas?.data?.data || resJuntadas?.data || resJuntadas;
 
@@ -59,9 +67,7 @@ export default function HomeScreen({ navigation }) {
         setBalance(dataBalance);
       }
       
-      if (Array.isArray(dataJuntadas)) {
-        setJuntadas(dataJuntadas.slice(0, 5)); // Top 5 recientes
-      }
+      // Se actualiza a través de la suscripción a subscribeLocalJuntadas
     } catch (err) {
       console.error("Error cargando la Home: ", err);
     } finally {
@@ -78,13 +84,14 @@ export default function HomeScreen({ navigation }) {
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
 
+      {/* Header */}
       <View style={styles.header}>
         <View>
           <Text style={styles.saludo}>{getSaludo()}</Text>
           <Text style={styles.nombre}>{nombreUsuario}</Text>
         </View>
         <View style={styles.headerIconos}>
-          <TouchableOpacity style={styles.iconoBtn}>
+          <TouchableOpacity style={styles.iconoBtn} onPress={() => navigation.navigate('Notifications')}>
             <Ionicons name="notifications-outline" size={22} color={colors.textPrimary} />
           </TouchableOpacity>
           <TouchableOpacity
@@ -96,6 +103,7 @@ export default function HomeScreen({ navigation }) {
         </View>
       </View>
 
+    {/* Card Balance */}
       <View style={styles.cardBalance}>
         <Text style={styles.balanceLabel}>Balance total</Text>
         {cargando ? (
@@ -113,6 +121,7 @@ export default function HomeScreen({ navigation }) {
                 <Text style={[styles.balanceValor, { color: colors.greenGlobal }]}>
                   {formatPesos(balance.porCobrar)}
                 </Text>
+                {/* Icono tendencia arriba */}
                 <Ionicons name="trending-up" size={14} color={colors.greenGlobal} style={{ position: 'absolute', top: 12, right: 12 }} />
               </View>
               
@@ -121,10 +130,12 @@ export default function HomeScreen({ navigation }) {
                 <Text style={[styles.balanceValor, { color: '#ec6c6a' }]}>
                   {formatPesos(balance.porPagar)}
                 </Text>
+                {/* Icono tendencia abajo */}
                 <Ionicons name="trending-down" size={14} color="#ec6c6a" style={{ position: 'absolute', top: 12, right: 12 }} />
               </View>
             </View>
 
+            {/* Botón Ver deudas */}
             <TouchableOpacity 
               style={styles.btnVerDeudas} 
               onPress={() => navigation.navigate('Deudas')}

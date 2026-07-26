@@ -46,12 +46,7 @@ async function listarJuntadas(req, res, next) {
         (s) => s.nombre.trim().toLowerCase() === usuario.trim().toLowerCase()
       );
 
-      // ── Usamos SIEMPRE el saldo bruto (pagado - corresponde) ──
-      // saldoPendiente refleja liquidaciones internas parciales de la juntada
-      // y puede silenciar deudas reales cuando hay pagos registrados pero la
-      // deuda original sigue vigente (ej: muestra $500 en vez de $2500).
-      // El Home debe mostrar cuánto aportó el usuario vs. lo que le corresponde,
-      // independientemente del proceso interno de saldos.
+      // Usamos siempre el saldo bruto para que el Home refleje cuánto aportó el usuario frente a lo que le corresponde.
       const saldoBruto = saldoUsuario ? (saldoUsuario.saldo ?? 0) : 0;
 
       return {
@@ -84,7 +79,6 @@ async function crearJuntada(req, res, next) {
       const err = new Error('El campo "nombre" es requerido.'); err.status = 400; return next(err);
     }
 
-    // req.user proviene del JWT verificado por requireAuth
     const { rows: [creador] } = await pool.query(
       'SELECT id, name, iniciales FROM usuarios WHERE id = $1',
       [req.user.id]
@@ -102,7 +96,6 @@ async function crearJuntada(req, res, next) {
       [id, nombre.trim(), descripcion.trim(), req.user.id, fecha]
     );
 
-    // Agregar al creador como único participante inicial
     const pid = uuidv4();
     const pnombre = creador.name.trim();
     const piniciales = creador.iniciales || getIniciales(pnombre);
@@ -148,7 +141,6 @@ async function obtenerJuntada(req, res, next) {
       err.status = 403; return next(err);
     }
 
-    // Backfill para juntadas legacy sin creador_id.
     if (!juntada.creadorId) {
       await pool.query(
         'UPDATE juntadas SET creador_id = $1 WHERE id = $2 AND creador_id IS NULL',
@@ -600,7 +592,6 @@ async function generarObtenerInvitacion(req, res, next) {
       err.status = 404; return next(err);
     }
 
-    // Reutilizar token existente no expirado
     const { rows: [existing] } = await pool.query(
       `SELECT token::text FROM invitation_tokens
        WHERE recurso_id = $1 AND tipo = 'juntada' AND expira_en > NOW()
@@ -639,7 +630,6 @@ async function unirseViaToken(req, res, next) {
     const { token } = req.params;
     const usuarioId = req.user.id;
 
-    // Validar token
     const { rows: [inv] } = await pool.query(
       `SELECT token, tipo, recurso_id::text FROM invitation_tokens
        WHERE token = $1 AND expira_en > NOW()`,
@@ -649,7 +639,6 @@ async function unirseViaToken(req, res, next) {
       const err = new Error('Enlace de invitación inválido o expirado.'); err.status = 404; return next(err);
     }
 
-    // Obtener info del usuario
     const { rows: [usuario] } = await pool.query(
       'SELECT name, iniciales FROM usuarios WHERE id = $1', [usuarioId]
     );
@@ -660,7 +649,6 @@ async function unirseViaToken(req, res, next) {
     if (inv.tipo === 'juntada') {
       const juntadaId = inv.recurso_id;
 
-      // Verificar si ya es participante
       const { rows: yaParticipante } = await pool.query(
         'SELECT id FROM juntada_participantes WHERE juntada_id = $1 AND LOWER(nombre) = LOWER($2)',
         [juntadaId, usuario.name]
@@ -670,7 +658,6 @@ async function unirseViaToken(req, res, next) {
         return res.json({ ok: true, data: { juntada, yaMiembro: true } });
       }
 
-      // Agregar como participante
       const { rows: [countRow] } = await pool.query(
         'SELECT COUNT(*)::int AS c FROM juntada_participantes WHERE juntada_id = $1', [juntadaId]
       );
@@ -685,7 +672,6 @@ async function unirseViaToken(req, res, next) {
 
       const juntada = await cargarJuntadaCompleta(juntadaId);
 
-      // Notificar a los demás participantes
       const otros = juntada.participantes
         .map(p => p.nombre)
         .filter(n => n.toLowerCase() !== usuario.name.toLowerCase());

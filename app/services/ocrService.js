@@ -21,7 +21,7 @@ function buildFilePart(imageUri) {
 
 /**
  * Sube la foto del ticket y corre OCR en el backend.
- * @param {string} imageUri - URI local de la imagen (file://...)
+ * @param {string} imageUri
  * @returns {Promise<{ amount: number|null, text: string, ticketUrl: string }>}
  */
 export const scanTicket = async (imageUri) => {
@@ -55,9 +55,9 @@ export const scanTicket = async (imageUri) => {
     }
 
     return {
-      amount: result.data.amount,     // number | null
+      amount: result.data.amount,
       text: result.data.text || '',
-      ticketUrl: result.data.url,     // ej: /uploads/ticket-123.jpg
+      ticketUrl: result.data.url,
     };
   } catch (error) {
     console.error('Error escaneando ticket:', error);
@@ -65,10 +65,6 @@ export const scanTicket = async (imageUri) => {
   }
 };
 
-/**
- * Compat: mantiene el nombre viejo por si lo usás en otro lado.
- * Devuelve solo el importe (o null).
- */
 export const extractAmountFromTicket = async (imageUri) => {
   const { amount } = await scanTicket(imageUri);
   return amount;

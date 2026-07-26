@@ -225,7 +225,7 @@ export default function JuntadaDetalleScreen({ route, navigation }) {
           <Ionicons name="add" size={18} color={colors.primary} />
         </TouchableOpacity>
 
-        {/* ── SECCIÓN NUEVA: Alias de transferencia ──────────────────────── */}
+        {/* ── Alias de transferencia ──────────────────────── */}
         {juntada.alias && (
           <View style={styles.aliasCard}>
             <View style={styles.aliasIconContainer}>
@@ -241,7 +241,7 @@ export default function JuntadaDetalleScreen({ route, navigation }) {
           </View>
         )}
 
-        {/* ── SECCIÓN NUEVA: Saldos Consolidados ─────────────────────────── */}
+        {/* ── Saldos Consolidados ─────────────────────────── */}
         {juntada.balance?.saldos && juntada.balance.saldos.length > 0 && (
           <View style={styles.saldosContainer}>
             <Text style={styles.seccionLabel}>SALDOS CONSOLIDADOS</Text>
@@ -327,7 +327,6 @@ export default function JuntadaDetalleScreen({ route, navigation }) {
         </TouchableOpacity>
       </View>
 
-      {/* Bottom sheet Subgrupos */}
       <SubgruposSheet
         visible={subgruposVisible}
         juntada={juntada}
@@ -339,7 +338,6 @@ export default function JuntadaDetalleScreen({ route, navigation }) {
         onEliminar={handleEliminarSubgrupo}
       />
 
-      {/* Actions sheet (tres puntos) */}
       <ActionsSheet
         visible={actionsVisible}
         titulo={juntada.nombre}
@@ -356,7 +354,6 @@ export default function JuntadaDetalleScreen({ route, navigation }) {
         onEliminar={() => { setActionsVisible(false); setConfirmEliminar(true); }}
       />
 
-      {/* Confirm eliminar juntada */}
       {confirmEliminar && (
         <ConfirmSheet
           titulo="Eliminar juntada"
@@ -374,7 +371,6 @@ export default function JuntadaDetalleScreen({ route, navigation }) {
         />
       )}
 
-      {/* Visor de foto del ticket (clip) */}
       <Modal visible={!!fotoTicket} transparent animationType="fade" onRequestClose={() => setFotoTicket(null)}>
         <View style={styles.fotoOverlay}>
           <TouchableOpacity style={StyleSheet.absoluteFill} activeOpacity={1} onPress={() => setFotoTicket(null)} />
@@ -392,7 +388,6 @@ export default function JuntadaDetalleScreen({ route, navigation }) {
         </View>
       </Modal>
 
-      {/* Listado de participantes */}
       <Modal visible={miembrosVisible} transparent animationType="fade" onRequestClose={() => setMiembrosVisible(false)}>
         <View style={styles.miembrosOverlay}>
           <TouchableOpacity style={StyleSheet.absoluteFill} activeOpacity={1} onPress={() => setMiembrosVisible(false)} />

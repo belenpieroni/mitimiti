@@ -41,12 +41,8 @@ async function getConsolidado(req, res, next) {
       [usuario]
     );
 
-    // 1. Cargar Juntadas (Pendientes y Pagos de juntada)
     const acreedoresMap = new Map();
     const pagosRecientes = [];
-
-    // Traer pagos donde el usuario fue el que pagó (de) O el que recibió (para).
-    // Con LOWER() en ambos lados para garantizar consistencia de mayúsculas.
     const { rows: juntadasPagos } = await pool.query(
       `SELECT pd.id, j.nombre as titulo, pd.monto, pd.creado_en, pd.de, pd.para
        FROM juntada_pagos_deudas pd
@@ -78,8 +74,6 @@ async function getConsolidado(req, res, next) {
       const juntada = await cargarJuntadaCompleta(id);
       const balance = calcularBalance(juntada);
 
-      // Usamos transferenciasOriginales para mostrar el monto bruto correcto
-      // (antes de descontar pagos parciales que reducirían el valor mostrado).
       for (const t of balance.transferenciasOriginales) {
         const isDeudor   = t.de.toLowerCase()   === usuario.toLowerCase();
         const isAcreedor = t.para.toLowerCase()  === usuario.toLowerCase();
@@ -113,7 +107,6 @@ async function getConsolidado(req, res, next) {
       }
     }
 
-    // 2. Cargar Gastos y Servicios de Vivienda
     const serviciosAPagar = [];
 
     const { rows: [userRow] } = await pool.query(
@@ -128,7 +121,6 @@ async function getConsolidado(req, res, next) {
       );
 
       if (vm) {
-        // Consultar los porcentajes de todos los acuerdos de esta vivienda
         const { rows: acuerdosPart } = await pool.query(
           `SELECT ap.acuerdo_id, ap.nombre, ap.porcentaje
            FROM acuerdo_participantes ap
@@ -145,7 +137,6 @@ async function getConsolidado(req, res, next) {
           acuerdoMap[ap.acuerdo_id][ap.nombre.toLowerCase()] = Number(ap.porcentaje);
         }
 
-        // Gastos
         const { rows: gastos } = await pool.query(
           'SELECT id, nombre, pagador, monto, status, fecha_pago, participantes, acuerdo_id FROM vivienda_gastos WHERE vivienda_id = $1 AND (status = $2 OR status = $3)',
           [vm.vivienda_id, 'PROCESADO', 'PAGADO']
@@ -156,7 +147,6 @@ async function getConsolidado(req, res, next) {
           const isPagador = g.pagador && g.pagador.toLowerCase() === usuario.toLowerCase();
           if (!isParticipante && !isPagador) continue;
 
-          // Helper para obtener la parte correspondiente a un participante dado
           const getParteGasto = (nombreParticipante) => {
             if (g.acuerdo_id && acuerdoMap[g.acuerdo_id]) {
               const pct = acuerdoMap[g.acuerdo_id][nombreParticipante.toLowerCase()] || 0;
@@ -218,7 +208,6 @@ async function getConsolidado(req, res, next) {
           }
         }
 
-        // Servicios
         const { rows: servicios } = await pool.query(
           'SELECT id, nombre, monto, status, is_variable, participantes, fecha_pago, acuerdo_id FROM vivienda_servicios WHERE vivienda_id = $1 AND (status = $2 OR status = $3 OR status = $4)',
           [vm.vivienda_id, 'PENDIENTE', 'PROCESADO', 'PAGADO']
@@ -265,7 +254,6 @@ async function getConsolidado(req, res, next) {
       }
     }
 
-    // 3. Cargar Compensaciones Históricas desde notificaciones
     const { rows: compensaciones } = await pool.query(
       `SELECT n.id::text, n.titulo, n.cuerpo, n.creada_en, n.payload
        FROM notificaciones_usuario n
@@ -294,7 +282,6 @@ async function getConsolidado(req, res, next) {
       });
     }
 
-    // Ordenar y formatear pagos recientes
     pagosRecientes.sort((a, b) => b.fechaDate.getTime() - a.fechaDate.getTime());
     const pagosRecientesFormateados = pagosRecientes.map(p => {
       const pad = (n) => n.toString().padStart(2, '0');
@@ -303,7 +290,6 @@ async function getConsolidado(req, res, next) {
       return { ...rest, fecha: formattedDate, fecha_pago: p.fechaDate.toISOString() };
     });
 
-    // No filtrar por totalAcreedor >= 0 para permitir que el acreedor (con saldo a favor) vea la deuda.
     const acreedoresFiltrados = Array.from(acreedoresMap.values()).filter(a => a.conceptos.length > 0);
 
     res.json({ 
@@ -321,8 +307,6 @@ async function getConsolidado(req, res, next) {
 
 async function pagarDeuda(req, res, next) {
   try {
-    // Soporta tanto PATCH /pagar/:deudaId (frontend actual)
-    // como body { juntadaId, de, para, monto } para uso futuro
     let juntadaId, de, para, monto;
 
     if (req.params.deudaId) {
@@ -383,7 +367,6 @@ async function pagarMultiple(req, res, next) {
       const deudorNombre = req.user?.name || req.user?.nombre || 'Alguien';
       const { contraparte, neto, gastosAFavor, gastosEnContra } = compensacion;
 
-      // Notificar a la contraparte (Acreedor)
       notifyUsersByName(
         [contraparte],
         {
@@ -400,7 +383,6 @@ async function pagarMultiple(req, res, next) {
         { category: 'general' }
       ).catch(console.error);
 
-      // Notificar al deudor (el usuario actual) para el historial
       notifyUsersByName(
         [deudorNombre],
         {

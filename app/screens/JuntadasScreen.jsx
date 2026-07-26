@@ -66,7 +66,7 @@ export default function JuntadasScreen({ navigation }) {
     setCargando(true);
     setError(null);
     try {
-      await listarJuntadas(nombreUsuario); 
+      const response = await listarJuntadas(nombreUsuario); 
     } catch (e) {
       console.error("Error cargando juntadas:", e);
       setError('No se pudo conectar con el servidor.');

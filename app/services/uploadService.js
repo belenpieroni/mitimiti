@@ -7,8 +7,8 @@ import { API_URL } from './api';
  * archivos (es frágil y suele fallar en nativo). Se usa el objeto
  * { uri, name, type } directamente en el FormData.
  *
- * @param {string} imageUri - URI local de la imagen (file://...)
- * @returns {Promise<Object>} - { filename, url, mimetype, size }
+ * @param {string} imageUri
+ * @returns {Promise<Object>}
  */
 export const uploadTicketPhoto = async (imageUri) => {
   try {
