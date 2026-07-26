@@ -29,6 +29,7 @@ router.patch('/:tipo/:id/revertir', ctrl.revertirPago);
 //NURVO//
 router.get('/acuerdos', ctrl.listarAcuerdos);
 router.post('/acuerdos', ctrl.guardarAcuerdo);
+router.put('/acuerdos/:id', ctrl.editarAcuerdo);
 router.delete('/acuerdos/:id', ctrl.eliminarAcuerdo);
 
 module.exports = router;

@@ -141,7 +141,8 @@ export default function ViviendaDashboard({ navigation }) {
   // Modal Acuerdos
   const [modalAcuerdosVisible, setModalAcuerdosVisible] = useState(false);
   const [vistaFormulario, setVistaFormulario] = useState(false);
-  const { reglas, agregarRegla, recargar } = useVivienda();
+  const { reglas, agregarRegla, actualizarRegla, recargar } = useVivienda();
+  const [editandoAcuerdoId, setEditandoAcuerdoId] = useState(null);
 
   // Formulario "Nuevo Acuerdo"
   const [form, setForm] = useState(buildFormInicial([integranteInicial]));
@@ -204,23 +205,70 @@ export default function ViviendaDashboard({ navigation }) {
   };
 
   const quitarIntegrante = (idx) => {
+    const nombre = form.integrantes[idx];
+    Alert.alert(
+      'Quitar integrante',
+      '¿Deseas eliminar a este integrante de este acuerdo?',
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        {
+          text: 'Quitar',
+          style: 'destructive',
+          onPress: () => {
+            setForm(f => {
+              const nuevos = f.integrantes.filter((_, i) => i !== idx);
+              const nuevoProp = { ...f.proporcional };
+              delete nuevoProp[nombre];
+              return { ...f, integrantes: nuevos, proporcional: nuevoProp };
+            });
+          }
+        }
+      ]
+    );
+  };
+
+  const agregarIntegrante = (nombre) => {
     setForm(f => {
-      const nuevos = f.integrantes.filter((_, i) => i !== idx);
+      if (f.integrantes.includes(nombre)) return f;
+      const nuevos = [...f.integrantes, nombre];
       const nuevoProp = { ...f.proporcional };
-      delete nuevoProp[f.integrantes[idx]];
+      nuevoProp[nombre] = { sueldo: '', porcentaje: '' };
       return { ...f, integrantes: nuevos, proporcional: nuevoProp };
     });
   };
 
   // ── Handlers: Proporcional ────────────────────────────────────────────────
   const updateProporcional = (nombre, campo, valor) => {
-    setForm(f => ({
-      ...f,
-      proporcional: {
+    setForm(f => {
+      const nuevoProp = {
         ...f.proporcional,
         [nombre]: { ...f.proporcional[nombre], [campo]: valor },
-      },
-    }));
+      };
+
+      if (campo === 'sueldo') {
+        const total = f.integrantes.reduce((sum, n) => {
+          const val = n === nombre ? valor : nuevoProp[n]?.sueldo;
+          return sum + (Number(val) || 0);
+        }, 0);
+
+        if (total > 0) {
+          f.integrantes.forEach(n => {
+            const val = n === nombre ? valor : nuevoProp[n]?.sueldo;
+            const sueldoNum = Number(val) || 0;
+            const pct = Math.round((sueldoNum / total) * 100);
+            nuevoProp[n] = {
+              ...nuevoProp[n],
+              porcentaje: String(pct || '')
+            };
+          });
+        }
+      }
+
+      return {
+        ...f,
+        proporcional: nuevoProp
+      };
+    });
   };
 
   // ── Handlers: Modal Acuerdos ──────────────────────────────────────────────
@@ -229,40 +277,82 @@ export default function ViviendaDashboard({ navigation }) {
     setVistaFormulario(false);
     const integrantesActuales = miVivienda?.miembros ? miVivienda.miembros.map(m => m.name) : [integranteInicial];
     setForm(buildFormInicial(integrantesActuales));
+    setEditandoAcuerdoId(null);
   };
 
   const abrirFormularioAcuerdo = () => {
     const integrantesActuales = miVivienda?.miembros ? miVivienda.miembros.map(m => m.name) : [integranteInicial];
     setForm(buildFormInicial(integrantesActuales));
+    setEditandoAcuerdoId(null);
+    setVistaFormulario(true);
+  };
+
+  const abrirFormularioEdicion = (regla) => {
+    const mIdx = MODELOS.findIndex(m => m.value === regla.modelo);
+    const integrantes = regla.participantes.map(p => p.nombre);
+    const proporcional = {};
+
+    const todosMiembros = miVivienda?.miembros || [];
+    todosMiembros.forEach(m => {
+      proporcional[m.name] = { sueldo: '', porcentaje: '' };
+    });
+
+    regla.participantes.forEach(p => {
+      proporcional[p.nombre] = {
+        sueldo: p.sueldo != null ? String(p.sueldo) : '',
+        porcentaje: p.porcentaje != null ? String(p.porcentaje) : ''
+      };
+    });
+
+    setForm({
+      integrantes,
+      nombreAcuerdo: regla.nombre || '',
+      modeloIdx: mIdx !== -1 ? mIdx : 0,
+      proporcional,
+    });
+    setEditandoAcuerdoId(regla.id);
     setVistaFormulario(true);
   };
 
   const guardarAcuerdoForm = async () => {
     const nombreAcuerdo = form.nombreAcuerdo.trim() || 'Acuerdo sin nombre';
-
     const modeloValue = MODELOS[form.modeloIdx].value;
 
     const nuevaRegla = {
-      id: Date.now().toString(),
       nombre: nombreAcuerdo,
       modelo: modeloValue,
-      // AQUÍ CORREGIMOS: calculamos el porcentaje y lo guardamos siempre
       participantes: form.integrantes.map(nombre => {
         let pct = 0;
+        let sueldoVal = null;
         if (form.modeloIdx === 1) { // Proporcional
           pct = Number(form.proporcional[nombre]?.porcentaje ?? 0);
+          sueldoVal = form.proporcional[nombre]?.sueldo ? Number(form.proporcional[nombre].sueldo) : null;
         } else if (form.modeloIdx === 0) { // Partes iguales
           pct = Math.round(100 / form.integrantes.length);
         } else { // Responsable único
           pct = 100;
         }
-        return { nombre, porcentaje: pct };
+        return { nombre, porcentaje: pct, sueldo: sueldoVal };
       }),
     };
-    await agregarRegla(nuevaRegla);  // esto ya hace refetch interno
-    setVistaFormulario(false);        // volvés a la lista, que ya tiene reglas actualizadas
-    setForm(buildFormInicial(integranteInicial));
-    setDropdownAbierto(false);
+
+    try {
+      if (editandoAcuerdoId) {
+        await actualizarRegla(editandoAcuerdoId, nuevaRegla);
+      } else {
+        await agregarRegla(nuevaRegla);
+      }
+      setVistaFormulario(false);
+      const integrantesActuales = miVivienda?.miembros ? miVivienda.miembros.map(m => m.name) : [integranteInicial];
+      setForm(buildFormInicial(integrantesActuales));
+      setEditandoAcuerdoId(null);
+      if (typeof setDropdownAbierto === 'function') {
+        setDropdownAbierto(false);
+      }
+    } catch (e) {
+      console.error('Error al guardar acuerdo:', e);
+      Alert.alert('Error', 'No se pudo guardar el acuerdo');
+    }
   };
 
   const handleCrearMiVivienda = async () => {
@@ -781,6 +871,21 @@ export default function ViviendaDashboard({ navigation }) {
                             <Text style={styles.avatarNombre} numberOfLines={1}>{nombre.split(' ')[0]}</Text>
                           </TouchableOpacity>
                         ))}
+                        {(miVivienda?.miembros || [])
+                          .map(m => m.name)
+                          .filter(nombre => !form.integrantes.includes(nombre))
+                          .map((nombre, i) => (
+                            <TouchableOpacity
+                              key={`disponible-${i}`}
+                              onPress={() => agregarIntegrante(nombre)}
+                              style={styles.avatarWrapper}
+                            >
+                              <View style={styles.avatarAdd}>
+                                <Ionicons name="add" size={20} color={colors.textSecondary} />
+                              </View>
+                              <Text style={styles.avatarNombre} numberOfLines={1}>{nombre.split(' ')[0]}</Text>
+                            </TouchableOpacity>
+                          ))}
                       </View>
                     </View>
 
@@ -789,7 +894,7 @@ export default function ViviendaDashboard({ navigation }) {
                       <Text style={styles.label}>Nombre del acuerdo</Text>
                       <TextInput
                         style={styles.textInput}
-                        placeholder="Ej: Gastos de Limpieza, Alquiler..."
+                        placeholder="Ej: Proporcional por sueldos, Regla 60-40, Fondo Común..."
                         placeholderTextColor={colors.textSecondary}
                         value={form.nombreAcuerdo}
                         onChangeText={v => setForm(f => ({ ...f, nombreAcuerdo: v }))}
@@ -918,19 +1023,27 @@ export default function ViviendaDashboard({ navigation }) {
                               </View>
                             </View>
 
-                            <TouchableOpacity
-                              style={{ padding: 8 }}
-                              onPress={async () => {
-                                try {
-                                  await eliminarAcuerdoReparto(regla.id);
-                                  await recargar();
-                                } catch (error) {
-                                  Alert.alert('Error', 'No se pudo eliminar');
-                                }
-                              }}
-                            >
-                              <Ionicons name="trash-outline" size={20} color="#ec6c6a" />
-                            </TouchableOpacity>
+                            <View style={{ flexDirection: 'row', gap: 4 }}>
+                              <TouchableOpacity
+                                style={{ padding: 8 }}
+                                onPress={() => abrirFormularioEdicion(regla)}
+                              >
+                               <Ionicons name="create-outline" size={20} color={colors.primary} />
+                              </TouchableOpacity>
+                              <TouchableOpacity
+                                style={{ padding: 8 }}
+                                onPress={async () => {
+                                  try {
+                                    await eliminarAcuerdoReparto(regla.id);
+                                    await recargar();
+                                  } catch (error) {
+                                    Alert.alert('Error', 'No se pudo eliminar');
+                                  }
+                                }}
+                              >
+                                <Ionicons name="trash-outline" size={20} color="#ec6c6a" />
+                              </TouchableOpacity>
+                            </View>
                           </View>
                         );
                       })}
