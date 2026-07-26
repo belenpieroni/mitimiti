@@ -40,6 +40,19 @@ npm run start:tunnel
 Opcionalmente podés usar `npm run android`, `npm run ios` o `npm run web`.
 
 Cuando usás `scripts/dev.sh`, la variable `EXPO_PUBLIC_API_URL` se completa sola con tu IP local, así la app puede hablar con el backend sin tocar nada a mano.
+
+### Docker front
+
+El servicio `front` usa un volumen Docker para `/app/node_modules`, de modo que las dependencias no se mezclan con el volumen del código fuente.
+
+Al iniciar el contenedor, si el volumen `node_modules` está vacío o no contiene paquetes clave como `expo-document-picker`, el entrypoint instala las dependencias automáticamente.
+
+Si cambiás dependencias o querés forzar una instalación limpia, ejecutá:
+
+```bash
+docker compose down -v
+bash scripts/dev.sh
+```
 Si abrís Expo Go, usá el QR o el link `exp://...exp.direct` que imprime el terminal del front.
 
 Si ves el prompt:
@@ -52,6 +65,29 @@ es porque `expo start --tunnel` se está ejecutando sin sesión de Expo en el co
 
 - elegir `Proceed anonymously` y continuar
 - o configurar `EXPO_TOKEN` en `.env` para evitar el prompt en cada arranque
+
+### Notificaciones en Android
+
+Expo Go para Android no incluye el módulo completo de `expo-notifications` para notificaciones push. Esto significa que:
+
+- el app no debe romperse; la lógica mostrará un aviso claro y omitirá el registro de token en Expo Go Android.
+- para probar notificaciones push reales en Android necesitás un development build o cliente compatible.
+
+La forma recomendada es:
+
+```bash
+# en un proyecto Expo con EAS configurado
+npx eas build --profile development --platform android
+```
+
+O si preferís usar un cliente local:
+
+```bash
+expo prebuild
+expo run:android
+```
+
+En iOS, Expo Go tiene mejor soporte para `expo-notifications`, pero para el despliegue real igualmente se recomienda un build nativo.
 
 ## Base de datos PostgreSQL
 
