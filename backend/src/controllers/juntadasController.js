@@ -298,11 +298,11 @@ async function eliminarJuntada(req, res, next) {
   }
 }
 
-// ── Participantes ─────────────────────────────────────────────────────────────
+
 
 async function agregarParticipante(req, res, next) {
   try {
-    const { rows: [juntada] } = await pool.query('SELECT id FROM juntadas WHERE id = $1', [req.params.id]);
+    const { rows: [juntada] } = await pool.query('SELECT id, nombre FROM juntadas WHERE id = $1', [req.params.id]);
     if (!juntada) {
       const err = new Error(`Juntada con id "${req.params.id}" no encontrada.`);
       err.status = 404; return next(err);
@@ -335,6 +335,14 @@ async function agregarParticipante(req, res, next) {
        VALUES ($1, $2, $3, $4, $5)`,
       [pid, req.params.id, nombreLimpio, iniciales || getIniciales(nombreLimpio), colorAsignado]
     );
+
+    notifyUsersByName([nombreLimpio], {
+      title: 'Te agregaron a una juntada',
+      body: `Ahora participas en "${juntada.nombre}"`,
+      data: { type: 'juntada_invite', juntadaId: juntada.id, juntadaNombre: juntada.nombre },
+    }, { category: NOTIFICATION_CATEGORIES.NUEVAS_JUNTADAS }).catch((err) => {
+      console.error('[push] Error enviando notificacion de juntada:', err.message);
+    });
 
     res.status(201).json({
       ok: true,
@@ -372,7 +380,7 @@ async function quitarParticipante(req, res, next) {
   }
 }
 
-// ── Gastos ────────────────────────────────────────────────────────────────────
+
 
 async function agregarGasto(req, res, next) {
   try {
@@ -471,7 +479,7 @@ async function eliminarGasto(req, res, next) {
   }
 }
 
-// ── Balance ───────────────────────────────────────────────────────────────────
+
 
 async function obtenerBalance(req, res, next) {
   try {
@@ -510,7 +518,7 @@ async function obtenerBalanceGlobal(req, res, next) {
   }
 }
 
-// ── Subgrupos ─────────────────────────────────────────────────────────────────
+
 
 const agregarSubgrupo = async (req, res) => {
   try {
@@ -581,7 +589,7 @@ const eliminarSubgrupo = async (req, res) => {
   }
 };
 
-// ── Invitaciones ─────────────────────────────────────────────────────────────
+
 
 async function generarObtenerInvitacion(req, res, next) {
   try {

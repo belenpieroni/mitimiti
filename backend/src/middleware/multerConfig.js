@@ -38,7 +38,7 @@ const upload = multer({
   storage,
   fileFilter,
   limits: {
-    fileSize: 10 * 1024 * 1024, // 10MB máximo (los PDF pueden ser pesados)
+    fileSize: 10 * 1024 * 1024, 
   },
 });
 

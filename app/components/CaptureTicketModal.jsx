@@ -136,7 +136,7 @@ export default function CaptureTicketModal({ visible, onClose, onAmountExtracted
 
           {!capturedPhoto ? (
             <ScrollView style={styles.captureContent} showsVerticalScrollIndicator={false}>
-              {/* Cámara */}
+              
               <View style={styles.cameraWrapper}>
                 <CameraView
                   ref={cameraRef}
@@ -151,7 +151,7 @@ export default function CaptureTicketModal({ visible, onClose, onAmountExtracted
                 </View>
               </View>
 
-              {/* Botón Capturar */}
+              
               <TouchableOpacity
                 style={styles.captureButton}
                 onPress={takePicture}

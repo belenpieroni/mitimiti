@@ -239,7 +239,7 @@ export default function AgregarGastoScreen({ route, navigation }) {
             </View>
           )}
 
-          {/* Método de división */}
+          
           <Text style={styles.label}>MÉTODO DE DIVISIÓN</Text>
           <View style={styles.metodosContainer}>
             <TouchableOpacity
@@ -266,7 +266,7 @@ export default function AgregarGastoScreen({ route, navigation }) {
             </TouchableOpacity>
           </View>
 
-          {/* Mostrar subgrupos o participantes */}
+          
           {splitMode === 'subgroups' && juntada.subgrupos?.length > 0 ? (
             <>
               <Text style={styles.label}>SUBGRUPOS SELECCIONADOS · {juntada.subgrupos.length}</Text>
@@ -300,9 +300,9 @@ export default function AgregarGastoScreen({ route, navigation }) {
                 </View>
               </View>
               
-              {/* ── CHECKLIST GRUPAL / FAMILIAR ── */}
+              
               <View style={styles.checklistContainer}>
-                {/* Renderizar Familias */}
+                
                 {(juntada.subgrupos || []).map(sg => {
                   const todosTildados = sg.integrantes.every(i => seleccionados.includes(i));
                   return (
@@ -343,7 +343,7 @@ export default function AgregarGastoScreen({ route, navigation }) {
                   );
                 })}
 
-                {/* Renderizar los que van solos */}
+                
                 {participantesSueltos.length > 0 && (
                   <View style={styles.familiaCard}>
                     <View style={styles.familiaHeader}>
@@ -384,7 +384,7 @@ export default function AgregarGastoScreen({ route, navigation }) {
             </>
           ) : null}
 
-          {/* Fecha */}
+          
           <Text style={styles.label}>FECHA DEL GASTO</Text>
           <TouchableOpacity 
             style={styles.fieldBox} 
@@ -418,7 +418,7 @@ export default function AgregarGastoScreen({ route, navigation }) {
             />
           )}
 
-          {/* Botón guardar */}
+          
           <TouchableOpacity
             style={[styles.btnGuardarGasto, !puedeGuardar && { opacity: 0.5, backgroundColor: colors.textSecondary }]}
             onPress={handleGuardar}

@@ -234,6 +234,17 @@ async function unirseViaToken(req, res, next) {
     const vivienda = await obtenerMiViviendaBase(req.user.id);
     const miembros = await obtenerMiembrosVivienda(vivienda.id);
 
+    const { rows: [usuarioRow] } = await pool.query('SELECT name FROM usuarios WHERE id = $1', [req.user.id]);
+    if (usuarioRow?.name) {
+      notifyUsersByName([usuarioRow.name], {
+        title: 'Te uniste a una Vivienda',
+        body: `Fuiste añadido al grupo de vivienda: "${vivienda.nombre}"`,
+        data: { type: 'vivienda_invite', viviendaId: vivienda.id, viviendaNombre: vivienda.nombre },
+      }, { category: 'general' }).catch((err) => {
+        console.error('[push] Error enviando notificacion de vivienda:', err.message);
+      });
+    }
+
     res.status(201).json({
       ok: true,
       data: {
@@ -257,7 +268,7 @@ async function obtenerMiViviendaOrFail(req) {
   return vivienda;
 }
 
-// ── Gastos ────────────────────────────────────────────────────────────────────
+
 
 async function listarGastos(req, res, next) {
   try {
@@ -468,7 +479,7 @@ async function eliminarGasto(req, res, next) {
   }
 }
 
-// ── Servicios periódicos ──────────────────────────────────────────────────────
+
 
 async function listarServicios(req, res, next) {
   try {
@@ -679,7 +690,7 @@ async function eliminarServicio(req, res, next) {
   }
 }
 
-// ── Liquidar servicio variable ────────────────────────────────────────────────
+
 
 async function liquidarServicio(req, res, next) {
   const client = await pool.connect();
@@ -758,7 +769,7 @@ async function liquidarServicio(req, res, next) {
   }
 }
 
-// ── Acuerdos de reparto ───────────────────────────────────────────────────────
+
 
 async function listarAcuerdos(req, res, next) {
   try {

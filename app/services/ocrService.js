@@ -1,15 +1,6 @@
 import { API_URL, getAuthToken } from './api';
 
-/**
- * OCR de tickets — versión que corre contra el BACKEND.
- *
- * Antes esto usaba tesseract.js directamente en la app, pero Tesseract.js
- * necesita APIs de navegador (Worker, Blob, canvas) que React Native / Expo
- * NO tiene -> de ahí el error "Property 'Worker' doesn't exist".
- *
- * Ahora la app solo manda la foto al backend (POST /api/uploads/scan),
- * el server corre el OCR y nos devuelve el importe ya extraído.
- */
+
 
 function buildFilePart(imageUri) {
   const filename = imageUri.split('/').pop() || `ticket-${Date.now()}.jpg`;
@@ -19,11 +10,7 @@ function buildFilePart(imageUri) {
   return { uri: imageUri, name: filename, type };
 }
 
-/**
- * Sube la foto del ticket y corre OCR en el backend.
- * @param {string} imageUri
- * @returns {Promise<{ amount: number|null, text: string, ticketUrl: string }>}
- */
+
 export const scanTicket = async (imageUri) => {
   try {
     const formData = new FormData();

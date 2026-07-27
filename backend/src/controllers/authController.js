@@ -18,7 +18,6 @@ const extractInitials = (name) =>
 exports.register = async (req, res, next) => {
   console.log('═══════════════════════');
   console.log('REGISTER RECIBIDO');
-  console.log(req.body);
 
   try {
     const { name, email, password } = req.body;
@@ -58,7 +57,6 @@ exports.register = async (req, res, next) => {
 exports.login = async (req, res, next) => {
   console.log('═══════════════════════');
   console.log('LOGIN RECIBIDO');
-  console.log(req.body);
 
   try {
     const { email, password } = req.body;

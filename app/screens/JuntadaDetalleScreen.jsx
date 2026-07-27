@@ -160,7 +160,7 @@ export default function JuntadaDetalleScreen({ route, navigation }) {
 
   return (
     <View style={styles.container}>
-      {/* Header */}
+      
       <View style={styles.header}>
         <TouchableOpacity style={styles.btnVolver} onPress={() => navigation.navigate('JuntadasList')}>
           <Ionicons name="chevron-back" size={22} color={colors.textPrimary} />
@@ -177,7 +177,7 @@ export default function JuntadaDetalleScreen({ route, navigation }) {
       </View>
 
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-        {/* Card total */}
+        
         <View style={styles.cardTotal}>
           <Text style={styles.cardTotalLabel}>Total gastado</Text>
           <Text style={styles.cardTotalMonto}>{formatPesos(totalGastado)}</Text>
@@ -194,7 +194,7 @@ export default function JuntadaDetalleScreen({ route, navigation }) {
           </TouchableOpacity>
         </View>
 
-        {/* Botón Invitar personas */}
+        
         <TouchableOpacity style={styles.invitarBtn} onPress={handleCompartirInvitacion}>
           <View style={styles.invitarBtnIcon}>
             <Ionicons name="person-add-outline" size={18} color="#fff" />
@@ -206,7 +206,7 @@ export default function JuntadaDetalleScreen({ route, navigation }) {
           <Ionicons name="share-outline" size={18} color={colors.primary} />
         </TouchableOpacity>
 
-        {/* Botón Subgrupos – card ancho completo */}
+        
         <TouchableOpacity
           onPress={() => setSubgruposVisible(true)}
           style={styles.subgruposBtn}
@@ -225,7 +225,7 @@ export default function JuntadaDetalleScreen({ route, navigation }) {
           <Ionicons name="add" size={18} color={colors.primary} />
         </TouchableOpacity>
 
-        {/* ── Alias de transferencia ──────────────────────── */}
+        
         {juntada.alias && (
           <View style={styles.aliasCard}>
             <View style={styles.aliasIconContainer}>
@@ -241,7 +241,7 @@ export default function JuntadaDetalleScreen({ route, navigation }) {
           </View>
         )}
 
-        {/* ── Saldos Consolidados ─────────────────────────── */}
+        
         {juntada.balance?.saldos && juntada.balance.saldos.length > 0 && (
           <View style={styles.saldosContainer}>
             <Text style={styles.seccionLabel}>SALDOS CONSOLIDADOS</Text>
@@ -277,7 +277,7 @@ export default function JuntadaDetalleScreen({ route, navigation }) {
           </View>
         )}
 
-        {/* Gastos */}
+        
         <View style={styles.gastosHeader}>
           <Text style={styles.gastosLabel}>GASTOS · {juntada.gastos.length}</Text>
           <TouchableOpacity onPress={() => navigation.navigate('AgregarGasto', { juntadaId })}>
@@ -317,7 +317,7 @@ export default function JuntadaDetalleScreen({ route, navigation }) {
         )}
       </ScrollView>
 
-      {/* Footer */}
+      
       <View style={styles.footer}>
         <TouchableOpacity
           style={styles.btnBalance}
@@ -508,7 +508,7 @@ function ConfirmSheet({ titulo, mensaje, onCancelar, onConfirmar }) {
 
 function SubgruposSheet({ visible, juntada, participantes, usuarioActualNombre, onCerrar, onGuardar, onEditar, onEliminar }) {
   const [creando, setCreando]       = useState(false);
-  const [editando, setEditando]     = useState(null); // subgrupo que se está editando
+  const [editando, setEditando]     = useState(null); 
   const [nombre, setNombre]         = useState('');
   const [seleccionados, setSelec]   = useState([]);
   const [guardando, setGuardando]   = useState(false);
@@ -581,7 +581,7 @@ function SubgruposSheet({ visible, juntada, participantes, usuarioActualNombre, 
         />
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
           <View style={sg.sheet}>
-          {/* Header */}
+          
           <View style={sg.header}>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
               <Ionicons name="people" size={18} color={colors.primary} />

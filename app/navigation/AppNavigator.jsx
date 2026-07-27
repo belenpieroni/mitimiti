@@ -1,5 +1,6 @@
-import { useMemo, useState } from 'react';
-import { NavigationContainer, useNavigation } from '@react-navigation/native';
+import { useMemo, useState, useEffect } from 'react';
+import { NavigationContainer, useNavigation, createNavigationContainerRef } from '@react-navigation/native';
+import * as Notifications from 'expo-notifications';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { View, TouchableOpacity, StyleSheet, Modal, Text, KeyboardAvoidingView, Platform, Linking } from 'react-native';
@@ -194,7 +195,7 @@ function RootTabs() {
                 </TouchableOpacity>
               </View>
 
-              {/* Nueva Juntada */}
+              
               <TouchableOpacity
                 style={mStyles.optionCard}
                 onPress={() => {
@@ -214,7 +215,7 @@ function RootTabs() {
                 </View>
               </TouchableOpacity>
 
-              {/* Nuevo gasto de Vivienda */}
+              
               <TouchableOpacity
                 style={mStyles.optionCard}
                 onPress={() => {
@@ -242,6 +243,8 @@ function RootTabs() {
   );
 }
 
+export const navigationRef = createNavigationContainerRef();
+
 export default function AppNavigator() {
   const [session, setSession] = useState(null);
 
@@ -260,6 +263,68 @@ export default function AppNavigator() {
     },
     logout: () => { setSession(null); setAuthToken(null); },
   }), [session]);
+
+  useEffect(() => {
+    if (Platform.OS === 'web') return;
+
+    if (Platform.OS === 'android') {
+      Notifications.setNotificationChannelAsync('default', {
+        name: 'default',
+        importance: Notifications.AndroidImportance.MAX,
+        vibrationPattern: [0, 250, 250, 250],
+        lightColor: '#4f46e5',
+      });
+    }
+
+    Notifications.setNotificationHandler({
+      handleNotification: async () => {
+        const currentRoute = navigationRef.isReady() ? navigationRef.getCurrentRoute()?.name : null;
+        const isNotificationsScreen = currentRoute === 'Notifications';
+        return {
+          shouldShowAlert: !isNotificationsScreen,
+          shouldPlaySound: !isNotificationsScreen,
+          shouldSetBadge: false,
+        };
+      },
+    });
+
+    const handleNotificationResponse = (response) => {
+      if (
+        response &&
+        response.notification.request.content.data &&
+        response.actionIdentifier === Notifications.DEFAULT_ACTION_IDENTIFIER
+      ) {
+        const data = response.notification.request.content.data;
+        if (data.type === 'juntada_invite' && data.juntadaId) {
+          if (navigationRef.isReady()) {
+            navigationRef.navigate('AppTabs', {
+              screen: 'Juntadas',
+              params: { screen: 'JuntadaDetalle', params: { juntadaId: data.juntadaId } }
+            });
+          }
+        } else if (data.type === 'vivienda_invite') {
+          if (navigationRef.isReady()) {
+            navigationRef.navigate('AppTabs', {
+              screen: 'Vivienda',
+              params: { screen: 'ViviendaDashboard' }
+            });
+          }
+        }
+      }
+    };
+
+    const subscription = Notifications.addNotificationResponseReceivedListener(handleNotificationResponse);
+
+    Notifications.getLastNotificationResponseAsync()
+      .then(response => {
+        if (response) handleNotificationResponse(response);
+      })
+      .catch(console.warn);
+
+    return () => {
+      subscription.remove();
+    };
+  }, []);
 
   const linking = {
     prefixes: ['mitimiti://'],
@@ -285,7 +350,7 @@ export default function AppNavigator() {
 
   return (
     <AuthContext.Provider value={authValue}>
-      <NavigationContainer linking={linking}>
+      <NavigationContainer ref={navigationRef} linking={linking}>
         <Stack.Navigator screenOptions={{ headerShown: false }}>
           {authValue.isAuthenticated ? (
             <Stack.Screen name="AppTabs" component={RootTabs} />

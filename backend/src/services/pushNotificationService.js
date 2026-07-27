@@ -18,12 +18,7 @@ const PREF_COLUMN_MAP = {
   [NOTIFICATION_CATEGORIES.SERVICIO_VARIABLE]: 'notif_recordatorios_vencimiento',
 };
 
-/**
- * Envía una notificación push a usuarios por nombre.
- * @param {string[]} names - Nombres de los destinatarios.
- * @param {{ title: string, body: string, data?: object }} payload
- * @param {{ category?: string }} options
- */
+
 async function notifyUsersByName(names, payload, options = {}) {
   if (!names || names.length === 0) return { sent: 0, failed: 0 };
 
@@ -89,11 +84,7 @@ async function guardarNotificacionesEnBD(usuarios, payload, categoria) {
   }
 }
 
-/**
- * Envía push a una lista de tokens directamente.
- * @param {string[]} tokens
- * @param {{ title: string, body: string, data?: object }} payload
- */
+
 async function sendPushToTokens(tokens, payload) {
   const validTokens = tokens.filter((t) => Expo.isExpoPushToken(t));
 
@@ -108,6 +99,8 @@ async function sendPushToTokens(tokens, payload) {
     title: payload.title,
     body: payload.body,
     data: payload.data || {},
+    priority: 'high',
+    channelId: 'default',
   }));
 
   let sent = 0;

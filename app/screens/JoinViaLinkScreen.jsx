@@ -10,7 +10,7 @@ import { useAuth } from '../context/AuthContext';
 export default function JoinViaLinkScreen({ route, navigation }) {
   const { token } = route.params || {};
   const { isAuthenticated } = useAuth();
-  const [estado, setEstado] = useState('pendiente'); // 'pendiente' | 'cargando' | 'ok' | 'error'
+  const [estado, setEstado] = useState('pendiente'); 
   const [juntadaNombre, setJuntadaNombre] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
   const [linkInput, setLinkInput] = useState(token || '');

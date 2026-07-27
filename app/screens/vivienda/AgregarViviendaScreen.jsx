@@ -222,13 +222,13 @@ const handleChange = (event, selectedDate) => {
           setMostrarPicker(true);
         }}
       >
-        {/* Usamos toLocaleDateString de forma segura */}
+        
         <Text style={styles.inputText}>
           {dateValue.toLocaleDateString()}
         </Text>
       </TouchableOpacity>
 
-      {/* Android: diálogo nativo */}
+      
       {Platform.OS === 'android' && mostrarPicker && (
         <DateTimePicker
           value={dateValue}
@@ -238,7 +238,7 @@ const handleChange = (event, selectedDate) => {
         />
       )}
 
-      {/* iOS: modal con spinner, sin absoluteFill para no interferir con el picker */}
+      
       {Platform.OS === 'ios' && (
         <Modal visible={mostrarPicker} transparent animationType="slide">
           <View style={styles.modalOverlay}>
@@ -339,18 +339,21 @@ export default function AgregarViviendaScreen({ route, navigation }) {
       if (data.proximoVencimiento) setFechaVencimiento(new Date(data.proximoVencimiento));
       if (data.acuerdoId) setAcuerdoId(data.acuerdoId);
       setIsVariable(!!(data.isVariable || data.is_variable));
-      setImagenUrl(data.imagenUrl || data.imagen_url || null);
       if (data.pagador) setPagador(data.pagador);
       if (data.participantes) setParticipantesGasto(data.participantes);
     }
   }, [editMode, data]);
 
   useEffect(() => {
-    if (editMode && data?.nombre && reglas.length > 0) {
-      const encontrada = reglas.find(
-        r => r.nombre.toLowerCase().trim() === data.nombre.toLowerCase().trim()
-      );
-      if (encontrada) setRegla(encontrada);
+    if (editMode && data && reglas.length > 0) {
+      const targetId = data.acuerdoId || data.acuerdo_id;
+      if (targetId) {
+        const encontrada = reglas.find(r => r.id === targetId);
+        if (encontrada) {
+          setRegla(encontrada);
+          setAcuerdoId(encontrada.id);
+        }
+      }
     }
   }, [editMode, data, reglas]);
 
@@ -498,7 +501,7 @@ export default function AgregarViviendaScreen({ route, navigation }) {
 
       <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
 
-        {/* Tabs */}
+        
         <View style={styles.tabsRow}>
           <TouchableOpacity
             style={[styles.tab, esServicio && styles.tabActive]}
@@ -521,7 +524,7 @@ export default function AgregarViviendaScreen({ route, navigation }) {
           </TouchableOpacity>
         </View>
 
-        {/* ACUERDO ASOCIADO */}
+        
         {esServicio && (
           <>
             <Text style={styles.label}>ACUERDO ASOCIADO</Text>
@@ -540,7 +543,7 @@ export default function AgregarViviendaScreen({ route, navigation }) {
 
 
 
-        {/* Modal Acuerdos */}
+        
         <Modal visible={modalAcuerdosVisible} transparent animationType="slide">
           <View style={styles.modalOverlay}>
             <TouchableOpacity style={StyleSheet.absoluteFill} onPress={() => setModalAcuerdosVisible(false)} />
@@ -583,7 +586,7 @@ export default function AgregarViviendaScreen({ route, navigation }) {
           </View>
         </Modal>
 
-        {/* SERVICIO / GASTO */}
+        
         <Text style={styles.label}>{esServicio ? 'SERVICIO' : 'GASTO'}</Text>
 
         {esServicio ? (
@@ -661,7 +664,7 @@ export default function AgregarViviendaScreen({ route, navigation }) {
           />
         )}
 
-        {/* Monto */}
+        
         <Text style={styles.label}>MONTO</Text>
         {esServicio && (
           <View style={[
@@ -711,7 +714,7 @@ export default function AgregarViviendaScreen({ route, navigation }) {
           />
         )}
 
-        {/* Participantes (solo Gastos) */}
+        
         {!esServicio && (
           <View style={{ marginTop: 16 }}>
             <Text style={styles.label}>PARTICIPANTES DEL GASTO</Text>
@@ -753,7 +756,7 @@ export default function AgregarViviendaScreen({ route, navigation }) {
           </View>
         )}
 
-        {/* Cálculo en tiempo real */}
+        
         {esServicio && regla && montoNumerico > 0 && (
           <CalculoEnTiempoReal monto={montoNumerico} regla={regla} />
         )}
@@ -761,7 +764,7 @@ export default function AgregarViviendaScreen({ route, navigation }) {
           <CalculoGastoPuntualEnTiempoReal total={montoNumerico} participantes={participantesGasto} />
         )}
 
-        {/* ── FECHA DE VENCIMIENTO (solo Servicios) ── */}
+        
         {esServicio && (
           <>
             <Text style={styles.label}>FECHA DE VENCIMIENTO</Text>
@@ -775,7 +778,7 @@ export default function AgregarViviendaScreen({ route, navigation }) {
           </>
         )}
 
-        {/* Frecuencia (solo Servicios) */}
+        
         {esServicio && (
           <>
 
@@ -794,7 +797,7 @@ export default function AgregarViviendaScreen({ route, navigation }) {
           </>
         )}
 
-        {/* Categoría (solo Gastos) */}
+        
         {!esServicio && (
           <>
             <Text style={styles.label}>CATEGORÍA</Text>
@@ -833,7 +836,7 @@ export default function AgregarViviendaScreen({ route, navigation }) {
           </>
         )}
 
-        {/* Pagador (solo Gastos) */}
+        
         {!esServicio && (
           <>
             <Text style={styles.label}>¿QUIÉN PAGÓ?</Text>
@@ -865,7 +868,7 @@ export default function AgregarViviendaScreen({ route, navigation }) {
           </>
         )}
 
-        {/* Guardar */}
+        
         <TouchableOpacity 
           style={[styles.btnGuardar, isSaving && { opacity: 0.6 }]} 
           onPress={handleGuardar}

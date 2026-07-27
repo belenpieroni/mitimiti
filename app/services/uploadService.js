@@ -1,15 +1,6 @@
 import { API_URL } from './api';
 
-/**
- * Sube una foto de ticket al backend (sin OCR).
- *
- * IMPORTANTE: en React Native NO se usa fetch(uri).blob() para adjuntar
- * archivos (es frágil y suele fallar en nativo). Se usa el objeto
- * { uri, name, type } directamente en el FormData.
- *
- * @param {string} imageUri
- * @returns {Promise<Object>}
- */
+
 export const uploadTicketPhoto = async (imageUri) => {
   try {
     const filename = imageUri.split('/').pop() || `ticket-${Date.now()}.jpg`;

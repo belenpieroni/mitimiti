@@ -82,7 +82,7 @@ export default function LoginScreen() {
         showsVerticalScrollIndicator={false}
       >
         
-        {/* LOGO E ISOTIPO */}
+        
         <View style={styles.logoContainer}>
           <View style={styles.logoBox}>
             <Image 
@@ -95,7 +95,7 @@ export default function LoginScreen() {
           <Text style={styles.subtitle}>Dividí gastos sin complicarte</Text>
         </View>
 
-        {/* CONTROLLER DE PESTAÑAS */}
+        
         <View style={styles.tabContainer}>
           <TouchableOpacity 
             style={[styles.tabButton, activeTab === 'login' && styles.tabButtonActive]} 
@@ -115,7 +115,7 @@ export default function LoginScreen() {
           </TouchableOpacity>
         </View>
 
-        {/* FORMULARIO DE INPUTS */}
+        
         <View style={styles.formContainer}>
           {activeTab === 'register' && (
             <View style={styles.inputWrapper}>
@@ -192,7 +192,7 @@ export default function LoginScreen() {
           )}
         </View>
 
-        {/* BOTÓN PRINCIPAL */}
+        
         <TouchableOpacity 
           style={[
             styles.btnPrimary, 
@@ -210,7 +210,7 @@ export default function LoginScreen() {
           )}
         </TouchableOpacity>
 
-        {/* FOOTER TOGGLE */}
+        
         <TouchableOpacity 
           style={styles.footerToggle} 
           onPress={() => setActiveTab(activeTab === 'login' ? 'register' : 'login')}

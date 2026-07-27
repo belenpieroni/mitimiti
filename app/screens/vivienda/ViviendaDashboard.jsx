@@ -313,12 +313,12 @@ export default function ViviendaDashboard({ navigation }) {
       participantes: form.integrantes.map(nombre => {
         let pct = 0;
         let sueldoVal = null;
-        if (form.modeloIdx === 1) { // Proporcional
+        if (form.modeloIdx === 1) { 
           pct = Number(form.proporcional[nombre]?.porcentaje ?? 0);
           sueldoVal = form.proporcional[nombre]?.sueldo ? Number(form.proporcional[nombre].sueldo) : null;
-        } else if (form.modeloIdx === 0) { // Partes iguales
+        } else if (form.modeloIdx === 0) { 
           pct = Math.round(100 / form.integrantes.length);
-        } else { // Responsable único
+        } else { 
           pct = 100;
         }
         return { nombre, porcentaje: pct, sueldo: sueldoVal };
@@ -519,14 +519,26 @@ export default function ViviendaDashboard({ navigation }) {
                     <Ionicons name="wallet-outline" size={18} color="#E65100" />
                   </TouchableOpacity>
                 ) : srv.status === 'PROCESADO' || (!srv.isVariable && srv.status !== 'PAGADO') ? (
-                  <TouchableOpacity style={[styles.btnTick, { borderColor: colors.primary }]} onPress={async (e) => {
+                  <TouchableOpacity style={[styles.btnTick, { borderColor: colors.primary }]} onPress={(e) => {
                     e.stopPropagation();
-                    try {
-                      await marcarPagadoVivienda('servicios', srv.id);
-                      await cargarData();
-                    } catch (err) {
-                      Alert.alert('Error', err?.message || 'Error al marcar como pagado');
-                    }
+                    Alert.alert(
+                      'Marcar como pagado',
+                      `¿Estás seguro de que deseas marcar el servicio "${srv.nombre}" como pagado?`,
+                      [
+                        { text: 'Cancelar', style: 'cancel' },
+                        {
+                          text: 'Confirmar',
+                          onPress: async () => {
+                            try {
+                              await marcarPagadoVivienda('servicios', srv.id);
+                              await cargarData();
+                            } catch (err) {
+                              Alert.alert('Error', err?.message || 'Error al marcar como pagado');
+                            }
+                          }
+                        }
+                      ]
+                    );
                   }}>
                     <Ionicons name="checkmark-outline" size={20} color={colors.primary} />
                   </TouchableOpacity>
@@ -536,7 +548,6 @@ export default function ViviendaDashboard({ navigation }) {
                   </View>
                 )}
 
-                {/* 👇 NUEVO: botón eliminar */}
                 <TouchableOpacity
                   style={[styles.btnTick, { borderColor: '#ec6c6a', marginTop: 6 }]}
                   onPress={(e) => {
@@ -611,14 +622,26 @@ export default function ViviendaDashboard({ navigation }) {
                 )}
 
                 {gasto.status !== 'PAGADO' ? (
-                  <TouchableOpacity style={[styles.btnTick, { borderColor: colors.primary, marginTop: 6 }]} onPress={async (e) => {
+                  <TouchableOpacity style={[styles.btnTick, { borderColor: colors.primary, marginTop: 6 }]} onPress={(e) => {
                     e.stopPropagation();
-                    try {
-                      await marcarPagadoVivienda('gastos', gasto.id);
-                      await cargarData();
-                    } catch (err) {
-                      Alert.alert('Error', err?.message || 'Error al marcar como pagado');
-                    }
+                    Alert.alert(
+                      'Marcar como pagado',
+                      `¿Estás seguro de que deseas marcar el gasto "${gasto.nombre}" como pagado?`,
+                      [
+                        { text: 'Cancelar', style: 'cancel' },
+                        {
+                          text: 'Confirmar',
+                          onPress: async () => {
+                            try {
+                              await marcarPagadoVivienda('gastos', gasto.id);
+                              await cargarData();
+                            } catch (err) {
+                              Alert.alert('Error', err?.message || 'Error al marcar como pagado');
+                            }
+                          }
+                        }
+                      ]
+                    );
                   }}>
                     <Ionicons name="checkmark-outline" size={20} color={colors.primary} />
                   </TouchableOpacity>
@@ -628,7 +651,6 @@ export default function ViviendaDashboard({ navigation }) {
                   </View>
                 )}
 
-                {/* 👇 NUEVO: botón eliminar Gasto */}
                 {gasto.pagador === integranteInicial && (
                   <TouchableOpacity
                     style={[styles.btnTick, { borderColor: '#ec6c6a', marginTop: 6 }]}
@@ -683,7 +705,6 @@ export default function ViviendaDashboard({ navigation }) {
         )}
       </ScrollView>
 
-      {/* ── Modal Detalles Servicio ────────────────────────────────────────── */}
       <Modal visible={!!servicioSeleccionado} transparent animationType="slide">
         <View style={styles.modalOverlay}>
           <TouchableOpacity style={StyleSheet.absoluteFill} onPress={() => setServicioSeleccionado(null)} />
@@ -779,13 +800,25 @@ export default function ViviendaDashboard({ navigation }) {
                         setServicioALiquidar(srv);
                         setLiquidarVisible(true);
                       } else {
-                        try {
-                          await marcarPagadoVivienda('servicios', servicioSeleccionado.id);
-                          setServicioSeleccionado(null);
-                          await cargarData();
-                        } catch (err) {
-                          Alert.alert('Error', err?.message || 'Error al marcar como pagado');
-                        }
+                        Alert.alert(
+                          'Marcar como pagado',
+                          `¿Estás seguro de que deseas marcar el servicio "${servicioSeleccionado.nombre}" como pagado?`,
+                          [
+                            { text: 'Cancelar', style: 'cancel' },
+                            {
+                              text: 'Confirmar',
+                              onPress: async () => {
+                                try {
+                                  await marcarPagadoVivienda('servicios', servicioSeleccionado.id);
+                                  setServicioSeleccionado(null);
+                                  await cargarData();
+                                } catch (err) {
+                                  Alert.alert('Error', err?.message || 'Error al marcar como pagado');
+                                }
+                              }
+                            }
+                          ]
+                        );
                       }
                     }}
                   >
@@ -802,7 +835,6 @@ export default function ViviendaDashboard({ navigation }) {
         </View>
       </Modal>
 
-      {/* ── Modal Liquidar Servicio Variable ────────────────────────────────── */}
       <LiquidarServicioModal
         visible={liquidarVisible}
         servicio={servicioALiquidar}
@@ -810,7 +842,6 @@ export default function ViviendaDashboard({ navigation }) {
         onLiquidado={() => { setLiquidarVisible(false); setServicioALiquidar(null); cargarData(); }}
       />
 
-      {/* ── Modal Acuerdos de Reparto ──────────────────────────────────────── */}
       <Modal visible={modalAcuerdosVisible} transparent animationType="fade">
         <KeyboardAvoidingView
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
@@ -820,7 +851,6 @@ export default function ViviendaDashboard({ navigation }) {
             <Pressable style={StyleSheet.absoluteFill} onPress={cerrarModalAcuerdos} />
 
             <View style={styles.modalSheetCentered}>
-              {/* Header */}
               <View style={styles.modalHeader}>
                 <Text style={{ fontSize: 20, fontWeight: 'bold', color: colors.textPrimary }}>
                   {vistaFormulario ? 'Nuevo acuerdo de división' : 'Acuerdos activos'}
@@ -839,7 +869,6 @@ export default function ViviendaDashboard({ navigation }) {
                 >
                   <View style={styles.formContainer}>
 
-                    {/* Integrantes */}
                     <View style={styles.formSection}>
                       <Text style={styles.label}>Integrantes de la casa</Text>
                       <View style={styles.integrantesRow}>
@@ -876,7 +905,6 @@ export default function ViviendaDashboard({ navigation }) {
                       </View>
                     </View>
 
-                    {/* Nombre del acuerdo */}
                     <View style={styles.formSection}>
                       <Text style={styles.label}>Nombre del acuerdo</Text>
                       <TextInput
@@ -888,7 +916,6 @@ export default function ViviendaDashboard({ navigation }) {
                       />
                     </View>
 
-                    {/* Modelo de división */}
                     <View style={styles.formSection}>
                       <Text style={styles.label}>Modelo de división</Text>
                       <View style={styles.rowModelos}>
@@ -908,7 +935,6 @@ export default function ViviendaDashboard({ navigation }) {
                       </View>
                     </View>
 
-                    {/* ── Sección Proporcional (dinámica) ────────────────── */}
                     {form.modeloIdx === 1 && (
                       <View style={styles.formSection}>
                         <Text style={styles.label}>Datos por integrante</Text>
@@ -949,7 +975,6 @@ export default function ViviendaDashboard({ navigation }) {
                       </View>
                     )}
 
-                    {/* Botones acción */}
                     <View style={styles.botonesAccionRow}>
                       <TouchableOpacity
                         style={[styles.btnAccion, { backgroundColor: '#eee' }]}
@@ -1045,7 +1070,6 @@ export default function ViviendaDashboard({ navigation }) {
         </KeyboardAvoidingView>
       </Modal>
 
-      {/* ── Modal Inicio Vivienda (crear o unirse) ───────────────────────── */}
       <Modal visible={modalMiembrosVisible} transparent animationType="fade">
         <View style={styles.modalOverlayFade}>
           <Pressable style={StyleSheet.absoluteFill} onPress={() => setModalMiembrosVisible(false)} />
@@ -1083,7 +1107,6 @@ export default function ViviendaDashboard({ navigation }) {
         </View>
       </Modal>
 
-      {/* ── Modal Inicio Vivienda (crear o unirse) ───────────────────────── */}
       <Modal visible={modalInicioViviendaVisible} transparent animationType="fade">
         <View style={styles.modalOverlayFade}>
           <View style={styles.modalInicioCard}>

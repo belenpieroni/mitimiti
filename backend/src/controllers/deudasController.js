@@ -4,7 +4,7 @@ const { notifyUsersByName } = require('../services/pushNotificationService');
 const { cargarJuntadaCompleta } = require('../helpers/juntadaHelpers');
 const { calcularBalance } = require('../services/balanceService');
 
-// Genera un ID codificado que lleva la info necesaria para registrar el pago
+
 function encodeConceptoId(juntadaId, de, para, monto) {
   return Buffer.from(`${juntadaId}|${de}|${para}|${monto}`).toString('base64url');
 }
