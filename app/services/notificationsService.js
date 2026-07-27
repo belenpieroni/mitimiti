@@ -7,7 +7,7 @@ let Notifications = null;
 let notificationHandlerInitialized = false;
 
 export function isExpoGoAndroid() {
-  return Constants.appOwnership === 'expo' && Platform.OS === 'android';
+  return false;
 }
 
 export async function getNotificationsModule() {

@@ -1,7 +1,4 @@
-/**
- * seed.js — Migra datos existentes de data/db.json a PostgreSQL.
- * Uso: docker compose exec backend npm run seed
- */
+
 require('dotenv').config({ path: require('path').join(__dirname, '../../../.env') });
 
 const fs = require('fs');
@@ -19,7 +16,7 @@ const pool = new Pool({
 const dbJsonPath = path.join(__dirname, '../../data/db.json');
 
 function normalizeId(id) {
-  // Intenta mantener el formato UUID; si no, genera uno nuevo
+  
   const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
   return uuidRegex.test(id) ? id : require('crypto').randomUUID();
 }
@@ -35,7 +32,7 @@ async function seed() {
   let insertados = 0;
   let omitidos = 0;
 
-  // ── Usuarios ────────────────────────────────────────────────────────────────
+  
   for (const u of db.usuarios || []) {
     try {
       await pool.query(
@@ -131,7 +128,7 @@ async function seed() {
     }
   }
 
-  // ── Vivienda gastos ───────────────────────────────────────────────────────────
+  
   for (const g of (db.vivienda?.gastos || [])) {
     const gid = normalizeId(g.id || require('crypto').randomUUID());
     try {
@@ -148,7 +145,7 @@ async function seed() {
     }
   }
 
-  // ── Vivienda servicios ────────────────────────────────────────────────────────
+  
   for (const s of (db.vivienda?.serviciosPeriodicos || [])) {
     const sid = normalizeId(s.id || require('crypto').randomUUID());
     try {
@@ -164,7 +161,7 @@ async function seed() {
     }
   }
 
-  // ── Vivienda acuerdos ─────────────────────────────────────────────────────────
+  
   for (const [key, a] of Object.entries(db.vivienda?.acuerdos || {})) {
     try {
       await pool.query(

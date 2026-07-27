@@ -15,7 +15,7 @@ export default function ViviendaJoinViaLinkScreen({ route, navigation }) {
 
   async function handleUnirse() {
     const raw = (tokenInput || '').trim();
-    const extracted = raw.includes('mitimiti://') ? raw.split('/').pop() : raw;
+    const extracted = raw.includes('mitimiti://') ? raw.split('mitimiti://vivienda/join/')[1] : raw;
     if (!extracted) {
       setEstado('error');
       setErrorMsg('Token de invitación inválido.');

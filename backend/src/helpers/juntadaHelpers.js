@@ -1,13 +1,6 @@
 const { pool } = require('../db');
 
-/**
- * Carga una juntada completa desde PostgreSQL con todos sus sub-documentos,
- * reconstruyendo el mismo shape de objeto que usaba db.json para que
- * el balanceService funcione sin cambios.
- *
- * @param {string} juntadaId
- * @returns {object|null}
- */
+
 async function cargarJuntadaCompleta(juntadaId) {
   const { rows: [juntada] } = await pool.query(
     `SELECT id::text, nombre, descripcion, fecha::text,

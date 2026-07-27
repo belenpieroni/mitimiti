@@ -422,7 +422,7 @@ export default function DeudasScreen({ navigation }) {
                           {acreedor.conceptos.map((concepto, index) => {
                             const isChecked = !uncheckedItems.has(concepto.id);
                             const isResta = concepto.tipoOperacion === 'resta';
-                            const montoColor = isResta ? '#33b849' : '#e65100'; // verde entradas, naranja salidas
+                            const montoColor = isResta ? '#33b849' : '#e65100'; 
 
                             return (
                               <TouchableOpacity 
@@ -453,7 +453,7 @@ export default function DeudasScreen({ navigation }) {
                             );
                           })}
 
-                          {/* Desglose de Saldo */}
+                          
                           <View style={styles.desgloseBox}>
                             <Text style={styles.desgloseTitulo}>Desglose de Saldo</Text>
                             <View style={styles.desgloseFila}>

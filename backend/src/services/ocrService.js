@@ -3,19 +3,7 @@ const Jimp = require('jimp');
 const fs = require('fs');
 const pdfjsLib = require('pdfjs-dist');
 
-/**
- * OCR del lado del SERVIDOR (Node).
- *
- * Soporta DOS motores:
- *  - OCR.space (nube): si está seteada la variable OCR_SPACE_API_KEY.
- *  - Tesseract.js (local): fallback gratuito sin internet/extra.
- *
- * Lógica de extracción:
- *  - Recolecta TODOS los montos asociados a "total" / "a pagar" en la boleta.
- *  - Si hay uno solo → lo devuelve.
- *  - Si hay varios  → devuelve el MENOR (el 1° vencimiento siempre es el más chico).
- *  - Fallback       → menor monto >= $100 de todo el texto.
- */
+
 
 async function preprocess(imagePath) {
   const image = await Jimp.read(imagePath);
@@ -313,11 +301,7 @@ async function extractTextFromImage(imagePath) {
   return tesseract(png);
 }
 
-/**
- * Escanea un ticket/boleta: OCR + extracción del importe del 1° vencimiento.
- * @param {string} imagePath
- * @returns {Promise<{ amount: number|null, text: string }>}
- */
+
 async function scanTicket(imagePath) {
   const text = await extractTextFromImage(imagePath);
   const amount = extractAmountFromText(text);
@@ -329,7 +313,7 @@ async function terminateWorker() {
     try {
       const worker = await workerPromise;
       await worker.terminate();
-    } catch (_) { /* ignorar */ }
+    } catch (_) {}
     workerPromise = null;
   }
 }

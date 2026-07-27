@@ -1,14 +1,8 @@
-/**
- * balanceService.js
- * ─────────────────
- * Lógica de negocio central de Miti Miti (Versión Familiar por Consumo)
- */
+
  
 const { calcularParte } = require('../helpers/mathUtils');
 
-/**
- * Redondea a 2 decimales para evitar errores de punto flotante.
- */
+
 function redondear(n) {
   return Math.round(n * 100) / 100;
 }
@@ -46,19 +40,14 @@ function aplicarPagosATransferencias(transferencias, pagosDeudas = []) {
   return pendientes;
 }
  
-/**
- * Dado un objeto juntada (con participantes, gastos y subgrupos), calcula:
- * - totalGastado
- * - saldos: array con deudas consolidadas por grupo familiar (sin deudas internas)
- * - transferencias: lista mínima de pagos entre familias/unidades
- */
+
 function calcularBalance(juntada) {
   const { participantes = [], gastos = [], subgrupos = [], pagosDeudas = [] } = juntada;
   const n = participantes.length;
  
   const totalGastado = gastos.reduce((sum, g) => sum + g.monto, 0);
  
-  // Trackers individuales iniciales de consumo y pago real
+  
   const pagadoPor = {};
   const correspondePor = {};
 
@@ -69,9 +58,9 @@ function calcularBalance(juntada) {
     nombreMap[p.nombre.toLowerCase()] = p.nombre;
   });
 
-  // 1. PROCESAR CADA GASTO SEGÚN CONSUMO REAL (Checklist de beneficiarios)
+  
   gastos.forEach((g) => {
-    // Acreditar el pago a la persona física que puso la plata
+    
     const pagadorNormalizado = g.pagador ? g.pagador.trim().toLowerCase() : '';
     const pagadorOriginal = nombreMap[pagadorNormalizado];
     if (pagadorOriginal && pagadoPor[pagadorOriginal] !== undefined) {
@@ -79,12 +68,12 @@ function calcularBalance(juntada) {
     }
 
     // Sistema de Checklist: si viene el array 'beneficiarios' con gente tildada, se usa.
-    // Si no viene (gastos viejos o división total), cae en el fallback de dividir entre todos.
+    
     let consumidores = g.beneficiarios && g.beneficiarios.length > 0 
       ? g.beneficiarios 
       : participantes.map(p => p.nombre);
       
-    // Normalizar beneficiarios al nombre exacto del participante usando el map (por si difieren en mayúsculas/espacios)
+    
     consumidores = consumidores
       .map(c => nombreMap[c ? c.trim().toLowerCase() : ''])
       .filter(Boolean);

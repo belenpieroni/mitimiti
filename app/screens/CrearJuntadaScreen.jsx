@@ -211,7 +211,7 @@ export default function CrearJuntadaScreen({ navigation, route }) {
             </View>
           )}
 
-          {/* Participante inicial (el creador) */}
+          
           {!editando && user && (
             <View>
               <Text style={styles.label}>PARTICIPANTES INICIALES</Text>
@@ -235,7 +235,7 @@ export default function CrearJuntadaScreen({ navigation, route }) {
 
         </ScrollView>
 
-        {/* Footer */}
+        
         <View style={styles.footer}>
           <TouchableOpacity
             style={[styles.btnCrear, !puedeGuardar && styles.btnCrearDeshabilitado]}

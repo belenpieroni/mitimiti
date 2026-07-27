@@ -41,10 +41,7 @@ export function subtituloRegla(regla) {
   return participantes.map(p => `${p.nombre} ${p.porcentaje ?? 0}%`).join(' · ');
 }
 
-/**
- * Calcula cuánto paga cada participante dado un monto total y una regla.
- * Retorna [{ nombre: string, monto: number }]
- */
+
 export function calcularDivision(total, regla) {
   if (!regla?.participantes?.length || !total) return [];
   const { modelo, participantes } = regla;

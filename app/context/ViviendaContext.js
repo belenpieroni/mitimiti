@@ -41,7 +41,7 @@ export function ViviendaProvider({ children }) {
   const agregarRegla = useCallback(async (nuevaRegla) => {
     try {
       await guardarAcuerdoReparto(nuevaRegla);
-      await cargarAcuerdos(); // ← esto actualiza `reglas` en el contexto
+      await cargarAcuerdos(); 
     } catch (e) {
       console.error('Error guardando regla:', e);
     }

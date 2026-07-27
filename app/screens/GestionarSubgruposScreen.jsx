@@ -101,7 +101,7 @@ export default function GestionarSubgruposScreen({ route, navigation }) {
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
       >
-        {/* Header */}
+        
         <View style={styles.header}>
           <TouchableOpacity onPress={() => navigation.goBack()} style={{ flex: 1 }}>
             <Ionicons name="people" size={20} color={colors.primary} />
@@ -116,7 +116,7 @@ export default function GestionarSubgruposScreen({ route, navigation }) {
           Agrupá familias o parejas para dividir los gastos por núcleo, no por persona.
         </Text>
 
-        {/* Mostrar subgrupos existentes */}
+        
         {juntada.subgrupos && juntada.subgrupos.length > 0 && (
           <View style={{ marginBottom: 24 }}>
             <View style={{ gap: 8 }}>
@@ -147,7 +147,7 @@ export default function GestionarSubgruposScreen({ route, navigation }) {
           </View>
         )}
 
-        {/* Estado vacío */}
+        
         {(!juntada.subgrupos || juntada.subgrupos.length === 0) && !creando && (
           <View style={styles.vaioSubgrupo}>
             <Ionicons name="people-outline" size={36} color={colors.textSecondary} />
@@ -158,7 +158,7 @@ export default function GestionarSubgruposScreen({ route, navigation }) {
           </View>
         )}
 
-        {/* Formulario de creación */}
+        
         {creando && (
           <View style={{ marginBottom: 20, paddingBottom: 20, borderBottomWidth: 1, borderBottomColor: colors.cardBg }}>
             <Text style={[styles.label, { marginBottom: 12 }]}>NOMBRE DEL SUBGRUPO</Text>
@@ -199,7 +199,7 @@ export default function GestionarSubgruposScreen({ route, navigation }) {
               )}
             </View>
 
-            {/* Botones de formulario */}
+            
             <View style={[styles.botones, { marginTop: 20 }]}>
               <TouchableOpacity 
                 style={styles.btnCancelar} 
@@ -227,7 +227,7 @@ export default function GestionarSubgruposScreen({ route, navigation }) {
           </View>
         )}
 
-        {/* Botón para crear nuevo */}
+        
         {!creando && (
           <TouchableOpacity
             style={styles.btnPrimarioSubgrupo}

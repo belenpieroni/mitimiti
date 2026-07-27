@@ -15,12 +15,7 @@ function getDiffDays(fechaStr) {
   return Math.round((targetMidnight - todayMidnight) / (1000 * 60 * 60 * 24));
 }
 
-/**
- * Avanza una fecha según la periodicidad del servicio.
- * @param {string} fechaStr - Fecha ISO (YYYY-MM-DD)
- * @param {string} periodicidad - semanal, quincenal, mensual, bimestral, semestral, anual
- * @returns {string} Nueva fecha ISO
- */
+
 function calcularProximaFecha(fechaStr, periodicidad) {
   const fecha = new Date(fechaStr);
   const p = (periodicidad || '').toLowerCase();
@@ -32,13 +27,13 @@ function calcularProximaFecha(fechaStr, periodicidad) {
     case 'bimestral':  fecha.setMonth(fecha.getMonth() + 2); break;
     case 'semestral':  fecha.setMonth(fecha.getMonth() + 6); break;
     case 'anual':      fecha.setFullYear(fecha.getFullYear() + 1); break;
-    default:           fecha.setMonth(fecha.getMonth() + 1); break; // fallback mensual
+    default:           fecha.setMonth(fecha.getMonth() + 1); break; 
   }
 
   return fecha.toISOString().split('T')[0];
 }
 
-// ── Cron: Reset de servicios variables ────────────────────────────────────────
+
 
 async function resetServiciosVariables() {
   console.log('[cron] Verificando servicios variables para reset...');
@@ -91,7 +86,7 @@ async function resetServiciosVariables() {
   }
 }
 
-// ── Cron: Vencimientos próximos ───────────────────────────────────────────────
+
 
 async function checkProximosVencimientos() {
   console.log('[cron] Verificando mora y vencimientos de servicios...');
@@ -165,7 +160,7 @@ async function checkProximosVencimientos() {
   }
 }
 
-// ── Cron: Gastos Puntuales Pendientes ─────────────────────────────────────────
+
 
 async function checkGastosPendientes() {
   console.log('[cron] Verificando gastos puntuales pendientes...');

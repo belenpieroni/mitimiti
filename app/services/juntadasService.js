@@ -69,10 +69,7 @@ export const eliminarJuntada     = (id)      => api.delete(`/juntadas/${id}`);
 export const agregarParticipante = (juntadaId, p)   => api.post(`/juntadas/${juntadaId}/participantes`, p);
 export const quitarParticipante  = (juntadaId, pid) => api.delete(`/juntadas/${juntadaId}/participantes/${pid}`);
 
-/**
- * @param {string} juntadaId 
- * @param {Object} g - { nombre, pagador, monto, splitMode, splitSubgroups, beneficiarios }
- */
+
 export const agregarGasto        = (juntadaId, g)   => api.post(`/juntadas/${juntadaId}/gastos`, g);
 export const eliminarGasto       = (juntadaId, gid) => api.delete(`/juntadas/${juntadaId}/gastos/${gid}`);
 

@@ -4,6 +4,7 @@ import { useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { colors } from '../theme/colors';
 import { listarJuntadas, obtenerBalanceGlobal, subscribeLocalJuntadas } from '../services/juntadasService';
+import { obtenerNotificaciones } from '../services/notificationsService';
 import { useAuth } from '../context/AuthContext';
 
 const modulos = [
@@ -23,7 +24,7 @@ function formatPesos(monto) {
 }
 
 export default function HomeScreen({ navigation }) {
-  const { user } = useAuth();
+  const { user, token } = useAuth();
   const nombreUsuario = user?.name || 'Usuario';
   const inicialesUsuario = (nombreUsuario || 'US')
     .split(' ')
@@ -42,6 +43,7 @@ export default function HomeScreen({ navigation }) {
   });
   const [juntadas, setJuntadas] = useState([]);
   const [cargando, setCargando] = useState(true);
+  const [unreadCount, setUnreadCount] = useState(0);
 
   useEffect(() => {
     const unsubscribe = subscribeLocalJuntadas((list) => {
@@ -54,12 +56,13 @@ export default function HomeScreen({ navigation }) {
     if (!user?.name) return;
     setCargando(true);
     try {
-      const [resGlobal, resJuntadas] = await Promise.all([
+      const [resGlobal, resJuntadas, resNotif] = await Promise.all([
         obtenerBalanceGlobal(nombre),
         listarJuntadas(nombre),
+        token ? obtenerNotificaciones(token) : Promise.resolve([]),
       ]);
 
-      // Extrae la data de manera segura (maneja tanto axios directo como interceptores personalizados)
+      
       const dataBalance = resGlobal?.data?.data || resGlobal?.data || resGlobal;
       const dataJuntadas = resJuntadas?.data?.data || resJuntadas?.data || resJuntadas;
 
@@ -67,7 +70,13 @@ export default function HomeScreen({ navigation }) {
         setBalance(dataBalance);
       }
       
-      // Se actualiza a través de la suscripción a subscribeLocalJuntadas
+      const notifs = Array.isArray(resNotif) ? resNotif : resNotif?.data?.data || resNotif?.data || [];
+      if (Array.isArray(notifs)) {
+        const unread = notifs.filter(n => !n.leida).length;
+        setUnreadCount(unread);
+      }
+      
+      
     } catch (err) {
       console.error("Error cargando la Home: ", err);
     } finally {
@@ -84,7 +93,7 @@ export default function HomeScreen({ navigation }) {
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
 
-      {/* Header */}
+      
       <View style={styles.header}>
         <View>
           <Text style={styles.saludo}>{getSaludo()}</Text>
@@ -93,6 +102,11 @@ export default function HomeScreen({ navigation }) {
         <View style={styles.headerIconos}>
           <TouchableOpacity style={styles.iconoBtn} onPress={() => navigation.navigate('Notifications')}>
             <Ionicons name="notifications-outline" size={22} color={colors.textPrimary} />
+            {unreadCount > 0 && (
+              <View style={styles.badge}>
+                <Text style={styles.badgeText}>{unreadCount > 9 ? '9+' : unreadCount}</Text>
+              </View>
+            )}
           </TouchableOpacity>
           <TouchableOpacity
             style={styles.avatar}
@@ -103,7 +117,7 @@ export default function HomeScreen({ navigation }) {
         </View>
       </View>
 
-    {/* Card Balance */}
+    
       <View style={styles.cardBalance}>
         <Text style={styles.balanceLabel}>Balance total</Text>
         {cargando ? (
@@ -121,7 +135,7 @@ export default function HomeScreen({ navigation }) {
                 <Text style={[styles.balanceValor, { color: colors.greenGlobal }]}>
                   {formatPesos(balance.porCobrar)}
                 </Text>
-                {/* Icono tendencia arriba */}
+                
                 <Ionicons name="trending-up" size={14} color={colors.greenGlobal} style={{ position: 'absolute', top: 12, right: 12 }} />
               </View>
               
@@ -130,12 +144,12 @@ export default function HomeScreen({ navigation }) {
                 <Text style={[styles.balanceValor, { color: '#ec6c6a' }]}>
                   {formatPesos(balance.porPagar)}
                 </Text>
-                {/* Icono tendencia abajo */}
+                
                 <Ionicons name="trending-down" size={14} color="#ec6c6a" style={{ position: 'absolute', top: 12, right: 12 }} />
               </View>
             </View>
 
-            {/* Botón Ver deudas */}
+            
             <TouchableOpacity 
               style={styles.btnVerDeudas} 
               onPress={() => navigation.navigate('Deudas')}
@@ -146,7 +160,7 @@ export default function HomeScreen({ navigation }) {
         )}
       </View>
 
-      {/* Módulos */}
+      
       <Text style={styles.seccionTitulo}>Módulos</Text>
       <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.modulosScroll}>
         {modulos.map((mod) => (
@@ -167,7 +181,7 @@ export default function HomeScreen({ navigation }) {
         ))}
       </ScrollView>
 
-      {/* Activos recientemente */}
+      
       <View style={styles.seccionHeader}>
         <Text style={styles.seccionTitulo}>Activos recientemente</Text>
         <TouchableOpacity onPress={() => navigation.navigate('Juntadas', { screen: 'JuntadasList' })}>
@@ -222,7 +236,15 @@ const styles = StyleSheet.create({
   iconoBtn: {
     width: 40, height: 40, borderRadius: 20,
     backgroundColor: colors.cardBg, justifyContent: 'center', alignItems: 'center',
+    position: 'relative',
   },
+  badge: {
+    position: 'absolute', top: 4, right: 6,
+    backgroundColor: '#E63946', borderRadius: 8,
+    minWidth: 16, height: 16, justifyContent: 'center', alignItems: 'center',
+    paddingHorizontal: 3, borderWidth: 1.5, borderColor: colors.cardBg,
+  },
+  badgeText: { color: 'white', fontSize: 9, fontWeight: 'bold' },
   avatar: {
     width: 40, height: 40, borderRadius: 20,
     backgroundColor: colors.primary, justifyContent: 'center', alignItems: 'center',

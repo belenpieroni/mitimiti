@@ -113,7 +113,7 @@ export default function LiquidarServicioModal({ visible, servicio, onClose, onLi
             </View>
 
             <ScrollView keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
-              {/* Service info */}
+              
               <View style={styles.serviceInfo}>
                 <Ionicons name="alert-circle-outline" size={28} color="#E65100" />
                 <View style={{ flex: 1, marginLeft: 12 }}>
