@@ -17,8 +17,10 @@ async function cargarJuntadaCompleta(juntadaId) {
     { rows: subgruposRaw },
   ] = await Promise.all([
     pool.query(
-      `SELECT id::text, nombre, iniciales, color
-       FROM juntada_participantes WHERE juntada_id = $1`,
+      `SELECT jp.id::text, jp.nombre, jp.iniciales, jp.color, p.alias
+       FROM juntada_participantes jp
+       LEFT JOIN perfiles p ON LOWER(jp.nombre) = LOWER(p.nombre)
+       WHERE jp.juntada_id = $1`,
       [juntadaId]
     ),
     pool.query(
@@ -65,8 +67,10 @@ async function cargarJuntadasCompletas(juntadaIds) {
   if (juntadas.length === 0) return [];
 
   const { rows: todosParticipantes } = await pool.query(
-    `SELECT id::text, juntada_id::text AS "juntadaId", nombre, iniciales, color
-     FROM juntada_participantes WHERE juntada_id = ANY($1::uuid[])`,
+    `SELECT jp.id::text, jp.juntada_id::text AS "juntadaId", jp.nombre, jp.iniciales, jp.color, p.alias
+     FROM juntada_participantes jp
+     LEFT JOIN perfiles p ON LOWER(jp.nombre) = LOWER(p.nombre)
+     WHERE jp.juntada_id = ANY($1::uuid[])`,
     [juntadaIds]
   );
 

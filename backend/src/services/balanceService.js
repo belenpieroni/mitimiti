@@ -159,6 +159,7 @@ function calcularBalance(juntada) {
       nombre: p.nombre,
       iniciales: p.iniciales,
       color: p.color,
+      alias: p.alias,
       pagado,
       corresponde,
       saldo, // positivo -> acreedor, negativo -> deudor, cero -> al día con su familia
