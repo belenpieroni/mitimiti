@@ -5,39 +5,13 @@ import { Ionicons } from '@expo/vector-icons';
 import * as Clipboard from 'expo-clipboard';
 import { colors } from '../theme/colors';
 import { obtenerBalance } from '../services/juntadasService';
+import Toast from '../components/Toast';
 
 function formatPesos(monto) {
   return '$' + Math.abs(monto).toLocaleString('es-AR');
 }
 
-const Toast = ({ visible, message, type }) => {
-  const translateY = useRef(new Animated.Value(-100)).current;
 
-  useEffect(() => {
-    if (visible) {
-      Animated.spring(translateY, {
-        toValue: 50,
-        useNativeDriver: true,
-      }).start();
-    } else {
-      Animated.timing(translateY, {
-        toValue: -100,
-        duration: 250,
-        useNativeDriver: true,
-      }).start();
-    }
-  }, [visible]);
-
-  const bgColor = type === 'error' ? colors.redGlobal : colors.greenGlobal;
-  const icon = type === 'error' ? 'alert-circle' : 'checkmark-circle';
-
-  return (
-    <Animated.View style={[styles.toastContainer, { transform: [{ translateY }], backgroundColor: bgColor }]}>
-      <Ionicons name={icon} size={20} color="white" />
-      <Text style={styles.toastText}>{message}</Text>
-    </Animated.View>
-  );
-};
 
 export default function BalanceScreen({ route, navigation }) {
   const { juntadaId } = route.params;
@@ -183,7 +157,21 @@ export default function BalanceScreen({ route, navigation }) {
                 <View style={[styles.avatarChico, { backgroundColor: s.color || colors.primary }]}>
                   <Text style={styles.avatarTexto}>{s.iniciales || s.nombre.slice(0,2).toUpperCase()}</Text>
                 </View>
-                <Text style={styles.saldoNombreFigma}>{s.nombre}</Text>
+                <View>
+                  <Text style={styles.saldoNombreFigma}>{s.nombre}</Text>
+                  {s.alias ? (
+                    <TouchableOpacity 
+                      style={{ flexDirection: 'row', alignItems: 'center', marginTop: 2, gap: 4 }} 
+                      onPress={async () => {
+                        await Clipboard.setStringAsync(s.alias);
+                        mostrarToast('Alias copiado', 'success');
+                      }}
+                    >
+                      <Ionicons name="copy-outline" size={14} color={colors.textSecondary} />
+                      <Text style={{ fontSize: 12, color: colors.textSecondary }}>{s.alias}</Text>
+                    </TouchableOpacity>
+                  ) : null}
+                </View>
               </View>
               <Text style={[
                 styles.saldoMontoFigma, 

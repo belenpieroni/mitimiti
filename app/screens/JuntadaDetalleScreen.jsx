@@ -4,11 +4,13 @@ import {
   ActivityIndicator, TextInput, Modal, Alert, KeyboardAvoidingView, Platform, Image, Share,
 } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
+import * as Clipboard from 'expo-clipboard';
 import { Ionicons } from '@expo/vector-icons';
 import { colors } from '../theme/colors';
 import api, { API_URL } from '../services/api';
 import { obtenerJuntada, agregarGasto, eliminarGasto, agregarSubgrupo, editarSubgrupo, eliminarSubgrupo, obtenerInvitacion, subscribePendingCreation } from '../services/juntadasService';
 import { useAuth } from '../context/AuthContext';
+import Toast from '../components/Toast';
 
 function formatPesos(monto) {
   return '$' + Math.abs(monto).toLocaleString('es-AR');
@@ -37,6 +39,14 @@ export default function JuntadaDetalleScreen({ route, navigation }) {
   const [confirmEliminar, setConfirmEliminar]   = useState(false);
   const [fotoTicket, setFotoTicket]             = useState(null); // URL de la foto que se está viendo
   const [miembrosVisible, setMiembrosVisible]   = useState(false);
+  const [toast, setToast]                       = useState({ visible: false, message: '', type: 'success' });
+
+  const mostrarToast = (message, type = 'success') => {
+    setToast({ visible: true, message, type });
+    setTimeout(() => {
+      setToast(prev => ({ ...prev, visible: false }));
+    }, 3000);
+  };
   
   const cargarJuntada = useCallback(async () => {
     if (String(juntadaId).startsWith('temp-')) {
@@ -119,7 +129,7 @@ export default function JuntadaDetalleScreen({ route, navigation }) {
   }
 
   const copiarAlias = (alias) => {
-    Alert.alert('Alias Copiado', `"${alias}" se copió al portapapeles.`);
+    mostrarToast(`"${alias}" se copió al portapapeles.`, 'success');
   };
 
   async function handleCompartirInvitacion() {
@@ -160,6 +170,7 @@ export default function JuntadaDetalleScreen({ route, navigation }) {
 
   return (
     <View style={styles.container}>
+      <Toast visible={toast.visible} message={toast.message} type={toast.type} />
       
       <View style={styles.header}>
         <TouchableOpacity style={styles.btnVolver} onPress={() => navigation.navigate('JuntadasList')}>
@@ -410,6 +421,18 @@ export default function JuntadaDetalleScreen({ route, navigation }) {
                     <View style={{ flex: 1 }}>
                       <Text style={styles.miembroNombre}>{p.nombre}</Text>
                       {esCreadorParticipante && <Text style={styles.miembroRol}>Creador</Text>}
+                      {p.alias ? (
+                        <TouchableOpacity 
+                          style={{ flexDirection: 'row', alignItems: 'center', marginTop: 2, gap: 4 }} 
+                          onPress={async () => {
+                            await Clipboard.setStringAsync(p.alias);
+                            mostrarToast('Alias copiado', 'success');
+                          }}
+                        >
+                          <Ionicons name="copy-outline" size={14} color={colors.textSecondary} />
+                          <Text style={{ fontSize: 12, color: colors.textSecondary }}>{p.alias}</Text>
+                        </TouchableOpacity>
+                      ) : null}
                     </View>
                   </View>
                 );
@@ -890,9 +913,12 @@ const styles = StyleSheet.create({
   miembroRol: { color: colors.textSecondary, fontSize: 12, marginTop: 2 },
   footer: {
     position: 'absolute', bottom: 0, left: 0, right: 0,
-    padding: 16, backgroundColor: colors.background,
+    padding: 16, paddingBottom: 18,
   },
-  btnBalance: { backgroundColor: colors.primary, borderRadius: 16, padding: 18, alignItems: 'center' },
+  btnBalance: { 
+    backgroundColor: colors.primary, borderRadius: 16, padding: 18, alignItems: 'center',
+    shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.15, shadowRadius: 8, elevation: 5
+  },
   btnBalanceTexto: { color: 'white', fontSize: 16, fontWeight: '700' },
   vacioCentrado: { alignItems: 'center', paddingVertical: 32, gap: 8 },
   vacioTexto: { color: colors.textSecondary, fontSize: 13 },
