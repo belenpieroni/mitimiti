@@ -45,9 +45,10 @@ async function obtenerMiViviendaBase(usuarioId) {
 
 async function obtenerMiembrosVivienda(viviendaId) {
   const { rows } = await pool.query(
-    `SELECT u.id::text, u.name
+    `SELECT u.id::text, u.name, p.alias
      FROM vivienda_miembros vm
      JOIN usuarios u ON u.id = vm.usuario_id
+     LEFT JOIN perfiles p ON LOWER(u.name) = LOWER(p.nombre)
      WHERE vm.vivienda_id = $1
      ORDER BY u.name`,
     [viviendaId]

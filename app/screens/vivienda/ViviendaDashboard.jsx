@@ -9,6 +9,8 @@ import { colors } from '../../theme/colors';
 import { useVivienda } from '../../context/ViviendaContext';
 import { useAuth } from '../../context/AuthContext';
 import { useFocusEffect } from '@react-navigation/native';
+import * as Clipboard from 'expo-clipboard';
+import Toast from '../../components/Toast';
 import {
   getGastosVivienda,
   getServiciosVivienda,
@@ -144,6 +146,15 @@ export default function ViviendaDashboard({ navigation }) {
   const [nuevaViviendaNombre, setNuevaViviendaNombre] = useState(() => `Vivienda de ${integranteInicial}`);
 
   const [cargando, setCargando] = useState(true);
+
+  const [toast, setToast] = useState({ visible: false, message: '', type: 'success' });
+
+  const mostrarToast = (message, type = 'success') => {
+    setToast({ visible: true, message, type });
+    setTimeout(() => {
+      setToast(prev => ({ ...prev, visible: false }));
+    }, 3000);
+  };
 
   useFocusEffect(
     React.useCallback(() => {
@@ -371,6 +382,7 @@ export default function ViviendaDashboard({ navigation }) {
 
   return (
     <View style={styles.container}>
+      <Toast visible={toast.visible} message={toast.message} type={toast.type} />
       <ScrollView contentContainerStyle={styles.scroll}>
         <Text style={styles.headerTitle}>Casa compartida</Text>
         <View style={styles.headerRow}>
@@ -1095,9 +1107,23 @@ export default function ViviendaDashboard({ navigation }) {
                     <View style={[styles.miembroAvatar, { backgroundColor: getColorByNombre(m?.name || 'NN') }]}>
                       <Text style={styles.miembroAvatarText}>{getIniciales(m?.name || 'NN')}</Text>
                     </View>
-                    <View style={{ flex: 1 }}>
-                      <Text style={styles.miembroNombre}>{m?.name || 'Sin nombre'}</Text>
-                      {esCreador && <Text style={styles.miembroRol}>Creador</Text>}
+                    <View style={{ flex: 1, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <View>
+                        <Text style={styles.miembroNombre}>{m?.name || 'Sin nombre'}</Text>
+                        {esCreador && <Text style={styles.miembroRol}>Creador</Text>}
+                      </View>
+                      {m?.alias ? (
+                        <TouchableOpacity 
+                          style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}
+                          onPress={async () => {
+                            await Clipboard.setStringAsync(m.alias);
+                            mostrarToast('Alias/CBU copiado', 'success');
+                          }}
+                        >
+                          <Text style={{ fontSize: 12, color: colors.textSecondary }}>{m.alias}</Text>
+                          <Ionicons name="copy-outline" size={14} color={colors.textSecondary} />
+                        </TouchableOpacity>
+                      ) : null}
                     </View>
                   </View>
                 );

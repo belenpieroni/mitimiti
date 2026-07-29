@@ -41,6 +41,9 @@ async function getConsolidado(req, res, next) {
       [usuario]
     );
 
+    const { rows: perfilesRows } = await pool.query('SELECT nombre, alias FROM perfiles');
+    const perfilesMap = Object.fromEntries(perfilesRows.map((p) => [p.nombre.toLowerCase(), p.alias]));
+
     const acreedoresMap = new Map();
     const pagosRecientes = [];
     const { rows: juntadasPagos } = await pool.query(
@@ -74,7 +77,7 @@ async function getConsolidado(req, res, next) {
       const juntada = await cargarJuntadaCompleta(id);
       const balance = calcularBalance(juntada);
 
-      for (const t of balance.transferenciasOriginales) {
+      for (const t of balance.transferencias) {
         const isDeudor   = t.de.toLowerCase()   === usuario.toLowerCase();
         const isAcreedor = t.para.toLowerCase()  === usuario.toLowerCase();
         if (!isDeudor && !isAcreedor) continue;
@@ -87,6 +90,7 @@ async function getConsolidado(req, res, next) {
             id: contraparteKey,
             nombre: contraparteNombre,
             avatar: getIniciales(contraparteNombre),
+            alias: perfilesMap[contraparteKey] || null,
             totalAcreedor: 0,
             conceptos: [],
           });
@@ -164,6 +168,7 @@ async function getConsolidado(req, res, next) {
               if (!acreedoresMap.has(contraparteKey)) {
                 acreedoresMap.set(contraparteKey, {
                   id: contraparteKey, nombre: g.pagador, avatar: getIniciales(g.pagador),
+                  alias: perfilesMap[contraparteKey] || null,
                   totalAcreedor: 0, conceptos: [],
                 });
               }
@@ -181,6 +186,7 @@ async function getConsolidado(req, res, next) {
                 if (!acreedoresMap.has(contraparteKey)) {
                   acreedoresMap.set(contraparteKey, {
                     id: contraparteKey, nombre: p, avatar: getIniciales(p),
+                    alias: perfilesMap[contraparteKey] || null,
                     totalAcreedor: 0, conceptos: [],
                   });
                 }

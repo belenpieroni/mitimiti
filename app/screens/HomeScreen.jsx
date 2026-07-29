@@ -7,6 +7,8 @@ import { listarJuntadas, obtenerBalanceGlobal, subscribeLocalJuntadas } from '..
 import { obtenerNotificaciones } from '../services/notificationsService';
 import { useAuth } from '../context/AuthContext';
 
+const API_BASE = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3000/api';
+
 const modulos = [
   { id: '1', nombre: 'Juntadas', icono: 'people-outline' },
   { id: '2', nombre: 'Vivienda', icono: 'home-outline' },
@@ -21,6 +23,45 @@ function getSaludo() {
 
 function formatPesos(monto) {
   return '$' + Math.abs(monto).toLocaleString('es-AR');
+}
+
+async function fetchConsolidadoBalance(nombre) {
+  try {
+    const res = await fetch(`${API_BASE}/deudas/consolidado/${encodeURIComponent(nombre)}`);
+    const data = await res.json();
+    if (!res.ok || !data.ok) return null;
+    
+    let acreedores = [];
+    let servicios = [];
+    if (Array.isArray(data.data)) {
+      acreedores = data.data;
+    } else {
+      acreedores = data.data.acreedores || [];
+      servicios = data.data.serviciosAPagar || [];
+    }
+
+    const porPagarAcreedores = acreedores.reduce((acc, a) => {
+      const netTotal = (a.conceptos || []).reduce((sum, c) => sum + (c.tipoOperacion === 'resta' ? -c.monto : c.monto), 0);
+      return acc + Math.max(0, netTotal);
+    }, 0);
+
+    const porCobrar = acreedores.reduce((acc, a) => {
+      const netTotal = (a.conceptos || []).reduce((sum, c) => sum + (c.tipoOperacion === 'resta' ? -c.monto : c.monto), 0);
+      return acc + (netTotal < 0 ? Math.abs(netTotal) : 0);
+    }, 0);
+
+    const porPagarServicios = servicios.reduce((acc, s) => acc + (s.monto || 0), 0);
+    const porPagar = porPagarAcreedores + porPagarServicios;
+
+    return {
+      total: porCobrar - porPagar,
+      porCobrar,
+      porPagar
+    };
+  } catch (error) {
+    console.error('Error fetching consolidado:', error);
+    return null;
+  }
 }
 
 export default function HomeScreen({ navigation }) {
@@ -56,14 +97,13 @@ export default function HomeScreen({ navigation }) {
     if (!user?.name) return;
     setCargando(true);
     try {
-      const [resGlobal, resJuntadas, resNotif] = await Promise.all([
-        obtenerBalanceGlobal(nombre),
+      const [dataBalance, resJuntadas, resNotif] = await Promise.all([
+        fetchConsolidadoBalance(nombre),
         listarJuntadas(nombre),
         token ? obtenerNotificaciones(token) : Promise.resolve([]),
       ]);
 
       
-      const dataBalance = resGlobal?.data?.data || resGlobal?.data || resGlobal;
       const dataJuntadas = resJuntadas?.data?.data || resJuntadas?.data || resJuntadas;
 
       if (dataBalance) {

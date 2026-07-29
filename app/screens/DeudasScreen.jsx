@@ -9,7 +9,8 @@ import {
   Platform,
   UIManager,
   ActivityIndicator,
-  Alert
+  Alert,
+  Linking
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { colors } from '../theme/colors';
@@ -17,6 +18,8 @@ import { useFocusEffect } from '@react-navigation/native';
 import { useAuth } from '../context/AuthContext';
 import { marcarPagadoVivienda, revertirPagoVivienda } from '../services/viviendaService';
 import Svg, { Circle, G } from 'react-native-svg';
+import * as Clipboard from 'expo-clipboard';
+import Toast from '../components/Toast';
 
 const API_BASE = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3000/api';
 
@@ -63,6 +66,15 @@ export default function DeudasScreen({ navigation }) {
   const [showFinancialDetail, setShowFinancialDetail] = useState(false);
   const [expandedCompId, setExpandedCompId] = useState(null);
   
+  const [toast, setToast] = useState({ visible: false, message: '', type: 'success' });
+
+  const mostrarToast = (message, type = 'success') => {
+    setToast({ visible: true, message, type });
+    setTimeout(() => {
+      setToast(prev => ({ ...prev, visible: false }));
+    }, 3000);
+  };
+
   const [pendientes, setPendientes] = useState([]);
   const [serviciosAPagar, setServiciosAPagar] = useState([]);
   const [pagosRecientes, setPagosRecientes] = useState([]);
@@ -236,6 +248,26 @@ export default function DeudasScreen({ navigation }) {
     }
   };
 
+  const handleMercadoPago = async (acreedor) => {
+    try {
+      const alias = acreedor.alias || acreedor.cvu;
+      if (!alias) {
+        mostrarToast(`No se encontró un Alias/CBU para ${acreedor.nombre}.`, 'error');
+        return;
+      }
+      
+      await Clipboard.setStringAsync(alias);
+      
+      try {
+        await Linking.openURL('mercadopago://');
+      } catch (e) {
+        mostrarToast(`No se pudo abrir la aplicación de Mercado Pago.\nSe copió el Alias/CBU y se deberá abrir la aplicación manualmente.`, 'warning');
+      }
+    } catch (error) {
+      mostrarToast('Hubo un problema al intentar copiar el Alias/CBU.', 'error');
+    }
+  };
+
   if (loading) {
     return <View style={styles.center}><ActivityIndicator size="large" color={colors.primary} /></View>;
   }
@@ -259,6 +291,7 @@ export default function DeudasScreen({ navigation }) {
 
   return (
     <View style={styles.safeArea}>
+      <Toast visible={toast.visible} message={toast.message} type={toast.type} />
       <ScrollView
         style={styles.container}
         contentContainerStyle={styles.content}
@@ -399,21 +432,37 @@ export default function DeudasScreen({ navigation }) {
                         LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
                         setExpandedId(expandedId === acreedor.id ? null : acreedor.id);
                       }}>
-                        <View style={styles.userInfoContainer}>
-                          <View style={styles.avatar}><Text style={styles.avatarText}>{acreedor.avatar}</Text></View>
-                          <View style={styles.userText}>
+                        <View style={styles.avatar}><Text style={styles.avatarText}>{acreedor.avatar}</Text></View>
+                        <View style={[styles.userText, { flex: 1, marginLeft: 12 }]}>
+                          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
                             <Text style={styles.userName}>{acreedor.nombre}</Text>
-                            <Text style={styles.userSub}>{activeConcepts.length} deudas seleccionadas</Text>
+                            <Text style={[
+                              styles.totalAmount,
+                              netTotal < 0 ? { color: '#33b849' } : (netTotal > 0 ? { color: '#e65100' } : { color: '#666' })
+                            ]}>
+                              {netTotal < 0 ? 'Te deben: ' : (netTotal > 0 ? 'Debes: ' : 'Al día: ')}${formatPesos(Math.abs(netTotal))}
+                            </Text>
                           </View>
-                        </View>
-                         <View style={styles.amountInfo}>
-                          <Text style={[
-                            styles.totalAmount,
-                            netTotal < 0 ? { color: '#33b849' } : (netTotal > 0 ? { color: '#e65100' } : { color: '#666' })
-                          ]}>
-                            {netTotal < 0 ? 'Te deben: ' : (netTotal > 0 ? 'Debes: ' : 'Al día: ')}${formatPesos(Math.abs(netTotal))}
-                          </Text>
-                          <Ionicons name={expandedId === acreedor.id ? "chevron-up" : "chevron-down"} size={20} color="#666" style={{ marginLeft: 6 }} />
+                          
+                          {acreedor.alias ? (
+                            <TouchableOpacity 
+                              style={{ flexDirection: 'row', alignItems: 'center', marginVertical: 6, gap: 4 }}
+                              onPress={async () => {
+                                await Clipboard.setStringAsync(acreedor.alias);
+                                mostrarToast('Alias/CBU copiado', 'success');
+                              }}
+                            >
+                              <Ionicons name="copy-outline" size={14} color={colors.textSecondary} />
+                              <Text style={{ fontSize: 12, color: colors.textSecondary }}>{acreedor.alias}</Text>
+                            </TouchableOpacity>
+                          ) : (
+                            <View style={{ height: 6 }} />
+                          )}
+                          
+                          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <Text style={styles.userSub}>{activeConcepts.length} deudas seleccionadas</Text>
+                            <Ionicons name={expandedId === acreedor.id ? "chevron-up" : "chevron-down"} size={20} color="#666" />
+                          </View>
                         </View>
                       </TouchableOpacity>
 
@@ -496,6 +545,18 @@ export default function DeudasScreen({ navigation }) {
                               }
                             </Text>
                           </TouchableOpacity>
+
+                          {netTotal > 0 && (
+                            <TouchableOpacity 
+                              style={styles.btnMercadoPago} 
+                              onPress={() => handleMercadoPago(acreedor)}
+                            >
+                              <Ionicons name="wallet-outline" size={18} color="white" style={{ marginRight: 8 }} />
+                              <Text style={styles.btnMercadoPagoText}>
+                                Pagar $ {formatPesos(netTotal)} con Mercado Pago
+                              </Text>
+                            </TouchableOpacity>
+                          )}
                         </View>
                       )}
                     </View>
@@ -637,6 +698,8 @@ const styles = StyleSheet.create({
   btnCancelarText: { fontSize: 11, fontWeight: '700', color: colors.primary },
   btnPagarTodo: { backgroundColor: colors.primary, padding: 15, borderRadius: 15, marginTop: 15, alignItems: 'center' },
   btnPagarTodoText: { color: 'white', fontWeight: 'bold', fontSize: 14 },
+  btnMercadoPago: { backgroundColor: '#009EE3', padding: 15, borderRadius: 15, marginTop: 10, flexDirection: 'row', alignItems: 'center', justifyContent: 'center' },
+  btnMercadoPagoText: { color: 'white', fontWeight: 'bold', fontSize: 14 },
   pagoRecienteCard: { flexDirection: 'row', backgroundColor: 'white', padding: 15, borderRadius: 20, alignItems: 'center', marginBottom: 10 },
   checkIconContainer: { width: 30, height: 30, borderRadius: 15, backgroundColor: 'rgba(51, 184, 73, 0.15)', justifyContent: 'center', alignItems: 'center' },
   pagoInfo: { flex: 1, marginLeft: 12 },
