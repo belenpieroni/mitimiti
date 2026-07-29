@@ -733,7 +733,9 @@ export default function AgregarViviendaScreen({ route, navigation }) {
                   <View style={styles.avatarRemoveBadge}>
                     <Ionicons name="remove" size={10} color="#fff" />
                   </View>
-                  <Text style={styles.avatarNombre} numberOfLines={1}>{nombre.split(' ')[0]}</Text>
+                  <Text style={styles.avatarNombre} numberOfLines={1}>
+                    {nombre.split(' ')[0]} {user?.name?.toLowerCase() === nombre.toLowerCase() && <Text style={{ color: colors.textSecondary, fontSize: 10, fontWeight: 'normal' }}>(vos)</Text>}
+                  </Text>
                 </TouchableOpacity>
               ))}
               {miembrosVivienda
@@ -749,7 +751,9 @@ export default function AgregarViviendaScreen({ route, navigation }) {
                     <View style={styles.avatarAdd}>
                       <Ionicons name="add" size={20} color={colors.textSecondary} />
                     </View>
-                    <Text style={styles.avatarNombre} numberOfLines={1}>{nombre.split(' ')[0]}</Text>
+                    <Text style={styles.avatarNombre} numberOfLines={1}>
+                      {nombre.split(' ')[0]} {user?.name?.toLowerCase() === nombre.toLowerCase() && <Text style={{ color: colors.textSecondary, fontSize: 10, fontWeight: 'normal' }}>(vos)</Text>}
+                    </Text>
                   </TouchableOpacity>
                 ))}
             </View>
@@ -851,7 +855,7 @@ export default function AgregarViviendaScreen({ route, navigation }) {
                       onPress={() => setPagador(nombre)}
                     >
                       <Text style={[styles.frecBtnText, seleccionado && styles.frecBtnTextActive]}>
-                        {nombre.split(' ')[0]}
+                        {nombre.split(' ')[0]} {user?.name?.toLowerCase() === nombre.toLowerCase() && <Text style={{ color: seleccionado ? 'white' : colors.textSecondary, fontSize: 12, fontWeight: 'normal' }}>(vos)</Text>}
                       </Text>
                     </TouchableOpacity>
                   );

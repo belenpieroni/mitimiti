@@ -137,13 +137,7 @@ export default function BalanceScreen({ route, navigation }) {
                   </View>
                 </TouchableOpacity>
 
-                <TouchableOpacity 
-                  style={styles.btnMarcarPagado}
-                  onPress={() => mostrarToast('Funcionalidad de pagos en desarrollo', 'success')}
-                >
-                  <Ionicons name="checkmark" size={16} color={colors.greenGlobal} style={{ marginTop: 2 }} />
-                  <Text style={styles.btnMarcarPagadoTexto}>Marcar como pagado</Text>
-                </TouchableOpacity>
+
               </View>
             );
           })

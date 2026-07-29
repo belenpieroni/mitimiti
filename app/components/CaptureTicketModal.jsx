@@ -11,7 +11,7 @@ import {
   ScrollView,
 } from 'react-native';
 import { CameraView, useCameraPermissions } from 'expo-camera';
-import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { MaterialCommunityIcons, Ionicons } from '@expo/vector-icons';
 import { colors } from '../theme/colors';
 import { scanTicket } from '../services/ocrService';
 
@@ -94,6 +94,9 @@ export default function CaptureTicketModal({ visible, onClose, onAmountExtracted
     return (
       <Modal visible={visible} animationType="slide" transparent={true}>
         <View style={styles.centerContainer}>
+          <TouchableOpacity style={{ position: 'absolute', top: 40, right: 20, padding: 8, zIndex: 10 }} onPress={handleClose}>
+            <Ionicons name="close" size={30} color="white" />
+          </TouchableOpacity>
           <Text style={styles.errorText}>No hay permiso de cámara</Text>
           <TouchableOpacity style={styles.btnClose} onPress={handleClose}>
             <Text style={styles.btnCloseText}>Cerrar</Text>
@@ -107,6 +110,9 @@ export default function CaptureTicketModal({ visible, onClose, onAmountExtracted
     return (
       <Modal visible={visible} animationType="slide" transparent={true}>
         <View style={styles.centerContainer}>
+          <TouchableOpacity style={{ position: 'absolute', top: 40, right: 20, padding: 8, zIndex: 10 }} onPress={handleClose}>
+            <Ionicons name="close" size={30} color="white" />
+          </TouchableOpacity>
           <Text style={styles.errorText}>Se requiere permiso de cámara</Text>
           <TouchableOpacity style={styles.btnClose} onPress={requestPermission}>
             <Text style={styles.btnCloseText}>Solicitar permiso</Text>

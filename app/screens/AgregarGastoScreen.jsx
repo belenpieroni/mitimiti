@@ -12,10 +12,12 @@ import { colors } from '../theme/colors';
 import { obtenerJuntada, agregarGasto } from '../services/juntadasService';
 import { uploadTicketPhoto } from '../services/uploadService';
 import CaptureTicketModal from '../components/CaptureTicketModal';
+import { useAuth } from '../context/AuthContext';
 import { calcularParte } from '../utils/mathUtils';
 
 export default function AgregarGastoScreen({ route, navigation }) {
   const { juntadaId } = route.params;
+  const { user } = useAuth();
   
   const [juntada, setJuntada] = useState(null);
   const [participantes, setParticipantes] = useState([]);
@@ -212,7 +214,9 @@ export default function AgregarGastoScreen({ route, navigation }) {
                 {participantes.find(p => p.nombre === pagador)?.iniciales || pagador.slice(0, 2).toUpperCase()}
               </Text>
             </View>
-            <Text style={styles.pagadorNombre}>{pagador}</Text>
+            <Text style={styles.pagadorNombre}>
+              {pagador} {user?.name?.toLowerCase() === pagador.toLowerCase() && <Text style={{ color: colors.textSecondary, fontSize: 12, fontWeight: 'normal' }}>(vos)</Text>}
+            </Text>
             <Ionicons name="chevron-down" size={18} color={colors.textSecondary} />
           </TouchableOpacity>
 
@@ -230,7 +234,9 @@ export default function AgregarGastoScreen({ route, navigation }) {
                   <View style={[styles.pagadorAvatar, { backgroundColor: p.color }]}>
                     <Text style={styles.pagadorAvatarTexto}>{p.iniciales}</Text>
                   </View>
-                  <Text style={styles.pagadorOptionTexto}>{p.nombre}</Text>
+                  <Text style={styles.pagadorOptionTexto}>
+                    {p.nombre} {user?.name?.toLowerCase() === p.nombre.toLowerCase() && <Text style={{ color: colors.textSecondary, fontSize: 12 }}>(vos)</Text>}
+                  </Text>
                   {pagador === p.nombre && (
                     <Ionicons name="checkmark" size={18} color={colors.primary} style={{ marginLeft: 'auto' }} />
                   )}
@@ -333,7 +339,7 @@ export default function AgregarGastoScreen({ route, navigation }) {
                                 <Text style={styles.avatarTextoExtraChico}>{p.iniciales}</Text>
                               </View>
                               <Text style={[styles.chipNombre, activo && { fontWeight: '700', color: 'white' }]}>
-                                {p.nombre}
+                                {p.nombre} {user?.name?.toLowerCase() === p.nombre.toLowerCase() && <Text style={{ fontWeight: 'normal', color: activo ? 'white' : colors.textSecondary, fontSize: 12 }}>(vos)</Text>}
                               </Text>
                             </TouchableOpacity>
                           );
@@ -364,7 +370,7 @@ export default function AgregarGastoScreen({ route, navigation }) {
                               <Text style={styles.avatarTextoExtraChico}>{p.iniciales}</Text>
                             </View>
                             <Text style={[styles.chipNombre, activo && { fontWeight: '700', color: 'white' }]}>
-                              {p.nombre}
+                              {p.nombre} {user?.name?.toLowerCase() === p.nombre.toLowerCase() && <Text style={{ fontWeight: 'normal', color: activo ? 'white' : colors.textSecondary, fontSize: 12 }}>(vos)</Text>}
                             </Text>
                           </TouchableOpacity>
                         );
