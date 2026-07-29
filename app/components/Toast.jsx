@@ -21,8 +21,8 @@ export default function Toast({ visible, message, type = 'success' }) {
     }
   }, [visible]);
 
-  const bgColor = type === 'error' ? colors.redGlobal : colors.greenGlobal;
-  const icon = type === 'error' ? 'alert-circle' : 'checkmark-circle';
+  const bgColor = type === 'error' ? colors.redGlobal : type === 'warning' ? '#F59E0B' : colors.greenGlobal;
+  const icon = type === 'error' ? 'alert-circle' : type === 'warning' ? 'warning' : 'checkmark-circle';
 
   return (
     <Animated.View style={[styles.toastContainer, { transform: [{ translateY }], backgroundColor: bgColor }]}>

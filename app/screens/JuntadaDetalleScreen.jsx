@@ -129,7 +129,7 @@ export default function JuntadaDetalleScreen({ route, navigation }) {
   }
 
   const copiarAlias = (alias) => {
-    mostrarToast(`"${alias}" se copió al portapapeles.`, 'success');
+    mostrarToast(`El Alias/CBU "${alias}" se copió al portapapeles.`, 'success');
   };
 
   async function handleCompartirInvitacion() {
@@ -243,7 +243,7 @@ export default function JuntadaDetalleScreen({ route, navigation }) {
               <Ionicons name="wallet-outline" size={20} color={colors.primary} />
             </View>
             <View style={{ flex: 1 }}>
-              <Text style={styles.aliasLabel}>Alias de destino para transferencias</Text>
+              <Text style={styles.aliasLabel}>Alias/CBU de destino para transferencias</Text>
               <Text style={styles.aliasTexto}>{juntada.alias}</Text>
             </View>
             <TouchableOpacity style={styles.btnCopiar} onPress={() => copiarAlias(juntada.alias)}>
@@ -426,7 +426,7 @@ export default function JuntadaDetalleScreen({ route, navigation }) {
                           style={{ flexDirection: 'row', alignItems: 'center', marginTop: 2, gap: 4 }} 
                           onPress={async () => {
                             await Clipboard.setStringAsync(p.alias);
-                            mostrarToast('Alias copiado', 'success');
+                            mostrarToast('Alias/CBU copiado', 'success');
                           }}
                         >
                           <Ionicons name="copy-outline" size={14} color={colors.textSecondary} />

@@ -1117,7 +1117,7 @@ export default function ViviendaDashboard({ navigation }) {
                           style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}
                           onPress={async () => {
                             await Clipboard.setStringAsync(m.alias);
-                            mostrarToast('Alias copiado', 'success');
+                            mostrarToast('Alias/CBU copiado', 'success');
                           }}
                         >
                           <Text style={{ fontSize: 12, color: colors.textSecondary }}>{m.alias}</Text>

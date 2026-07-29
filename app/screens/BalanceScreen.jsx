@@ -164,7 +164,7 @@ export default function BalanceScreen({ route, navigation }) {
                       style={{ flexDirection: 'row', alignItems: 'center', marginTop: 2, gap: 4 }} 
                       onPress={async () => {
                         await Clipboard.setStringAsync(s.alias);
-                        mostrarToast('Alias copiado', 'success');
+                        mostrarToast('Alias/CBU copiado', 'success');
                       }}
                     >
                       <Ionicons name="copy-outline" size={14} color={colors.textSecondary} />

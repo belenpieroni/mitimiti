@@ -252,7 +252,7 @@ export default function DeudasScreen({ navigation }) {
     try {
       const alias = acreedor.alias || acreedor.cvu;
       if (!alias) {
-        mostrarToast(`No se encontró un Alias o CVU para ${acreedor.nombre}.`, 'error');
+        mostrarToast(`No se encontró un Alias/CBU para ${acreedor.nombre}.`, 'error');
         return;
       }
       
@@ -261,10 +261,10 @@ export default function DeudasScreen({ navigation }) {
       try {
         await Linking.openURL('mercadopago://');
       } catch (e) {
-        mostrarToast(`El alias se copió al portapapeles.\nAbre Mercado Pago manualmente para transferir.`);
+        mostrarToast(`No se pudo abrir la aplicación de Mercado Pago.\nSe copió el Alias/CBU y se deberá abrir la aplicación manualmente.`, 'warning');
       }
     } catch (error) {
-      mostrarToast('Hubo un problema al intentar copiar el alias.', 'error');
+      mostrarToast('Hubo un problema al intentar copiar el Alias/CBU.', 'error');
     }
   };
 
@@ -449,7 +449,7 @@ export default function DeudasScreen({ navigation }) {
                               style={{ flexDirection: 'row', alignItems: 'center', marginVertical: 6, gap: 4 }}
                               onPress={async () => {
                                 await Clipboard.setStringAsync(acreedor.alias);
-                                mostrarToast('Alias copiado', 'success');
+                                mostrarToast('Alias/CBU copiado', 'success');
                               }}
                             >
                               <Ionicons name="copy-outline" size={14} color={colors.textSecondary} />
