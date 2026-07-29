@@ -77,7 +77,7 @@ async function getConsolidado(req, res, next) {
       const juntada = await cargarJuntadaCompleta(id);
       const balance = calcularBalance(juntada);
 
-      for (const t of balance.transferenciasOriginales) {
+      for (const t of balance.transferencias) {
         const isDeudor   = t.de.toLowerCase()   === usuario.toLowerCase();
         const isAcreedor = t.para.toLowerCase()  === usuario.toLowerCase();
         if (!isDeudor && !isAcreedor) continue;
