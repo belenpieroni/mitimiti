@@ -35,7 +35,8 @@ function getApiBase() {
   }
 
   if (Platform.OS === 'web' && typeof window !== 'undefined') {
-    return normalizeBaseUrl(`${window.location.origin}/api`);
+    const host = window.location.hostname;
+    return normalizeBaseUrl(`http://${host}:3000/api`);
   }
 
   const host = getExpoHost();
