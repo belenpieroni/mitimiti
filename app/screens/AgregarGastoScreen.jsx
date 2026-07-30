@@ -268,7 +268,7 @@ export default function AgregarGastoScreen({ route, navigation }) {
               activeOpacity={0.7}
             >
               <Ionicons name="people" size={18} color={splitMode === 'subgroups' ? 'white' : colors.textSecondary} />
-              <Text style={[styles.metodoTitulo, splitMode === 'subgroups' && { color: 'white' }]}>Por familias</Text>
+              <Text style={[styles.metodoTitulo, splitMode === 'subgroups' && { color: 'white' }]}>Por Subgrupos</Text>
             </TouchableOpacity>
           </View>
 

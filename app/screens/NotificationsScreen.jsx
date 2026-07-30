@@ -220,15 +220,19 @@ export default function NotificationsScreen({ navigation }) {
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
-          <Ionicons name="chevron-back" size={22} color={colors.textSecondary} />
-        </TouchableOpacity>
+        <View style={styles.headerSide}>
+          <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
+            <Ionicons name="chevron-back" size={22} color={colors.textSecondary} />
+          </TouchableOpacity>
+        </View>
 
         <Text style={styles.title}>Notificaciones</Text>
 
-        <TouchableOpacity onPress={markAllAsRead}>
-          <Text style={styles.readAll}>Marcar leidas</Text>
-        </TouchableOpacity>
+        <View style={styles.headerSide}>
+          <TouchableOpacity onPress={markAllAsRead} style={styles.headerActionBtn}>
+            <Text style={styles.readAll}>Marcar leidas</Text>
+          </TouchableOpacity>
+        </View>
       </View>
 
       <ScrollView contentContainerStyle={styles.content}>
@@ -325,6 +329,14 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+  },
+  headerSide: {
+    width: 100,
+    justifyContent: 'center',
+    alignItems: 'flex-start',
+  },
+  headerActionBtn: {
+    alignSelf: 'flex-end',
   },
   backBtn: {
     width: 40,

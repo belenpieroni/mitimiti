@@ -174,7 +174,6 @@ export default function JuntadasScreen({ navigation }) {
                     {tipoDeuda === 'pagar'  && <Text style={styles.teDebes}>Debés {formatPesos(montoDeuda)}</Text>}
                     {tipoDeuda === 'ninguna' && <Text style={styles.sinDeuda}>Sin deudas</Text>}
                   </View>
-                  <Ionicons name="ellipsis-horizontal" size={18} color={colors.textSecondary} />
                 </View>
               </TouchableOpacity>
             );

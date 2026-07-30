@@ -181,6 +181,12 @@ export default function JuntadaDetalleScreen({ route, navigation }) {
           <Text style={styles.headerSub}>{juntada.participantes.length} participantes · {juntada.fecha}</Text>
         </View>
         {esCreador && (
+          <TouchableOpacity style={styles.btnHeaderAction} onPress={handleCompartirInvitacion}>
+            <Ionicons name="link-outline" size={18} color={colors.textPrimary} />
+            <Text style={styles.btnHeaderActionText}>Invitar</Text>
+          </TouchableOpacity>
+        )}
+        {esCreador && (
           <TouchableOpacity style={styles.btnMenu} onPress={() => setActionsVisible(true)}>
             <Ionicons name="ellipsis-horizontal" size={22} color={colors.textPrimary} />
           </TouchableOpacity>
@@ -205,19 +211,6 @@ export default function JuntadaDetalleScreen({ route, navigation }) {
           </TouchableOpacity>
         </View>
 
-        
-        <TouchableOpacity style={styles.invitarBtn} onPress={handleCompartirInvitacion}>
-          <View style={styles.invitarBtnIcon}>
-            <Ionicons name="person-add-outline" size={18} color="#fff" />
-          </View>
-          <View style={{ flex: 1 }}>
-            <Text style={styles.invitarBtnTitulo}>Invitar personas</Text>
-            <Text style={styles.invitarBtnSub}>Compartir enlace de invitación</Text>
-          </View>
-          <Ionicons name="share-outline" size={18} color={colors.primary} />
-        </TouchableOpacity>
-
-        
         <TouchableOpacity
           onPress={() => setSubgruposVisible(true)}
           style={styles.subgruposBtn}
@@ -226,7 +219,7 @@ export default function JuntadaDetalleScreen({ route, navigation }) {
             <Ionicons name="people" size={18} color={colors.primary} />
           </View>
           <View style={{ flex: 1 }}>
-            <Text style={styles.subgruposBtnTitulo}>Subgrupos familiares</Text>
+            <Text style={styles.subgruposBtnTitulo}>Subgrupos</Text>
             <Text style={styles.subgruposBtnSubtitulo}>
               {!juntada.subgrupos || juntada.subgrupos.length === 0
                 ? 'Agrupá parejas o familias para dividir por núcleo'
@@ -820,6 +813,14 @@ const styles = StyleSheet.create({
   btnMenu: {
     width: 36, height: 36, borderRadius: 18,
     backgroundColor: colors.cardBg, justifyContent: 'center', alignItems: 'center',
+  },
+  btnHeaderAction: {
+    flexDirection: 'row', alignItems: 'center', gap: 6,
+    backgroundColor: colors.cardBg, borderRadius: 16, paddingVertical: 8, paddingHorizontal: 12,
+    marginRight: 8,
+  },
+  btnHeaderActionText: {
+    color: colors.textPrimary, fontSize: 13, fontWeight: '600',
   },
   headerInfo: { flex: 1 },
   headerTitulo: { fontSize: 18, fontWeight: 'bold', color: colors.textPrimary },

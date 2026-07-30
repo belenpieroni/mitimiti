@@ -8,7 +8,8 @@ import {
   ActivityIndicator,
   RefreshControl,
   SafeAreaView,
-  LayoutAnimation
+  LayoutAnimation,
+  Platform
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { colors } from '../theme/colors';
@@ -87,16 +88,19 @@ export default function HistorialCompletoScreen({ navigation, route }) {
   });
 
   return (
-    <SafeAreaView style={styles.safeArea}>
-      <View style={styles.header}>
-        <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
-          <Ionicons name="chevron-back" size={24} color="#333" />
-        </TouchableOpacity>
-        <Text style={styles.title}>Historial Completo</Text>
-        <View style={{ width: 40 }} />
-      </View>
+    <SafeAreaView style={styles.whiteSafeArea}>
+      <View style={styles.pageBackground}>
+        <View style={styles.header}>
+          <View style={styles.headerSide}>
+            <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
+              <Ionicons name="chevron-back" size={24} color="#333" />
+            </TouchableOpacity>
+          </View>
+          <Text style={styles.title}>Historial Completo</Text>
+          <View style={styles.headerSide} />
+        </View>
 
-      {loading ? (
+        {loading ? (
         <View style={styles.center}>
           <ActivityIndicator size="large" color={colors.primary} />
         </View>
@@ -199,17 +203,24 @@ export default function HistorialCompletoScreen({ navigation, route }) {
 }
 
 const styles = StyleSheet.create({
-  safeArea: { flex: 1, backgroundColor: colors.background },
+  whiteSafeArea: { flex: 1, backgroundColor: colors.cardBg },
+  pageBackground: { flex: 1, backgroundColor: colors.background },
   center: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 20 },
   header: {
+    paddingTop: 52,
+    paddingHorizontal: 20,
+    paddingBottom: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#ECEFF3',
+    backgroundColor: colors.cardBg,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    borderBottomWidth: 1,
-    borderBottomColor: '#ECEFF3',
-    backgroundColor: '#fff'
+  },
+  headerSide: {
+    width: 100,
+    justifyContent: 'center',
+    alignItems: 'flex-start',
   },
   backBtn: {
     width: 40,
@@ -220,32 +231,29 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   title: { fontSize: 18, fontWeight: '700', color: colors.textPrimary },
-  container: { flex: 1 },
-  content: { padding: 16 },
+  container: { flex: 1, backgroundColor: 'transparent' },
+  content: { padding: 16, paddingTop: 0 },
   emptyText: { color: colors.textSecondary, fontSize: 14, textAlign: 'center' },
   grupoContainer: {
     marginBottom: 20,
-    backgroundColor: '#fff',
-    borderRadius: 20,
-    padding: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
-    elevation: 2,
   },
   grupoFechaHeader: {
     fontSize: 14,
     fontWeight: '700',
     color: '#888',
     textTransform: 'capitalize',
-    marginBottom: 12,
+    marginBottom: 10,
     letterSpacing: 0.5,
   },
   card: {
+    borderRadius: 14,
+    backgroundColor: colors.cardBg,
+    borderWidth: 1,
+    borderColor: '#E9ECF0',
+    padding: 12,
+    marginBottom: 10,
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 12,
   },
   borderBottom: {
     borderBottomWidth: 1,

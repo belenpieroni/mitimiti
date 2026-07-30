@@ -133,6 +133,7 @@ export default function ViviendaDashboard({ navigation }) {
   const [servicioSeleccionado, setServicioSeleccionado] = useState(null);
   const [liquidarVisible, setLiquidarVisible] = useState(false);
   const [servicioALiquidar, setServicioALiquidar] = useState(null);
+  const [mostrarTodosServicios, setMostrarTodosServicios] = useState(false);
 
   const [modalAcuerdosVisible, setModalAcuerdosVisible] = useState(false);
   const [vistaFormulario, setVistaFormulario] = useState(false);
@@ -185,16 +186,33 @@ export default function ViviendaDashboard({ navigation }) {
     }
   };
 
-  const totalMes = [...(gastos || []), ...(servicios || [])]
+  const allItems = [...(gastos || []), ...(servicios || [])];
+  const isPaid = (item) => String(item?.status || '').toUpperCase() === 'PAGADO';
+  const isNotPaid = (item) => !isPaid(item);
+
+  const totalMes = allItems.reduce((sum, item) => sum + (item.monto || 0), 0);
+
+  const tuPartePendiente = allItems
+    .filter(isNotPaid)
+    .reduce((sum, item) => sum + (item.monto_responsabilidad_usuario || item.monto || 0), 0);
+
+  const yaPagado = allItems
+    .filter(isPaid)
     .reduce((sum, item) => sum + (item.monto || 0), 0);
 
-  const tuPartePendiente = [...(gastos || []), ...(servicios || [])]
-    .filter(item => item.status !== 'PAGADO')
-    .reduce((sum, item) => sum + (item.monto_responsabilidad_usuario || 0), 0);
+  const serviciosOrdenados = [...(servicios || [])].sort((a, b) => {
+    const pagoA = isPaid(a) ? 1 : 0;
+    const pagoB = isPaid(b) ? 1 : 0;
+    if (pagoA !== pagoB) return pagoA - pagoB;
+    const fechaA = new Date(a.proximoVencimiento || a.fecha || 0).getTime();
+    const fechaB = new Date(b.proximoVencimiento || b.fecha || 0).getTime();
+    return fechaA - fechaB;
+  });
 
-  const yaPagado = [...(gastos || []), ...(servicios || [])]
-    .filter(item => item.status === 'PAGADO')
-    .reduce((sum, item) => sum + (item.monto_responsabilidad_usuario || 0), 0);
+  const visibleServicios = mostrarTodosServicios || serviciosOrdenados.length <= 4
+    ? serviciosOrdenados
+    : serviciosOrdenados.slice(0, 4);
+  const visibleGastos = (gastos || []).filter(isNotPaid);
 
   const nombreHeader = getPrimerNombre(user?.name || user?.nombre || '') || 'Vivienda';
 
@@ -418,8 +436,7 @@ export default function ViviendaDashboard({ navigation }) {
                 navigation.navigate('AgregarVivienda');
               }}
             >
-              <Ionicons name="add" size={16} color="#fff" />
-              <Text style={styles.btnGastoText}>Gasto</Text>
+              <Ionicons name="add" size={20} color="#fff" />
             </TouchableOpacity>
           </ScrollView>
         </View>
@@ -473,7 +490,7 @@ export default function ViviendaDashboard({ navigation }) {
           {vistaActiva === 'servicios' ? 'SERVICIOS PERIÓDICOS' : 'GASTOS PUNTUALES'}
         </Text>
 
-        {vistaActiva === 'servicios' ? (servicios || []).filter(s => s.status !== 'PAGADO').map(srv => {
+        {vistaActiva === 'servicios' ? visibleServicios.map(srv => {
           const targetDate = new Date(srv.proximoVencimiento);
           const today = new Date();
           const targetMidnight = new Date(targetDate.getFullYear(), targetDate.getMonth(), targetDate.getDate());
@@ -591,7 +608,7 @@ export default function ViviendaDashboard({ navigation }) {
               </View>
             </TouchableOpacity>
           );
-        }) : (gastos || []).filter(gasto => gasto.status !== 'PAGADO').map(gasto => {
+        }) : visibleGastos.map(gasto => {
           const targetDate = new Date(gasto.fecha);
           const today = new Date();
           const targetMidnight = new Date(targetDate.getFullYear(), targetDate.getMonth(), targetDate.getDate());
@@ -707,6 +724,20 @@ export default function ViviendaDashboard({ navigation }) {
             <Ionicons name="repeat-outline" size={36} color={colors.textSecondary} />
             <Text style={styles.emptyStateText}>Todavía no hay servicios cargados</Text>
           </View>
+        )}
+
+        {vistaActiva === 'servicios' && serviciosOrdenados.length > 4 && (
+          <TouchableOpacity
+            style={styles.btnVerMas}
+            onPress={() => setMostrarTodosServicios(prev => !prev)}
+          >
+            <Text style={styles.btnVerMasText}>{mostrarTodosServicios ? 'Ver menos' : 'Ver más'}</Text>
+            <Ionicons
+              name={mostrarTodosServicios ? 'chevron-up' : 'chevron-down'}
+              size={16}
+              color={colors.primary}
+            />
+          </TouchableOpacity>
         )}
 
         {vistaActiva === 'gastos' && (gastos || []).length === 0 && (
