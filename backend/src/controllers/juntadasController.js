@@ -439,7 +439,8 @@ async function agregarGasto(req, res, next) {
 
     const nuevo = {
       id, nombre: nombre.trim(), pagador: pagador.trim(),
-      splitMode, splitSubgroups, beneficiarios: beneficiarios.map((b) => b.trim()),
+      splitMode, splitSubgroups,
+      beneficiarios: finalBeneficiarios.map((b) => b.trim()),
       monto: montoRedondeado, ticketPhoto, creadoEn: new Date().toISOString(),
     };
 

@@ -68,12 +68,24 @@ function calcularBalance(juntada) {
     }
 
     // Sistema de Checklist: si viene el array 'beneficiarios' con gente tildada, se usa.
-    
-    let consumidores = g.beneficiarios && g.beneficiarios.length > 0 
-      ? g.beneficiarios 
-      : participantes.map(p => p.nombre);
-      
-    
+    // En modo subgrupos, si no hay beneficiarios directos, se calculan los integrantes
+    // de los subgrupos seleccionados.
+    let consumidores = [];
+    if (g.beneficiarios && g.beneficiarios.length > 0) {
+      consumidores = g.beneficiarios;
+    } else if (g.splitMode === 'subgroups' && Array.isArray(g.splitSubgroups) && g.splitSubgroups.length > 0) {
+      const integrantes = new Set();
+      g.splitSubgroups.forEach((subgroupId) => {
+        const sg = subgrupos.find((group) => group.id === subgroupId);
+        if (sg?.integrantes?.length > 0) {
+          sg.integrantes.forEach((nombre) => integrantes.add(nombre));
+        }
+      });
+      consumidores = Array.from(integrantes);
+    } else {
+      consumidores = participantes.map((p) => p.nombre);
+    }
+
     consumidores = consumidores
       .map(c => nombreMap[c ? c.trim().toLowerCase() : ''])
       .filter(Boolean);

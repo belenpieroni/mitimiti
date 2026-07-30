@@ -80,7 +80,7 @@ export default function AgregarGastoScreen({ route, navigation }) {
   const integrantesEnGrupos = (juntada?.subgrupos || []).flatMap(sg => sg.integrantes || []);
   const participantesSueltos = participantes.filter(p => !integrantesEnGrupos.includes(p.nombre));
 
-  const montoNum = parseInt(monto) || 0;
+  const montoNum = parseFloat(monto.replace(',', '.')) || 0;
   const puedeGuardar = nombre.trim() && montoNum > 0 && pagador && 
     (splitMode === 'equal' ? seleccionados.length > 0 : juntada?.subgrupos?.length > 0);
 
@@ -166,7 +166,7 @@ export default function AgregarGastoScreen({ route, navigation }) {
               placeholder="0"
               keyboardType="numeric"
               value={monto}
-              onChangeText={(text) => setMonto(text.replace(/\D/g, ''))}
+              onChangeText={(text) => setMonto(text.replace(/[^0-9.,]/g, ''))}
               editable={!guardando}
               placeholderTextColor={colors.textSecondary + '80'}
             />

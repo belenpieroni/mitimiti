@@ -7,9 +7,8 @@ import {
   ScrollView,
   ActivityIndicator,
   RefreshControl,
-  SafeAreaView,
   LayoutAnimation,
-  Platform
+  Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { colors } from '../theme/colors';
@@ -88,12 +87,11 @@ export default function HistorialCompletoScreen({ navigation, route }) {
   });
 
   return (
-    <SafeAreaView style={styles.whiteSafeArea}>
-      <View style={styles.pageBackground}>
-        <View style={styles.header}>
+    <View style={styles.container}>
+      <View style={styles.header}>
           <View style={styles.headerSide}>
             <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
-              <Ionicons name="chevron-back" size={24} color="#333" />
+              <Ionicons name="chevron-back" size={22} color={colors.textSecondary} />
             </TouchableOpacity>
           </View>
           <Text style={styles.title}>Historial Completo</Text>
@@ -111,7 +109,6 @@ export default function HistorialCompletoScreen({ navigation, route }) {
         </View>
       ) : (
         <ScrollView
-          style={styles.container}
           contentContainerStyle={styles.content}
           refreshControl={
             <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[colors.primary]} />
@@ -198,13 +195,12 @@ export default function HistorialCompletoScreen({ navigation, route }) {
           ))}
         </ScrollView>
       )}
-    </SafeAreaView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  whiteSafeArea: { flex: 1, backgroundColor: colors.cardBg },
-  pageBackground: { flex: 1, backgroundColor: colors.background },
+  container: { flex: 1, backgroundColor: colors.background },
   center: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 20 },
   header: {
     paddingTop: 52,
@@ -231,7 +227,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   title: { fontSize: 18, fontWeight: '700', color: colors.textPrimary },
-  container: { flex: 1, backgroundColor: 'transparent' },
   content: { padding: 16, paddingTop: 0 },
   emptyText: { color: colors.textSecondary, fontSize: 14, textAlign: 'center' },
   grupoContainer: {
