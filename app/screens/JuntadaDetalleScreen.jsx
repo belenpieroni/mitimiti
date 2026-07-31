@@ -1,14 +1,16 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet,
   ActivityIndicator, TextInput, Modal, Alert, KeyboardAvoidingView, Platform, Image, Share,
 } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
+import * as Clipboard from 'expo-clipboard';
 import { Ionicons } from '@expo/vector-icons';
 import { colors } from '../theme/colors';
 import api, { API_URL } from '../services/api';
-import { obtenerJuntada, agregarGasto, eliminarGasto, agregarSubgrupo, editarSubgrupo, eliminarSubgrupo, obtenerInvitacion } from '../services/juntadasService';
+import { obtenerJuntada, agregarGasto, eliminarGasto, agregarSubgrupo, editarSubgrupo, eliminarSubgrupo, obtenerInvitacion, subscribePendingCreation } from '../services/juntadasService';
 import { useAuth } from '../context/AuthContext';
+import Toast from '../components/Toast';
 
 function formatPesos(monto) {
   return '$' + Math.abs(monto).toLocaleString('es-AR');
@@ -26,7 +28,6 @@ function normalizeId(value) {
   return String(value || '').trim().toLowerCase();
 }
 
-// ── Pantalla principal ────────────────────────────────────────────────────────
 export default function JuntadaDetalleScreen({ route, navigation }) {
   const { juntadaId } = route.params;
   const { user } = useAuth();
@@ -38,8 +39,23 @@ export default function JuntadaDetalleScreen({ route, navigation }) {
   const [confirmEliminar, setConfirmEliminar]   = useState(false);
   const [fotoTicket, setFotoTicket]             = useState(null); // URL de la foto que se está viendo
   const [miembrosVisible, setMiembrosVisible]   = useState(false);
+  const [toast, setToast]                       = useState({ visible: false, message: '', type: 'success' });
+
+  const mostrarToast = (message, type = 'success') => {
+    setToast({ visible: true, message, type });
+    setTimeout(() => {
+      setToast(prev => ({ ...prev, visible: false }));
+    }, 3000);
+  };
   
   const cargarJuntada = useCallback(async () => {
+    if (String(juntadaId).startsWith('temp-')) {
+      if (route.params?.optimisticData) {
+        setJuntada(route.params.optimisticData);
+        setCargando(false);
+      }
+      return;
+    }
     setCargando(true);
     setError(null);
     try {
@@ -49,6 +65,21 @@ export default function JuntadaDetalleScreen({ route, navigation }) {
       setError(e.message);
     } finally {
       setCargando(false);
+    }
+  }, [juntadaId, route.params?.optimisticData]);
+
+  useEffect(() => {
+    if (String(juntadaId).startsWith('temp-')) {
+      const unsubscribe = subscribePendingCreation(juntadaId, (status) => {
+        if (status.success) {
+          const dataJ = status.result?.data?.data || status.result?.data || status.result;
+          navigation.replace('JuntadaDetalle', { juntadaId: dataJ.id });
+        } else {
+          Alert.alert('Error', 'No se pudo crear la juntada en el servidor.');
+          navigation.goBack();
+        }
+      });
+      return unsubscribe;
     }
   }, [juntadaId]);
 
@@ -97,9 +128,8 @@ export default function JuntadaDetalleScreen({ route, navigation }) {
     }
   }
 
-  // Simulación de copiado al portapapeles para el Alias
   const copiarAlias = (alias) => {
-    Alert.alert('Alias Copiado', `"${alias}" se copió al portapapeles.`);
+    mostrarToast(`El Alias/CBU "${alias}" se copió al portapapeles.`, 'success');
   };
 
   async function handleCompartirInvitacion() {
@@ -140,7 +170,8 @@ export default function JuntadaDetalleScreen({ route, navigation }) {
 
   return (
     <View style={styles.container}>
-      {/* Header */}
+      <Toast visible={toast.visible} message={toast.message} type={toast.type} />
+      
       <View style={styles.header}>
         <TouchableOpacity style={styles.btnVolver} onPress={() => navigation.navigate('JuntadasList')}>
           <Ionicons name="chevron-back" size={22} color={colors.textPrimary} />
@@ -150,6 +181,12 @@ export default function JuntadaDetalleScreen({ route, navigation }) {
           <Text style={styles.headerSub}>{juntada.participantes.length} participantes · {juntada.fecha}</Text>
         </View>
         {esCreador && (
+          <TouchableOpacity style={styles.btnHeaderAction} onPress={handleCompartirInvitacion}>
+            <Ionicons name="link-outline" size={18} color={colors.textPrimary} />
+            <Text style={styles.btnHeaderActionText}>Invitar</Text>
+          </TouchableOpacity>
+        )}
+        {esCreador && (
           <TouchableOpacity style={styles.btnMenu} onPress={() => setActionsVisible(true)}>
             <Ionicons name="ellipsis-horizontal" size={22} color={colors.textPrimary} />
           </TouchableOpacity>
@@ -157,7 +194,7 @@ export default function JuntadaDetalleScreen({ route, navigation }) {
       </View>
 
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-        {/* Card total */}
+        
         <View style={styles.cardTotal}>
           <Text style={styles.cardTotalLabel}>Total gastado</Text>
           <Text style={styles.cardTotalMonto}>{formatPesos(totalGastado)}</Text>
@@ -174,19 +211,6 @@ export default function JuntadaDetalleScreen({ route, navigation }) {
           </TouchableOpacity>
         </View>
 
-        {/* Botón Invitar personas */}
-        <TouchableOpacity style={styles.invitarBtn} onPress={handleCompartirInvitacion}>
-          <View style={styles.invitarBtnIcon}>
-            <Ionicons name="person-add-outline" size={18} color="#fff" />
-          </View>
-          <View style={{ flex: 1 }}>
-            <Text style={styles.invitarBtnTitulo}>Invitar personas</Text>
-            <Text style={styles.invitarBtnSub}>Compartir enlace de invitación</Text>
-          </View>
-          <Ionicons name="share-outline" size={18} color={colors.primary} />
-        </TouchableOpacity>
-
-        {/* Botón Subgrupos – card ancho completo */}
         <TouchableOpacity
           onPress={() => setSubgruposVisible(true)}
           style={styles.subgruposBtn}
@@ -195,7 +219,7 @@ export default function JuntadaDetalleScreen({ route, navigation }) {
             <Ionicons name="people" size={18} color={colors.primary} />
           </View>
           <View style={{ flex: 1 }}>
-            <Text style={styles.subgruposBtnTitulo}>Subgrupos familiares</Text>
+            <Text style={styles.subgruposBtnTitulo}>Subgrupos</Text>
             <Text style={styles.subgruposBtnSubtitulo}>
               {!juntada.subgrupos || juntada.subgrupos.length === 0
                 ? 'Agrupá parejas o familias para dividir por núcleo'
@@ -205,14 +229,14 @@ export default function JuntadaDetalleScreen({ route, navigation }) {
           <Ionicons name="add" size={18} color={colors.primary} />
         </TouchableOpacity>
 
-        {/* ── SECCIÓN NUEVA: Alias de transferencia ──────────────────────── */}
+        
         {juntada.alias && (
           <View style={styles.aliasCard}>
             <View style={styles.aliasIconContainer}>
               <Ionicons name="wallet-outline" size={20} color={colors.primary} />
             </View>
             <View style={{ flex: 1 }}>
-              <Text style={styles.aliasLabel}>Alias de destino para transferencias</Text>
+              <Text style={styles.aliasLabel}>Alias/CBU de destino para transferencias</Text>
               <Text style={styles.aliasTexto}>{juntada.alias}</Text>
             </View>
             <TouchableOpacity style={styles.btnCopiar} onPress={() => copiarAlias(juntada.alias)}>
@@ -221,19 +245,20 @@ export default function JuntadaDetalleScreen({ route, navigation }) {
           </View>
         )}
 
-        {/* ── SECCIÓN NUEVA: Saldos Consolidados ─────────────────────────── */}
-        {juntada.saldos && juntada.saldos.length > 0 && (
+        
+        {juntada.balance?.saldos && juntada.balance.saldos.length > 0 && (
           <View style={styles.saldosContainer}>
             <Text style={styles.seccionLabel}>SALDOS CONSOLIDADOS</Text>
             <View style={styles.saldosCard}>
-              {juntada.saldos.map((s, idx) => {
-                const esAFavor = s.monto >= 0; // Arreglado: todo junto
+              {juntada.balance.saldos.map((s, idx) => {
+                const esAFavor = s.saldo >= 0;
+                const montoSaldo = Math.abs(s.saldo);
                 return (
                   <View 
                     key={idx} 
                     style={[
                       styles.saldoRow, 
-                      idx < juntada.saldos.length - 1 && styles.saldoRowBorder
+                      idx < juntada.balance.saldos.length - 1 && styles.saldoRowBorder
                     ]}
                   >
                     <View style={styles.saldoInfoLeft}>
@@ -247,7 +272,7 @@ export default function JuntadaDetalleScreen({ route, navigation }) {
                       <Text style={styles.saldoNombre}>{s.nombre}</Text>
                     </View>
                     <Text style={[styles.saldoMonto, esAFavor ? styles.saldoPositivo : styles.saldoNegativo]}>
-                      {esAFavor ? `A favor: ` : `Debe: `}{formatPesos(s.monto)}
+                      {esAFavor ? `A favor: ` : `Debe: `}{formatPesos(montoSaldo)}
                     </Text>
                   </View>
                 );
@@ -256,7 +281,7 @@ export default function JuntadaDetalleScreen({ route, navigation }) {
           </View>
         )}
 
-        {/* Gastos */}
+        
         <View style={styles.gastosHeader}>
           <Text style={styles.gastosLabel}>GASTOS · {juntada.gastos.length}</Text>
           <TouchableOpacity onPress={() => navigation.navigate('AgregarGasto', { juntadaId })}>
@@ -296,7 +321,7 @@ export default function JuntadaDetalleScreen({ route, navigation }) {
         )}
       </ScrollView>
 
-      {/* Footer */}
+      
       <View style={styles.footer}>
         <TouchableOpacity
           style={styles.btnBalance}
@@ -306,7 +331,6 @@ export default function JuntadaDetalleScreen({ route, navigation }) {
         </TouchableOpacity>
       </View>
 
-      {/* Bottom sheet Subgrupos */}
       <SubgruposSheet
         visible={subgruposVisible}
         juntada={juntada}
@@ -318,7 +342,6 @@ export default function JuntadaDetalleScreen({ route, navigation }) {
         onEliminar={handleEliminarSubgrupo}
       />
 
-      {/* Actions sheet (tres puntos) */}
       <ActionsSheet
         visible={actionsVisible}
         titulo={juntada.nombre}
@@ -335,7 +358,6 @@ export default function JuntadaDetalleScreen({ route, navigation }) {
         onEliminar={() => { setActionsVisible(false); setConfirmEliminar(true); }}
       />
 
-      {/* Confirm eliminar juntada */}
       {confirmEliminar && (
         <ConfirmSheet
           titulo="Eliminar juntada"
@@ -353,7 +375,6 @@ export default function JuntadaDetalleScreen({ route, navigation }) {
         />
       )}
 
-      {/* Visor de foto del ticket (clip) */}
       <Modal visible={!!fotoTicket} transparent animationType="fade" onRequestClose={() => setFotoTicket(null)}>
         <View style={styles.fotoOverlay}>
           <TouchableOpacity style={StyleSheet.absoluteFill} activeOpacity={1} onPress={() => setFotoTicket(null)} />
@@ -371,7 +392,6 @@ export default function JuntadaDetalleScreen({ route, navigation }) {
         </View>
       </Modal>
 
-      {/* Listado de participantes */}
       <Modal visible={miembrosVisible} transparent animationType="fade" onRequestClose={() => setMiembrosVisible(false)}>
         <View style={styles.miembrosOverlay}>
           <TouchableOpacity style={StyleSheet.absoluteFill} activeOpacity={1} onPress={() => setMiembrosVisible(false)} />
@@ -394,6 +414,18 @@ export default function JuntadaDetalleScreen({ route, navigation }) {
                     <View style={{ flex: 1 }}>
                       <Text style={styles.miembroNombre}>{p.nombre}</Text>
                       {esCreadorParticipante && <Text style={styles.miembroRol}>Creador</Text>}
+                      {p.alias ? (
+                        <TouchableOpacity 
+                          style={{ flexDirection: 'row', alignItems: 'center', marginTop: 2, gap: 4 }} 
+                          onPress={async () => {
+                            await Clipboard.setStringAsync(p.alias);
+                            mostrarToast('Alias/CBU copiado', 'success');
+                          }}
+                        >
+                          <Ionicons name="copy-outline" size={14} color={colors.textSecondary} />
+                          <Text style={{ fontSize: 12, color: colors.textSecondary }}>{p.alias}</Text>
+                        </TouchableOpacity>
+                      ) : null}
                     </View>
                   </View>
                 );
@@ -437,7 +469,6 @@ const actSheet = StyleSheet.create({
   confirmEliminarTxt: { fontSize: 14, fontWeight: '600', color: 'white' },
 });
 
-// ── Actions Sheet (tres puntos) ──────────────────────────────────────────────
 function ActionsSheet({ visible, titulo, onCerrar, onEditar, onEliminar }) {
   return (
     <Modal visible={visible} transparent animationType="slide">
@@ -491,10 +522,9 @@ function ConfirmSheet({ titulo, mensaje, onCancelar, onConfirmar }) {
   );
 }
 
-// ── Bottom Sheet: Subgrupos ──────────────────────────────────────────────────
 function SubgruposSheet({ visible, juntada, participantes, usuarioActualNombre, onCerrar, onGuardar, onEditar, onEliminar }) {
   const [creando, setCreando]       = useState(false);
-  const [editando, setEditando]     = useState(null); // subgrupo que se está editando
+  const [editando, setEditando]     = useState(null); 
   const [nombre, setNombre]         = useState('');
   const [seleccionados, setSelec]   = useState([]);
   const [guardando, setGuardando]   = useState(false);
@@ -567,7 +597,7 @@ function SubgruposSheet({ visible, juntada, participantes, usuarioActualNombre, 
         />
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
           <View style={sg.sheet}>
-          {/* Header */}
+          
           <View style={sg.header}>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
               <Ionicons name="people" size={18} color={colors.primary} />
@@ -587,7 +617,6 @@ function SubgruposSheet({ visible, juntada, participantes, usuarioActualNombre, 
 
           <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled" style={{ maxHeight: 320 }}>
             {mostrandoForm ? (
-              // ── Formulario crear / editar ──
               <View>
                 <TextInput
                   autoFocus
@@ -629,7 +658,6 @@ function SubgruposSheet({ visible, juntada, participantes, usuarioActualNombre, 
                 </View>
               </View>
             ) : (
-              // ── Lista de subgrupos ──
               <View style={{ gap: 8, marginBottom: 12 }}>
                 {subgrupos.length === 0 ? (
                   <View style={sg.empty}>
@@ -786,6 +814,14 @@ const styles = StyleSheet.create({
     width: 36, height: 36, borderRadius: 18,
     backgroundColor: colors.cardBg, justifyContent: 'center', alignItems: 'center',
   },
+  btnHeaderAction: {
+    flexDirection: 'row', alignItems: 'center', gap: 6,
+    backgroundColor: colors.cardBg, borderRadius: 16, paddingVertical: 8, paddingHorizontal: 12,
+    marginRight: 8,
+  },
+  btnHeaderActionText: {
+    color: colors.textPrimary, fontSize: 13, fontWeight: '600',
+  },
   headerInfo: { flex: 1 },
   headerTitulo: { fontSize: 18, fontWeight: 'bold', color: colors.textPrimary },
   headerSub: { fontSize: 12, color: colors.textSecondary },
@@ -834,7 +870,6 @@ const styles = StyleSheet.create({
     marginLeft: 8,
   },
   btnEliminar: { padding: 4 },
-  // Visor de foto del ticket
   fotoOverlay: {
     flex: 1, justifyContent: 'center', alignItems: 'center',
     backgroundColor: 'rgba(0,0,0,0.75)', padding: 20,
@@ -879,9 +914,12 @@ const styles = StyleSheet.create({
   miembroRol: { color: colors.textSecondary, fontSize: 12, marginTop: 2 },
   footer: {
     position: 'absolute', bottom: 0, left: 0, right: 0,
-    padding: 16, backgroundColor: colors.background,
+    padding: 16, paddingBottom: 18,
   },
-  btnBalance: { backgroundColor: colors.primary, borderRadius: 16, padding: 18, alignItems: 'center' },
+  btnBalance: { 
+    backgroundColor: colors.primary, borderRadius: 16, padding: 18, alignItems: 'center',
+    shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.15, shadowRadius: 8, elevation: 5
+  },
   btnBalanceTexto: { color: 'white', fontSize: 16, fontWeight: '700' },
   vacioCentrado: { alignItems: 'center', paddingVertical: 32, gap: 8 },
   vacioTexto: { color: colors.textSecondary, fontSize: 13 },
@@ -891,7 +929,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 24, paddingVertical: 12,
   },
   btnReintentarTexto: { color: 'white', fontWeight: '600' },
-  // Botón Invitar personas
   invitarBtn: {
     flexDirection: 'row', alignItems: 'center', gap: 12,
     backgroundColor: colors.primary, borderRadius: 16, padding: 14,
@@ -903,7 +940,6 @@ const styles = StyleSheet.create({
   },
   invitarBtnTitulo: { fontSize: 13, fontWeight: '700', color: 'white' },
   invitarBtnSub: { fontSize: 11, color: 'rgba(255,255,255,0.8)', marginTop: 2 },
-  // Botón Subgrupos en el detalle
   subgruposBtn: {
     flexDirection: 'row', alignItems: 'center', gap: 12,
     backgroundColor: 'white', borderRadius: 16, padding: 14,
@@ -916,7 +952,6 @@ const styles = StyleSheet.create({
   subgruposBtnTitulo: { fontSize: 13, fontWeight: '600', color: colors.textPrimary },
   subgruposBtnSubtitulo: { fontSize: 11, color: colors.textSecondary, marginTop: 2 },
   
-  // Estilos Nuevos: Alias de Transferencia
   aliasCard: {
     flexDirection: 'row', alignItems: 'center', gap: 12,
     backgroundColor: 'white', borderRadius: 16, padding: 14,
@@ -930,7 +965,6 @@ const styles = StyleSheet.create({
   aliasTexto: { fontSize: 14, fontWeight: '700', color: colors.textPrimary, marginTop: 2 },
   btnCopiar: { width: 32, height: 32, borderRadius: 16, justifyContent: 'center', alignItems: 'center' },
 
-  // Estilos Nuevos: Saldos Consolidados Familiares
   seccionLabel: { fontSize: 11, fontWeight: '700', color: colors.textSecondary, letterSpacing: 0.5, marginBottom: 8 },
   saldosContainer: { marginBottom: 16 },
   saldosCard: {

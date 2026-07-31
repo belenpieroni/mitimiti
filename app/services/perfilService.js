@@ -2,7 +2,6 @@ import api from './api';
 
 export async function obtenerPerfil(nombre) {
   try {
-    // Si tu axios/api.js ya devuelve "res.data", esto te trae directamente el objeto del perfil
     const response = await api.get(`/perfiles/${encodeURIComponent(nombre)}`);
     return response?.data || response; 
   } catch (error) {

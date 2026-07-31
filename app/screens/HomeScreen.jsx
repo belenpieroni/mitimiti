@@ -1,10 +1,13 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, StyleSheet, ActivityIndicator } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { colors } from '../theme/colors';
-import { listarJuntadas, obtenerBalanceGlobal } from '../services/juntadasService';
+import { listarJuntadas, obtenerBalanceGlobal, subscribeLocalJuntadas } from '../services/juntadasService';
+import { obtenerNotificaciones } from '../services/notificationsService';
 import { useAuth } from '../context/AuthContext';
+
+const API_BASE = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3000/api';
 
 const modulos = [
   { id: '1', nombre: 'Juntadas', icono: 'people-outline' },
@@ -22,8 +25,47 @@ function formatPesos(monto) {
   return '$' + Math.abs(monto).toLocaleString('es-AR');
 }
 
+async function fetchConsolidadoBalance(nombre) {
+  try {
+    const res = await fetch(`${API_BASE}/deudas/consolidado/${encodeURIComponent(nombre)}`);
+    const data = await res.json();
+    if (!res.ok || !data.ok) return null;
+    
+    let acreedores = [];
+    let servicios = [];
+    if (Array.isArray(data.data)) {
+      acreedores = data.data;
+    } else {
+      acreedores = data.data.acreedores || [];
+      servicios = data.data.serviciosAPagar || [];
+    }
+
+    const porPagarAcreedores = acreedores.reduce((acc, a) => {
+      const netTotal = (a.conceptos || []).reduce((sum, c) => sum + (c.tipoOperacion === 'resta' ? -c.monto : c.monto), 0);
+      return acc + Math.max(0, netTotal);
+    }, 0);
+
+    const porCobrar = acreedores.reduce((acc, a) => {
+      const netTotal = (a.conceptos || []).reduce((sum, c) => sum + (c.tipoOperacion === 'resta' ? -c.monto : c.monto), 0);
+      return acc + (netTotal < 0 ? Math.abs(netTotal) : 0);
+    }, 0);
+
+    const porPagarServicios = servicios.reduce((acc, s) => acc + (s.monto || 0), 0);
+    const porPagar = porPagarAcreedores + porPagarServicios;
+
+    return {
+      total: porCobrar - porPagar,
+      porCobrar,
+      porPagar
+    };
+  } catch (error) {
+    console.error('Error fetching consolidado:', error);
+    return null;
+  }
+}
+
 export default function HomeScreen({ navigation }) {
-  const { user } = useAuth();
+  const { user, token } = useAuth();
   const nombreUsuario = user?.name || 'Usuario';
   const inicialesUsuario = (nombreUsuario || 'US')
     .split(' ')
@@ -42,27 +84,39 @@ export default function HomeScreen({ navigation }) {
   });
   const [juntadas, setJuntadas] = useState([]);
   const [cargando, setCargando] = useState(true);
+  const [unreadCount, setUnreadCount] = useState(0);
+
+  useEffect(() => {
+    const unsubscribe = subscribeLocalJuntadas((list) => {
+      setJuntadas(list.slice(0, 5));
+    });
+    return unsubscribe;
+  }, []);
 
   const cargarDatos = useCallback(async () => {
     if (!user?.name) return;
     setCargando(true);
     try {
-      const [resGlobal, resJuntadas] = await Promise.all([
-        obtenerBalanceGlobal(nombre),
+      const [dataBalance, resJuntadas, resNotif] = await Promise.all([
+        fetchConsolidadoBalance(nombre),
         listarJuntadas(nombre),
+        token ? obtenerNotificaciones(token) : Promise.resolve([]),
       ]);
 
-      // Extrae la data de manera segura (maneja tanto axios directo como interceptores personalizados)
-      const dataBalance = resGlobal?.data?.data || resGlobal?.data || resGlobal;
+      
       const dataJuntadas = resJuntadas?.data?.data || resJuntadas?.data || resJuntadas;
 
       if (dataBalance) {
         setBalance(dataBalance);
       }
       
-      if (Array.isArray(dataJuntadas)) {
-        setJuntadas(dataJuntadas.slice(0, 5)); // Top 5 recientes
+      const notifs = Array.isArray(resNotif) ? resNotif : resNotif?.data?.data || resNotif?.data || [];
+      if (Array.isArray(notifs)) {
+        const unread = notifs.filter(n => !n.leida).length;
+        setUnreadCount(unread);
       }
+      
+      
     } catch (err) {
       console.error("Error cargando la Home: ", err);
     } finally {
@@ -79,7 +133,7 @@ export default function HomeScreen({ navigation }) {
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
 
-      {/* Header */}
+      
       <View style={styles.header}>
         <View>
           <Text style={styles.saludo}>{getSaludo()}</Text>
@@ -88,6 +142,11 @@ export default function HomeScreen({ navigation }) {
         <View style={styles.headerIconos}>
           <TouchableOpacity style={styles.iconoBtn} onPress={() => navigation.navigate('Notifications')}>
             <Ionicons name="notifications-outline" size={22} color={colors.textPrimary} />
+            {unreadCount > 0 && (
+              <View style={styles.badge}>
+                <Text style={styles.badgeText}>{unreadCount > 9 ? '9+' : unreadCount}</Text>
+              </View>
+            )}
           </TouchableOpacity>
           <TouchableOpacity
             style={styles.avatar}
@@ -98,7 +157,7 @@ export default function HomeScreen({ navigation }) {
         </View>
       </View>
 
-    {/* Card Balance */}
+    
       <View style={styles.cardBalance}>
         <Text style={styles.balanceLabel}>Balance total</Text>
         {cargando ? (
@@ -116,7 +175,7 @@ export default function HomeScreen({ navigation }) {
                 <Text style={[styles.balanceValor, { color: colors.greenGlobal }]}>
                   {formatPesos(balance.porCobrar)}
                 </Text>
-                {/* Icono tendencia arriba */}
+                
                 <Ionicons name="trending-up" size={14} color={colors.greenGlobal} style={{ position: 'absolute', top: 12, right: 12 }} />
               </View>
               
@@ -125,12 +184,12 @@ export default function HomeScreen({ navigation }) {
                 <Text style={[styles.balanceValor, { color: '#ec6c6a' }]}>
                   {formatPesos(balance.porPagar)}
                 </Text>
-                {/* Icono tendencia abajo */}
+                
                 <Ionicons name="trending-down" size={14} color="#ec6c6a" style={{ position: 'absolute', top: 12, right: 12 }} />
               </View>
             </View>
 
-            {/* Botón Ver deudas */}
+            
             <TouchableOpacity 
               style={styles.btnVerDeudas} 
               onPress={() => navigation.navigate('Deudas')}
@@ -141,7 +200,7 @@ export default function HomeScreen({ navigation }) {
         )}
       </View>
 
-      {/* Módulos */}
+      
       <Text style={styles.seccionTitulo}>Módulos</Text>
       <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.modulosScroll}>
         {modulos.map((mod) => (
@@ -162,7 +221,7 @@ export default function HomeScreen({ navigation }) {
         ))}
       </ScrollView>
 
-      {/* Activos recientemente */}
+      
       <View style={styles.seccionHeader}>
         <Text style={styles.seccionTitulo}>Activos recientemente</Text>
         <TouchableOpacity onPress={() => navigation.navigate('Juntadas', { screen: 'JuntadasList' })}>
@@ -217,7 +276,15 @@ const styles = StyleSheet.create({
   iconoBtn: {
     width: 40, height: 40, borderRadius: 20,
     backgroundColor: colors.cardBg, justifyContent: 'center', alignItems: 'center',
+    position: 'relative',
   },
+  badge: {
+    position: 'absolute', top: 4, right: 6,
+    backgroundColor: '#E63946', borderRadius: 8,
+    minWidth: 16, height: 16, justifyContent: 'center', alignItems: 'center',
+    paddingHorizontal: 3, borderWidth: 1.5, borderColor: colors.cardBg,
+  },
+  badgeText: { color: 'white', fontSize: 9, fontWeight: 'bold' },
   avatar: {
     width: 40, height: 40, borderRadius: 20,
     backgroundColor: colors.primary, justifyContent: 'center', alignItems: 'center',

@@ -1,6 +1,6 @@
 const { randomUUID: uuidv4 } = require('crypto');
 const { pool } = require('../db');
-const { cargarJuntadaCompleta } = require('../helpers/juntadaHelpers');
+const { cargarJuntadaCompleta, cargarJuntadasCompletas } = require('../helpers/juntadaHelpers');
 const { calcularBalance, calcularBalanceGlobal } = require('../services/balanceService');
 const { notifyUsersByName, NOTIFICATION_CATEGORIES } = require('../services/pushNotificationService');
 
@@ -36,16 +36,17 @@ async function listarJuntadas(req, res, next) {
       [usuario]
     );
 
-    const juntadas = await Promise.all(ids.map(({ id }) => cargarJuntadaCompleta(id)));
+    const idsArray = ids.map(({ id }) => id);
+    const juntadas = await cargarJuntadasCompletas(idsArray);
 
     const resultado = juntadas.map((juntada) => {
       const balance = calcularBalance(juntada);
+
       const saldoUsuario = balance.saldos.find(
-        (s) => s.nombre.toLowerCase() === usuario.toLowerCase()
+        (s) => s.nombre.trim().toLowerCase() === usuario.trim().toLowerCase()
       );
-      const saldoNeto = saldoUsuario
-        ? (typeof saldoUsuario.saldoPendiente === 'number' ? saldoUsuario.saldoPendiente : saldoUsuario.saldo)
-        : 0;
+
+      const saldoBruto = saldoUsuario ? (saldoUsuario.saldo ?? 0) : 0;
 
       return {
         id: juntada.id,
@@ -56,10 +57,10 @@ async function listarJuntadas(req, res, next) {
         cantidadGastos: juntada.gastos.length,
         totalGastado: balance.totalGastado,
         participantes: juntada.participantes,
-        deuda: Math.abs(saldoNeto),
-        tipo: saldoUsuario
-          ? saldoNeto > 0.01 ? 'cobrar' : saldoNeto < -0.01 ? 'pagar' : 'ninguna'
-          : 'ninguna',
+        deuda: Math.abs(saldoBruto),
+        tipo: saldoBruto > 0.01  ? 'cobrar'
+            : saldoBruto < -0.01 ? 'pagar'
+            : 'ninguna',
       };
     });
 
@@ -77,7 +78,6 @@ async function crearJuntada(req, res, next) {
       const err = new Error('El campo "nombre" es requerido.'); err.status = 400; return next(err);
     }
 
-    // req.user proviene del JWT verificado por requireAuth
     const { rows: [creador] } = await pool.query(
       'SELECT id, name, iniciales FROM usuarios WHERE id = $1',
       [req.user.id]
@@ -95,7 +95,6 @@ async function crearJuntada(req, res, next) {
       [id, nombre.trim(), descripcion.trim(), req.user.id, fecha]
     );
 
-    // Agregar al creador como único participante inicial
     const pid = uuidv4();
     const pnombre = creador.name.trim();
     const piniciales = creador.iniciales || getIniciales(pnombre);
@@ -141,7 +140,6 @@ async function obtenerJuntada(req, res, next) {
       err.status = 403; return next(err);
     }
 
-    // Backfill para juntadas legacy sin creador_id.
     if (!juntada.creadorId) {
       await pool.query(
         'UPDATE juntadas SET creador_id = $1 WHERE id = $2 AND creador_id IS NULL',
@@ -299,11 +297,11 @@ async function eliminarJuntada(req, res, next) {
   }
 }
 
-// ── Participantes ─────────────────────────────────────────────────────────────
+
 
 async function agregarParticipante(req, res, next) {
   try {
-    const { rows: [juntada] } = await pool.query('SELECT id FROM juntadas WHERE id = $1', [req.params.id]);
+    const { rows: [juntada] } = await pool.query('SELECT id, nombre FROM juntadas WHERE id = $1', [req.params.id]);
     if (!juntada) {
       const err = new Error(`Juntada con id "${req.params.id}" no encontrada.`);
       err.status = 404; return next(err);
@@ -336,6 +334,14 @@ async function agregarParticipante(req, res, next) {
        VALUES ($1, $2, $3, $4, $5)`,
       [pid, req.params.id, nombreLimpio, iniciales || getIniciales(nombreLimpio), colorAsignado]
     );
+
+    notifyUsersByName([nombreLimpio], {
+      title: 'Te agregaron a una juntada',
+      body: `Ahora participas en "${juntada.nombre}"`,
+      data: { type: 'juntada_invite', juntadaId: juntada.id, juntadaNombre: juntada.nombre },
+    }, { category: NOTIFICATION_CATEGORIES.NUEVAS_JUNTADAS }).catch((err) => {
+      console.error('[push] Error enviando notificacion de juntada:', err.message);
+    });
 
     res.status(201).json({
       ok: true,
@@ -373,7 +379,7 @@ async function quitarParticipante(req, res, next) {
   }
 }
 
-// ── Gastos ────────────────────────────────────────────────────────────────────
+
 
 async function agregarGasto(req, res, next) {
   try {
@@ -385,8 +391,12 @@ async function agregarGasto(req, res, next) {
 
     const {
       nombre, pagador, monto,
-      splitMode = 'equal', splitSubgroups = [], beneficiarios = [], ticketPhoto = null,
+      splitMode = 'equal', splitSubgroups = [], beneficiarios = [], dividirEntre = [], ticketPhoto = null,
     } = req.body;
+
+    const finalBeneficiarios = (Array.isArray(beneficiarios) && beneficiarios.length > 0)
+      ? beneficiarios
+      : (Array.isArray(dividirEntre) ? dividirEntre : []);
 
     if (!nombre || nombre.trim() === '') {
       const err = new Error('El campo "nombre" del gasto es requerido.'); err.status = 400; return next(err);
@@ -406,9 +416,9 @@ async function agregarGasto(req, res, next) {
       err.status = 422; return next(err);
     }
 
-    if (beneficiarios.length > 0) {
+    if (finalBeneficiarios.length > 0) {
       const nombresValidos = juntada.participantes.map((p) => p.nombre.toLowerCase());
-      const invalidos = beneficiarios.filter((b) => !nombresValidos.includes(b.trim().toLowerCase()));
+      const invalidos = finalBeneficiarios.filter((b) => !nombresValidos.includes(b.trim().toLowerCase()));
       if (invalidos.length > 0) {
         const err = new Error(`Los siguientes beneficiarios no pertenecen a la juntada: ${invalidos.join(', ')}`);
         err.status = 422; return next(err);
@@ -423,12 +433,13 @@ async function agregarGasto(req, res, next) {
          (id, juntada_id, nombre, pagador, monto, split_mode, split_subgroups, beneficiarios, ticket_photo)
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
       [id, req.params.id, nombre.trim(), pagador.trim(), montoRedondeado,
-       splitMode, splitSubgroups, beneficiarios.map((b) => b.trim()), ticketPhoto]
+       splitMode, splitSubgroups, finalBeneficiarios.map((b) => b.trim()), ticketPhoto]
     );
 
     const nuevo = {
       id, nombre: nombre.trim(), pagador: pagador.trim(),
-      splitMode, splitSubgroups, beneficiarios: beneficiarios.map((b) => b.trim()),
+      splitMode, splitSubgroups,
+      beneficiarios: finalBeneficiarios.map((b) => b.trim()),
       monto: montoRedondeado, ticketPhoto, creadoEn: new Date().toISOString(),
     };
 
@@ -468,7 +479,7 @@ async function eliminarGasto(req, res, next) {
   }
 }
 
-// ── Balance ───────────────────────────────────────────────────────────────────
+
 
 async function obtenerBalance(req, res, next) {
   try {
@@ -498,7 +509,8 @@ async function obtenerBalanceGlobal(req, res, next) {
        WHERE LOWER(p.nombre) = LOWER($1)`,
       [nombre]
     );
-    const juntadas = await Promise.all(ids.map(({ id }) => cargarJuntadaCompleta(id)));
+    const idsArray = ids.map(({ id }) => id);
+    const juntadas = await cargarJuntadasCompletas(idsArray);
     const balance = calcularBalanceGlobal(nombre, juntadas);
     res.json({ ok: true, data: balance });
   } catch (err) {
@@ -506,7 +518,7 @@ async function obtenerBalanceGlobal(req, res, next) {
   }
 }
 
-// ── Subgrupos ─────────────────────────────────────────────────────────────────
+
 
 const agregarSubgrupo = async (req, res) => {
   try {
@@ -548,7 +560,6 @@ const editarSubgrupo = async (req, res) => {
     if (!nombre || !integrantes || integrantes.length < 1)
       return res.status(400).json({ error: 'El subgrupo debe tener un nombre y al menos 1 integrante.' });
 
-    // Actualizamos tanto el nombre como el array de integrantes en una sola consulta
     const query = `
       UPDATE juntada_subgrupos 
       SET nombre = $1, integrantes = $2 
@@ -589,7 +600,7 @@ const unirseSubgrupo = async (req, res) => {
     const { id, sgid } = req.params;
     const usuarioId = req.user.id; 
 
-    // Agrega el UUID al array solo si no existe previamente
+
     const query = `
       UPDATE juntada_subgrupos
       SET integrantes = array_append(integrantes, $1)
@@ -599,12 +610,10 @@ const unirseSubgrupo = async (req, res) => {
     const { rows, rowCount } = await pool.query(query, [usuarioId, sgid]);
 
     if (rowCount === 0) {
-      // Si no modificó filas, chequeamos si el subgrupo realmente existe
       const { rows: existeRows } = await pool.query('SELECT * FROM juntada_subgrupos WHERE id = $1', [sgid]);
       if (existeRows.length === 0) {
         return res.status(404).json({ error: 'Subgrupo no encontrado.' });
       }
-      // Si existía, significa que ya era miembro
       return res.status(200).json({ ok: true, data: existeRows[0], mensaje: 'Ya formás parte de este subgrupo.' });
     }
 
@@ -619,7 +628,6 @@ const salirSubgrupo = async (req, res) => {
     const { id, sgid } = req.params;
     const usuarioId = req.user.id;
 
-    // Remueve el UUID del usuario del array de integrantes
     const query = `
       UPDATE juntada_subgrupos
       SET integrantes = array_remove(integrantes, $1)
@@ -648,7 +656,6 @@ async function generarObtenerInvitacion(req, res, next) {
       err.status = 404; return next(err);
     }
 
-    // Reutilizar token existente no expirado
     const { rows: [existing] } = await pool.query(
       `SELECT token::text FROM invitation_tokens
        WHERE recurso_id = $1 AND tipo = 'juntada' AND expira_en > NOW()
@@ -687,7 +694,6 @@ async function unirseViaToken(req, res, next) {
     const { token } = req.params;
     const usuarioId = req.user.id;
 
-    // Validar token
     const { rows: [inv] } = await pool.query(
       `SELECT token, tipo, recurso_id::text FROM invitation_tokens
        WHERE token = $1 AND expira_en > NOW()`,
@@ -697,7 +703,6 @@ async function unirseViaToken(req, res, next) {
       const err = new Error('Enlace de invitación inválido o expirado.'); err.status = 404; return next(err);
     }
 
-    // Obtener info del usuario
     const { rows: [usuario] } = await pool.query(
       'SELECT name, iniciales FROM usuarios WHERE id = $1', [usuarioId]
     );
@@ -708,7 +713,6 @@ async function unirseViaToken(req, res, next) {
     if (inv.tipo === 'juntada') {
       const juntadaId = inv.recurso_id;
 
-      // Verificar si ya es participante
       const { rows: yaParticipante } = await pool.query(
         'SELECT id FROM juntada_participantes WHERE juntada_id = $1 AND LOWER(nombre) = LOWER($2)',
         [juntadaId, usuario.name]
@@ -718,7 +722,6 @@ async function unirseViaToken(req, res, next) {
         return res.json({ ok: true, data: { juntada, yaMiembro: true } });
       }
 
-      // Agregar como participante
       const { rows: [countRow] } = await pool.query(
         'SELECT COUNT(*)::int AS c FROM juntada_participantes WHERE juntada_id = $1', [juntadaId]
       );
@@ -733,7 +736,6 @@ async function unirseViaToken(req, res, next) {
 
       const juntada = await cargarJuntadaCompleta(juntadaId);
 
-      // Notificar a los demás participantes
       const otros = juntada.participantes
         .map(p => p.nombre)
         .filter(n => n.toLowerCase() !== usuario.name.toLowerCase());

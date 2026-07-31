@@ -11,7 +11,7 @@ import {
   ScrollView,
 } from 'react-native';
 import { CameraView, useCameraPermissions } from 'expo-camera';
-import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { MaterialCommunityIcons, Ionicons } from '@expo/vector-icons';
 import { colors } from '../theme/colors';
 import { scanTicket } from '../services/ocrService';
 
@@ -46,11 +46,9 @@ export default function CaptureTicketModal({ visible, onClose, onAmountExtracted
 
     setIsProcessing(true);
     try {
-      // El OCR ahora corre en el backend: sube la foto y devuelve el importe.
       const { amount, ticketUrl } = await scanTicket(capturedPhoto);
 
       if (amount) {
-        // Éxito: retorna el importe extraído
         Alert.alert(
           'Importe detectado',
           `Se extrajo: $${amount.toFixed(2)}`,
@@ -63,8 +61,6 @@ export default function CaptureTicketModal({ visible, onClose, onAmountExtracted
             {
               text: 'Usar',
               onPress: () => {
-                // Pasamos también ticketUrl (ya quedó subida en el server)
-                // para no volver a subir la foto al guardar el gasto.
                 onAmountExtracted({ amount, photo: capturedPhoto, ticketUrl });
                 handleClose();
               },
@@ -72,7 +68,6 @@ export default function CaptureTicketModal({ visible, onClose, onAmountExtracted
           ]
         );
       } else {
-        // Falla: no se encontró importe
         Alert.alert(
           'No se detectó importe',
           'El OCR no pudo extraer un número válido del ticket. Por favor, ingresa el importe manualmente.'
@@ -99,6 +94,9 @@ export default function CaptureTicketModal({ visible, onClose, onAmountExtracted
     return (
       <Modal visible={visible} animationType="slide" transparent={true}>
         <View style={styles.centerContainer}>
+          <TouchableOpacity style={{ position: 'absolute', top: 40, right: 20, padding: 8, zIndex: 10 }} onPress={handleClose}>
+            <Ionicons name="close" size={30} color="white" />
+          </TouchableOpacity>
           <Text style={styles.errorText}>No hay permiso de cámara</Text>
           <TouchableOpacity style={styles.btnClose} onPress={handleClose}>
             <Text style={styles.btnCloseText}>Cerrar</Text>
@@ -112,6 +110,9 @@ export default function CaptureTicketModal({ visible, onClose, onAmountExtracted
     return (
       <Modal visible={visible} animationType="slide" transparent={true}>
         <View style={styles.centerContainer}>
+          <TouchableOpacity style={{ position: 'absolute', top: 40, right: 20, padding: 8, zIndex: 10 }} onPress={handleClose}>
+            <Ionicons name="close" size={30} color="white" />
+          </TouchableOpacity>
           <Text style={styles.errorText}>Se requiere permiso de cámara</Text>
           <TouchableOpacity style={styles.btnClose} onPress={requestPermission}>
             <Text style={styles.btnCloseText}>Solicitar permiso</Text>
@@ -132,7 +133,6 @@ export default function CaptureTicketModal({ visible, onClose, onAmountExtracted
 
       <View style={styles.overlay}>
         <View style={styles.modalContent}>
-          {/* Header */}
           <View style={styles.modalHeader}>
             <Text style={styles.modalTitle}>Escanear ticket</Text>
             <TouchableOpacity onPress={handleClose} style={styles.closeButton}>
@@ -141,9 +141,8 @@ export default function CaptureTicketModal({ visible, onClose, onAmountExtracted
           </View>
 
           {!capturedPhoto ? (
-            // Pantalla de captura
             <ScrollView style={styles.captureContent} showsVerticalScrollIndicator={false}>
-              {/* Cámara */}
+              
               <View style={styles.cameraWrapper}>
                 <CameraView
                   ref={cameraRef}
@@ -158,7 +157,7 @@ export default function CaptureTicketModal({ visible, onClose, onAmountExtracted
                 </View>
               </View>
 
-              {/* Botón Capturar */}
+              
               <TouchableOpacity
                 style={styles.captureButton}
                 onPress={takePicture}
@@ -167,7 +166,6 @@ export default function CaptureTicketModal({ visible, onClose, onAmountExtracted
               </TouchableOpacity>
             </ScrollView>
           ) : (
-            // Pantalla de preview
             <ScrollView style={styles.previewContent} showsVerticalScrollIndicator={false}>
               <Image
                 source={{ uri: capturedPhoto }}

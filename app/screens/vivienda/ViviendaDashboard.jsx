@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import LiquidarServicioModal from '../../components/LiquidarServicioModal';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
   Modal, TextInput, KeyboardAvoidingView, Platform, Pressable, Alert, Share,
@@ -8,6 +9,8 @@ import { colors } from '../../theme/colors';
 import { useVivienda } from '../../context/ViviendaContext';
 import { useAuth } from '../../context/AuthContext';
 import { useFocusEffect } from '@react-navigation/native';
+import * as Clipboard from 'expo-clipboard';
+import Toast from '../../components/Toast';
 import {
   getGastosVivienda,
   getServiciosVivienda,
@@ -16,8 +19,9 @@ import {
   getMiVivienda,
   crearMiVivienda,
   obtenerInvitacionVivienda,
+  marcarPagadoVivienda,
+  eliminarGastoVivienda
 } from '../../services/viviendaService';
-// ─── Colores para Avatares ────────────────────────────────────────────────────
 const coloresDisponibles = [
   '#473472', '#526D82', '#9DB2BF', '#42b271',
   '#c084fc', '#f97316', '#ec6c6a', '#38bdf8',
@@ -25,7 +29,7 @@ const coloresDisponibles = [
 
 function getIniciales(nombre) {
   if (typeof nombre !== 'string') return '??';
-  
+
   const partes = nombre.trim().split(' ');
   if (partes.length >= 2) return (partes[0][0] + partes[1][0]).toUpperCase();
   return nombre.slice(0, 2).toUpperCase();
@@ -63,7 +67,6 @@ function AvatarStack({ personas = [] }) {
   );
 }
 
-// ─── Mapa de íconos por nombre de servicio ────────────────────────────────────
 const ICONS_MAP = {
   'Netflix': 'tv-outline',
   'Spotify': 'musical-notes-outline',
@@ -87,59 +90,57 @@ const GASTO_ICONS_MAP = {
   'Otras categorías': 'pricetag-outline',
 };
 
-// ─── Mapa de modelo (string) → { label, icon } ───────────────────────────────
 const MODELO_MAP = {
-  proporcional:      { label: 'Proporcional',   icon: 'bar-chart-outline' },
-  partes_iguales:    { label: 'Partes iguales', icon: 'scale-outline' },
-  responsable_unico: { label: 'Resp. único',    icon: 'person-outline' },
+  proporcional: { label: 'Proporcional', icon: 'bar-chart-outline' },
+  partes_iguales: { label: 'Partes iguales', icon: 'scale-outline' },
+  responsable_unico: { label: 'Resp. único', icon: 'person-outline' },
 };
 
-// ─── Opciones del dropdown de categorías ─────────────────────────────────────
 const CATEGORIAS = [
-  { label: 'Agua',             icon: 'water-outline' },
-  { label: 'Factura de Luz',   icon: 'flash-outline' },
+  { label: 'Agua', icon: 'water-outline' },
+  { label: 'Factura de Luz', icon: 'flash-outline' },
   { label: 'Internet / Fibra', icon: 'wifi-outline' },
-  { label: 'Netflix',          icon: 'tv-outline' },
-  { label: 'Spotify',          icon: 'musical-notes-outline' },
-  { label: 'Otro',             icon: 'receipt-outline' },
+  { label: 'Netflix', icon: 'tv-outline' },
+  { label: 'Spotify', icon: 'musical-notes-outline' },
+  { label: 'Otro', icon: 'receipt-outline' },
 ];
 
-// ─── Modelos de división ──────────────────────────────────────────────────────
 const MODELOS = [
-  { label: 'Partes iguales', icon: 'scale-outline',     value: 'partes_iguales' },
-  { label: 'Proporcional',   icon: 'bar-chart-outline', value: 'proporcional' },
-  { label: 'Resp. único',    icon: 'person-outline',    value: 'responsable_unico' },
+  { label: 'Partes iguales', icon: 'scale-outline', value: 'partes_iguales' },
+  { label: 'Proporcional', icon: 'bar-chart-outline', value: 'proporcional' },
+  { label: 'Resp. único', icon: 'person-outline', value: 'responsable_unico' },
 ];
 
-// ─── Estado inicial del formulario ────────────────────────────────────────────
-const buildFormInicial = (integranteInicial = 'Yo') => ({
-  integrantes: [integranteInicial],
-  categoria: CATEGORIAS[0],
-  modeloIdx: 0,
-  categoriaCustom: '',
-  proporcional: Object.fromEntries(
-    [[integranteInicial, { sueldo: '', porcentaje: '' }]]
-  ),
-});
+const buildFormInicial = (integrantesIniciales = ['Yo']) => {
+  const form = {
+    integrantes: [...integrantesIniciales],
+    nombreAcuerdo: '',
+    modeloIdx: 0,
+    proporcional: {}
+  };
+  integrantesIniciales.forEach(nombre => {
+    form.proporcional[nombre] = { sueldo: '', porcentaje: '' };
+  });
+  return form;
+};
 
 export default function ViviendaDashboard({ navigation }) {
   const { user } = useAuth();
   const integranteInicial = user?.name || user?.nombre || 'Yo';
-  const [gastos, setGastos]       = useState([]);
+  const [gastos, setGastos] = useState([]);
   const [servicios, setServicios] = useState([]);
   const [vistaActiva, setVistaActiva] = useState('servicios');
   const [servicioSeleccionado, setServicioSeleccionado] = useState(null);
+  const [liquidarVisible, setLiquidarVisible] = useState(false);
+  const [servicioALiquidar, setServicioALiquidar] = useState(null);
+  const [mostrarTodosServicios, setMostrarTodosServicios] = useState(false);
 
-  // Modal Acuerdos
   const [modalAcuerdosVisible, setModalAcuerdosVisible] = useState(false);
   const [vistaFormulario, setVistaFormulario] = useState(false);
-  const { reglas, agregarRegla, recargar } = useVivienda();
+  const { reglas, agregarRegla, actualizarRegla, recargar } = useVivienda();
+  const [editandoAcuerdoId, setEditandoAcuerdoId] = useState(null);
 
-  // Formulario "Nueva Regla"
-  const [form, setForm]                         = useState(buildFormInicial(integranteInicial));
-  const [nuevoIntegrante, setNuevoIntegrante]   = useState('');
-  const [mostrarInputIntegrante, setMostrarInputIntegrante] = useState(false);
-  const [dropdownAbierto, setDropdownAbierto]   = useState(false);
+  const [form, setForm] = useState(buildFormInicial([integranteInicial]));
   const [modalInicioViviendaVisible, setModalInicioViviendaVisible] = useState(false);
   const [modalMiembrosVisible, setModalMiembrosVisible] = useState(false);
   const [miVivienda, setMiVivienda] = useState(null);
@@ -147,7 +148,15 @@ export default function ViviendaDashboard({ navigation }) {
 
   const [cargando, setCargando] = useState(true);
 
-  // ── Data ──────────────────────────────────────────────────────────────────
+  const [toast, setToast] = useState({ visible: false, message: '', type: 'success' });
+
+  const mostrarToast = (message, type = 'success') => {
+    setToast({ visible: true, message, type });
+    setTimeout(() => {
+      setToast(prev => ({ ...prev, visible: false }));
+    }, 3000);
+  };
+
   useFocusEffect(
     React.useCallback(() => {
       cargarData();
@@ -167,7 +176,7 @@ export default function ViviendaDashboard({ navigation }) {
       }
 
       setModalInicioViviendaVisible(false);
-      const gastosData    = await getGastosVivienda();
+      const gastosData = await getGastosVivienda();
       const serviciosData = await getServiciosVivienda();
       setGastos(gastosData || []);
       setServicios(serviciosData || []);
@@ -177,8 +186,35 @@ export default function ViviendaDashboard({ navigation }) {
     }
   };
 
- const totalMes = (gastos || []).reduce((sum, g) => sum + (g.monto || 0), 0);
- const nombreHeader = getPrimerNombre(user?.name || user?.nombre || '') || 'Vivienda';
+  const allItems = [...(gastos || []), ...(servicios || [])];
+  const isPaid = (item) => String(item?.status || '').toUpperCase() === 'PAGADO';
+  const isNotPaid = (item) => !isPaid(item);
+
+  const totalMes = allItems.reduce((sum, item) => sum + (item.monto || 0), 0);
+
+  const tuPartePendiente = allItems
+    .filter(isNotPaid)
+    .reduce((sum, item) => sum + (item.monto_responsabilidad_usuario || item.monto || 0), 0);
+
+  const yaPagado = allItems
+    .filter(isPaid)
+    .reduce((sum, item) => sum + (item.monto || 0), 0);
+
+  const serviciosOrdenados = [...(servicios || [])].sort((a, b) => {
+    const pagoA = isPaid(a) ? 1 : 0;
+    const pagoB = isPaid(b) ? 1 : 0;
+    if (pagoA !== pagoB) return pagoA - pagoB;
+    const fechaA = new Date(a.proximoVencimiento || a.fecha || 0).getTime();
+    const fechaB = new Date(b.proximoVencimiento || b.fecha || 0).getTime();
+    return fechaA - fechaB;
+  });
+
+  const visibleServicios = mostrarTodosServicios || serviciosOrdenados.length <= 4
+    ? serviciosOrdenados
+    : serviciosOrdenados.slice(0, 4);
+  const visibleGastos = (gastos || []).filter(isNotPaid);
+
+  const nombreHeader = getPrimerNombre(user?.name || user?.nombre || '') || 'Vivienda';
 
   const renderDiasParaVencer = (isoDate) => {
     const diff = new Date(isoDate) - new Date();
@@ -188,118 +224,183 @@ export default function ViviendaDashboard({ navigation }) {
     return `Vence en ${days} días`;
   };
 
-  // ── Handlers: Integrantes ─────────────────────────────────────────────────
-  const agregarIntegrante = () => {
-    const nombre = nuevoIntegrante.trim();
-    if (!nombre) return;
-    setForm(f => ({
-      ...f,
-      integrantes: [...f.integrantes, nombre],
-      proporcional: { ...f.proporcional, [nombre]: { sueldo: '', porcentaje: '' } },
-    }));
-    setNuevoIntegrante('');
-    setMostrarInputIntegrante(false);
+  const quitarIntegrante = (idx) => {
+    const nombre = form.integrantes[idx];
+    Alert.alert(
+      'Quitar integrante',
+      '¿Deseas eliminar a este integrante de este acuerdo?',
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        {
+          text: 'Quitar',
+          style: 'destructive',
+          onPress: () => {
+            setForm(f => {
+              const nuevos = f.integrantes.filter((_, i) => i !== idx);
+              const nuevoProp = { ...f.proporcional };
+              delete nuevoProp[nombre];
+              return { ...f, integrantes: nuevos, proporcional: nuevoProp };
+            });
+          }
+        }
+      ]
+    );
   };
 
-  const quitarIntegrante = (idx) => {
+  const agregarIntegrante = (nombre) => {
     setForm(f => {
-      const nuevos = f.integrantes.filter((_, i) => i !== idx);
+      if (f.integrantes.includes(nombre)) return f;
+      const nuevos = [...f.integrantes, nombre];
       const nuevoProp = { ...f.proporcional };
-      delete nuevoProp[f.integrantes[idx]];
+      nuevoProp[nombre] = { sueldo: '', porcentaje: '' };
       return { ...f, integrantes: nuevos, proporcional: nuevoProp };
     });
   };
 
-  // ── Handlers: Categoría ───────────────────────────────────────────────────
-  const seleccionarCategoria = (cat) => {
-    setForm(f => ({ ...f, categoria: cat, categoriaCustom: '' }));
-    setDropdownAbierto(false);
-  };
-
-  // ── Handlers: Proporcional ────────────────────────────────────────────────
   const updateProporcional = (nombre, campo, valor) => {
-    setForm(f => ({
-      ...f,
-      proporcional: {
+    setForm(f => {
+      const nuevoProp = {
         ...f.proporcional,
         [nombre]: { ...f.proporcional[nombre], [campo]: valor },
-      },
-    }));
+      };
+
+      if (campo === 'sueldo') {
+        const total = f.integrantes.reduce((sum, n) => {
+          const val = n === nombre ? valor : nuevoProp[n]?.sueldo;
+          return sum + (Number(val) || 0);
+        }, 0);
+
+        if (total > 0) {
+          f.integrantes.forEach(n => {
+            const val = n === nombre ? valor : nuevoProp[n]?.sueldo;
+            const sueldoNum = Number(val) || 0;
+            const pct = Math.round((sueldoNum / total) * 100);
+            nuevoProp[n] = {
+              ...nuevoProp[n],
+              porcentaje: String(pct || '')
+            };
+          });
+        }
+      }
+
+      return {
+        ...f,
+        proporcional: nuevoProp
+      };
+    });
   };
 
-  // ── Handlers: Modal Acuerdos ──────────────────────────────────────────────
   const cerrarModalAcuerdos = () => {
     setModalAcuerdosVisible(false);
     setVistaFormulario(false);
-    setForm(buildFormInicial(integranteInicial));
-    setNuevoIntegrante('');
-    setMostrarInputIntegrante(false);
-    setDropdownAbierto(false);
+    const integrantesActuales = miVivienda?.miembros ? miVivienda.miembros.map(m => m.name) : [integranteInicial];
+    setForm(buildFormInicial(integrantesActuales));
+    setEditandoAcuerdoId(null);
   };
 
-  const abrirFormulario = () => {
-    setForm(buildFormInicial(integranteInicial));
-    setDropdownAbierto(false);
+  const abrirFormularioAcuerdo = () => {
+    const integrantesActuales = miVivienda?.miembros ? miVivienda.miembros.map(m => m.name) : [integranteInicial];
+    setForm(buildFormInicial(integrantesActuales));
+    setEditandoAcuerdoId(null);
     setVistaFormulario(true);
   };
 
-const guardarRegla = async () => {
-  const nombreCategoria = form.categoria.label === 'Otro' && form.categoriaCustom.trim() 
-    ? form.categoriaCustom.trim() : form.categoria.label;
-  
-  const modeloValue = MODELOS[form.modeloIdx].value;
+  const abrirFormularioEdicion = (regla) => {
+    const mIdx = MODELOS.findIndex(m => m.value === regla.modelo);
+    const integrantes = regla.participantes.map(p => p.nombre);
+    const proporcional = {};
 
-  const nuevaRegla = {
-    id: Date.now().toString(),
-    nombre: nombreCategoria,
-    modelo: modeloValue,
-    // AQUÍ CORREGIMOS: calculamos el porcentaje y lo guardamos siempre
-    participantes: form.integrantes.map(nombre => {
-      let pct = 0;
-      if (form.modeloIdx === 1) { // Proporcional
-        pct = Number(form.proporcional[nombre]?.porcentaje ?? 0);
-      } else if (form.modeloIdx === 0) { // Partes iguales
-        pct = Math.round(100 / form.integrantes.length);
-      } else { // Responsable único
-        pct = 100;
-      }
-      return { nombre, porcentaje: pct };
-    }),
+    const todosMiembros = miVivienda?.miembros || [];
+    todosMiembros.forEach(m => {
+      proporcional[m.name] = { sueldo: '', porcentaje: '' };
+    });
+
+    regla.participantes.forEach(p => {
+      proporcional[p.nombre] = {
+        sueldo: p.sueldo != null ? String(p.sueldo) : '',
+        porcentaje: p.porcentaje != null ? String(p.porcentaje) : ''
+      };
+    });
+
+    setForm({
+      integrantes,
+      nombreAcuerdo: regla.nombre || '',
+      modeloIdx: mIdx !== -1 ? mIdx : 0,
+      proporcional,
+    });
+    setEditandoAcuerdoId(regla.id);
+    setVistaFormulario(true);
   };
-  await agregarRegla(nuevaRegla);  // esto ya hace refetch interno
-  setVistaFormulario(false);        // volvés a la lista, que ya tiene reglas actualizadas
-  setForm(buildFormInicial(integranteInicial));
-  setDropdownAbierto(false);
-};
 
-const handleCrearMiVivienda = async () => {
-  try {
-    const nombre = (nuevaViviendaNombre || '').trim() || `Vivienda de ${integranteInicial}`;
-    const creada = await crearMiVivienda({ nombre });
-    setMiVivienda(creada);
-    setModalInicioViviendaVisible(false);
-    setNuevaViviendaNombre(`Vivienda de ${integranteInicial}`);
-    await cargarData();
-  } catch (e) {
-    Alert.alert('Error', e.message || 'No se pudo crear la vivienda.');
-  }
-};
+  const guardarAcuerdoForm = async () => {
+    const nombreAcuerdo = form.nombreAcuerdo.trim() || 'Acuerdo sin nombre';
+    const modeloValue = MODELOS[form.modeloIdx].value;
 
-const handleCompartirInvitacionVivienda = async () => {
-  try {
-    const invitacion = await obtenerInvitacionVivienda();
-    const nombre = miVivienda?.nombre || invitacion?.viviendaNombre || 'mi vivienda';
-    const mensaje = `¡Te invito a unirte a "${nombre}" en MitiMiti!\n\nHacé clic acá para sumarte: ${invitacion.deepLink}`;
-    await Share.share({ title: 'Invitación a vivienda', message: mensaje });
-  } catch (e) {
-    Alert.alert('Error', e.message || 'No se pudo generar el enlace de vivienda.');
-  }
-};
+    const nuevaRegla = {
+      nombre: nombreAcuerdo,
+      modelo: modeloValue,
+      participantes: form.integrantes.map(nombre => {
+        let pct = 0;
+        let sueldoVal = null;
+        if (form.modeloIdx === 1) { 
+          pct = Number(form.proporcional[nombre]?.porcentaje ?? 0);
+          sueldoVal = form.proporcional[nombre]?.sueldo ? Number(form.proporcional[nombre].sueldo) : null;
+        } else if (form.modeloIdx === 0) { 
+          pct = Math.round(100 / form.integrantes.length);
+        } else { 
+          pct = 100;
+        }
+        return { nombre, porcentaje: pct, sueldo: sueldoVal };
+      }),
+    };
+
+    try {
+      if (editandoAcuerdoId) {
+        await actualizarRegla(editandoAcuerdoId, nuevaRegla);
+      } else {
+        await agregarRegla(nuevaRegla);
+      }
+      setVistaFormulario(false);
+      const integrantesActuales = miVivienda?.miembros ? miVivienda.miembros.map(m => m.name) : [integranteInicial];
+      setForm(buildFormInicial(integrantesActuales));
+      setEditandoAcuerdoId(null);
+      if (typeof setDropdownAbierto === 'function') {
+        setDropdownAbierto(false);
+      }
+    } catch (e) {
+      console.error('Error al guardar acuerdo:', e);
+      Alert.alert('Error', 'No se pudo guardar el acuerdo');
+    }
+  };
+
+  const handleCrearMiVivienda = async () => {
+    try {
+      const nombre = (nuevaViviendaNombre || '').trim() || `Vivienda de ${integranteInicial}`;
+      const creada = await crearMiVivienda({ nombre });
+      setMiVivienda(creada);
+      setModalInicioViviendaVisible(false);
+      setNuevaViviendaNombre(`Vivienda de ${integranteInicial}`);
+      await cargarData();
+    } catch (e) {
+      Alert.alert('Error', e.message || 'No se pudo crear la vivienda.');
+    }
+  };
+
+  const handleCompartirInvitacionVivienda = async () => {
+    try {
+      const invitacion = await obtenerInvitacionVivienda();
+      const nombre = miVivienda?.nombre || invitacion?.viviendaNombre || 'mi vivienda';
+      const mensaje = `¡Te invito a unirte a "${nombre}" en MitiMiti!\n\nHacé clic acá para sumarte: ${invitacion.deepLink}`;
+      await Share.share({ title: 'Invitación a vivienda', message: mensaje });
+    } catch (e) {
+      Alert.alert('Error', e.message || 'No se pudo generar el enlace de vivienda.');
+    }
+  };
 
 
-  // ─── Render ───────────────────────────────────────────────────────────────
   return (
     <View style={styles.container}>
+      <Toast visible={toast.visible} message={toast.message} type={toast.type} />
       <ScrollView contentContainerStyle={styles.scroll}>
         <Text style={styles.headerTitle}>Casa compartida</Text>
         <View style={styles.headerRow}>
@@ -335,8 +436,7 @@ const handleCompartirInvitacionVivienda = async () => {
                 navigation.navigate('AgregarVivienda');
               }}
             >
-              <Ionicons name="add" size={16} color="#fff" />
-              <Text style={styles.btnGastoText}>Gasto</Text>
+              <Ionicons name="add" size={20} color="#fff" />
             </TouchableOpacity>
           </ScrollView>
         </View>
@@ -350,11 +450,11 @@ const handleCompartirInvitacionVivienda = async () => {
           <View style={styles.badgesRow}>
             <View style={styles.badge}>
               <Text style={styles.badgeLabel}>Tu parte pendiente</Text>
-              <Text style={styles.badgeValue}>$0</Text>
+              <Text style={styles.badgeValue}>${tuPartePendiente.toLocaleString('es-AR')}</Text>
             </View>
             <View style={styles.badge}>
               <Text style={styles.badgeLabel}>Ya pagado</Text>
-              <Text style={[styles.badgeValue, { color: colors.greenGlobal }]}>$0</Text>
+              <Text style={[styles.badgeValue, { color: colors.greenGlobal }]}>${yaPagado.toLocaleString('es-AR')}</Text>
             </View>
           </View>
 
@@ -390,14 +490,22 @@ const handleCompartirInvitacionVivienda = async () => {
           {vistaActiva === 'servicios' ? 'SERVICIOS PERIÓDICOS' : 'GASTOS PUNTUALES'}
         </Text>
 
-        {vistaActiva === 'servicios' ? (servicios || []).map(srv => {
-          const isUrgente = new Date(srv.proximoVencimiento) - new Date() <= 5 * 24 * 60 * 60 * 1000;
-          const iconName  = ICONS_MAP[srv.nombre] || 'receipt-outline';
-          const tuParte   = srv.monto / (srv.participantes?.length || 1);
+        {vistaActiva === 'servicios' ? visibleServicios.map(srv => {
+          const targetDate = new Date(srv.proximoVencimiento);
+          const today = new Date();
+          const targetMidnight = new Date(targetDate.getFullYear(), targetDate.getMonth(), targetDate.getDate());
+          const todayMidnight = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+          const diffDays = Math.round((targetMidnight - todayMidnight) / (1000 * 60 * 60 * 24));
+          const isVencido = diffDays < 0;
+          const isUrgente = diffDays >= 0 && diffDays <= 3;
+
+          const iconName = ICONS_MAP[srv.nombre] || 'receipt-outline';
+          const montoSafe = srv.monto != null ? srv.monto : 0;
+          const tuParte = srv.monto_responsabilidad_usuario || 0;
           return (
             <TouchableOpacity key={srv.id} style={styles.servicioCard} onPress={() => setServicioSeleccionado(srv)}>
-              <View style={[styles.servicioIcon, isUrgente ? {} : { backgroundColor: '#F0F4F8' }]}>
-                <Ionicons name={iconName} size={24} color={isUrgente ? colors.redGlobal : colors.textSecondary} />
+              <View style={[styles.servicioIcon, (isUrgente || isVencido) ? {} : { backgroundColor: '#F0F4F8' }]}>
+                <Ionicons name={iconName} size={24} color={(isUrgente || isVencido) ? colors.redGlobal : colors.textSecondary} />
               </View>
               <View style={styles.servicioInfo}>
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, paddingRight: 4 }}>
@@ -407,74 +515,205 @@ const handleCompartirInvitacionVivienda = async () => {
                     <Text style={styles.badgePeriodoText}>{srv.periodicidad}</Text>
                   </View>
                 </View>
-                <Text style={[styles.servicioDate, isUrgente && { color: colors.redGlobal }]}>
-                  {renderDiasParaVencer(srv.proximoVencimiento)}
+                <Text style={[styles.servicioDate, (isUrgente || isVencido) && { color: colors.redGlobal, fontWeight: isVencido ? 'bold' : 'normal' }]}>
+                  {isVencido ? 'Venció el' : 'Vence:'} {targetDate.toLocaleDateString('es-AR', { day: 'numeric', month: 'long' })}
                 </Text>
-                <Text style={styles.servicioTuParte}>Tu parte: ${tuParte.toLocaleString('es-AR')}</Text>
+                <Text style={styles.servicioTuParte}>Tu parte: {srv.monto != null ? `$${tuParte.toLocaleString('es-AR')}` : '$ –'}</Text>
                 <View style={{ marginTop: 6 }}>
                   <AvatarStack personas={srv.participantes || []} />
                 </View>
               </View>
-<View style={styles.servicioRight}>
-  <Text style={styles.servicioAmount}>${srv.monto.toLocaleString('es-AR')}</Text>
-  {isUrgente
-    ? <View style={styles.badgeUrgente}><Text style={styles.badgeUrgenteText}>Urgente</Text></View>
-    : <View style={styles.badgeAlDia}><Text style={styles.badgeAlDiaText}>Al día</Text></View>
-  }
-  <TouchableOpacity style={styles.btnTick}>
-    <Ionicons name="checkmark" size={20} color={colors.greenGlobal} />
-  </TouchableOpacity>
+              <View style={styles.servicioRight}>
+                <Text style={styles.servicioAmount}>{srv.monto != null ? `$${srv.monto.toLocaleString('es-AR')}` : '$ –'}</Text>
+                {srv.isVariable ? (
+                  srv.status === 'PENDIENTE'
+                    ? <View style={styles.badgePendiente}><Text style={styles.badgePendienteText}>Esperando Factura</Text></View>
+                    : srv.status === 'PAGADO'
+                      ? <View style={styles.badgeAlDia}><Text style={styles.badgeAlDiaText}>Pagado</Text></View>
+                      : <View style={styles.badgeLiquidado}><Text style={styles.badgeLiquidadoText}>Listo para pagar</Text></View>
+                ) : (
+                  srv.status === 'PAGADO'
+                    ? <View style={styles.badgeAlDia}><Text style={styles.badgeAlDiaText}>Pagado</Text></View>
+                    : isUrgente
+                      ? <View style={styles.badgeUrgente}><Text style={styles.badgeUrgenteText}>Urgente</Text></View>
+                      : <View style={styles.badgeLiquidado}><Text style={styles.badgeLiquidadoText}>Listo para pagar</Text></View>
+                )}
 
-  {/* 👇 NUEVO: botón eliminar */}
-<TouchableOpacity
-  style={[styles.btnTick, { borderColor: '#ec6c6a', marginTop: 6 }]}
-  onPress={(e) => {
-    e.stopPropagation(); 
-    Alert.alert(
-      'Eliminar servicio',
-      `¿Querés eliminar "${srv.nombre}"?`,
-      [
-        { text: 'Cancelar', style: 'cancel' },
-        {
-          text: 'Eliminar',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-                const idSeguro = srv.id || (srv.nombre || '').toLowerCase().replace(/[^a-z0-9]/g, '_');
-                await eliminarServicioVivienda(idSeguro);
-              await cargarData();
-            } catch (e) {
-                Alert.alert('Error', e?.message || 'No se pudo eliminar el servicio');
-            }
-          },
-        },
-      ]
-    );
-  }}
->
-  <Ionicons name="trash-outline" size={18} color="#ec6c6a" />
-</TouchableOpacity>
-</View>
+                {srv.isVariable && srv.status === 'PENDIENTE' ? (
+                  <TouchableOpacity style={[styles.btnTick, { borderColor: '#E65100' }]} onPress={(e) => {
+                    e.stopPropagation();
+                    setServicioALiquidar(srv);
+                    setLiquidarVisible(true);
+                  }}>
+                    <Ionicons name="wallet-outline" size={18} color="#E65100" />
+                  </TouchableOpacity>
+                ) : srv.status === 'PROCESADO' || (!srv.isVariable && srv.status !== 'PAGADO') ? (
+                  <TouchableOpacity style={[styles.btnTick, { borderColor: colors.greenGlobal, backgroundColor: 'rgba(34, 197, 94, 0.1)' }]} onPress={(e) => {
+                    e.stopPropagation();
+                    Alert.alert(
+                      'Marcar como pagado',
+                      `¿Estás seguro de que deseas marcar el servicio "${srv.nombre}" como pagado?`,
+                      [
+                        { text: 'Cancelar', style: 'cancel' },
+                        {
+                          text: 'Confirmar',
+                          onPress: async () => {
+                            try {
+                              await marcarPagadoVivienda('servicios', srv.id);
+                              await cargarData();
+                            } catch (err) {
+                              Alert.alert('Error', err?.message || 'Error al marcar como pagado');
+                            }
+                          }
+                        }
+                      ]
+                    );
+                  }}>
+                    <Ionicons name="checkmark" size={20} color={colors.greenGlobal} />
+                  </TouchableOpacity>
+                ) : (
+                  <View style={[styles.btnTick, { borderColor: '#E5E7EB', backgroundColor: '#F3F4F6' }]}>
+                    <Ionicons name="checkmark" size={20} color={colors.textSecondary} />
+                  </View>
+                )}
+
+                <TouchableOpacity
+                  style={[styles.btnTick, { borderColor: '#ec6c6a', marginTop: 6 }]}
+                  onPress={(e) => {
+                    e.stopPropagation();
+                    Alert.alert(
+                      'Eliminar servicio',
+                      `¿Querés eliminar "${srv.nombre}"?`,
+                      [
+                        { text: 'Cancelar', style: 'cancel' },
+                        {
+                          text: 'Eliminar',
+                          style: 'destructive',
+                          onPress: async () => {
+                            try {
+                              const idSeguro = srv.id || (srv.nombre || '').toLowerCase().replace(/[^a-z0-9]/g, '_');
+                              await eliminarServicioVivienda(idSeguro);
+                              await cargarData();
+                            } catch (e) {
+                              Alert.alert('Error', e?.message || 'No se pudo eliminar el servicio');
+                            }
+                          },
+                        },
+                      ]
+                    );
+                  }}
+                >
+                  <Ionicons name="trash-outline" size={18} color="#ec6c6a" />
+                </TouchableOpacity>
+              </View>
             </TouchableOpacity>
           );
-        }) : (gastos || []).map(gasto => {
+        }) : visibleGastos.map(gasto => {
+          const targetDate = new Date(gasto.fecha);
+          const today = new Date();
+          const targetMidnight = new Date(targetDate.getFullYear(), targetDate.getMonth(), targetDate.getDate());
+          const todayMidnight = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+          const diffDays = Math.round((targetMidnight - todayMidnight) / (1000 * 60 * 60 * 24));
+          const isVencido = diffDays < 0;
+          const isUrgente = diffDays >= 0 && diffDays <= 3;
+          
           const iconName = GASTO_ICONS_MAP[gasto.categoria] || 'receipt-outline';
           return (
             <View key={gasto.id} style={styles.servicioCard}>
               <View style={[styles.servicioIcon, { backgroundColor: '#F0F4F8' }]}>
-                <Ionicons name={iconName} size={24} color={colors.textSecondary} />
+                <Ionicons name={iconName} size={24} color={(isUrgente || isVencido) ? colors.redGlobal : colors.textSecondary} />
               </View>
               <View style={styles.servicioInfo}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 2 }}>
+                  <Text style={[styles.servicioDate, { marginBottom: 0, textTransform: 'uppercase', fontWeight: 'bold', fontSize: 10, color: colors.primary }]}>
+                    {gasto.categoria}
+                  </Text>
+                </View>
                 <Text style={styles.servicioName}>{gasto.nombre}</Text>
-                <Text style={styles.servicioDate}>{gasto.categoria}</Text>
-                <Text style={styles.servicioTuParte}>
-                  {new Date(gasto.fecha).toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric' })}
+                <Text style={[styles.servicioDate, (isUrgente || isVencido) && { color: colors.redGlobal, fontWeight: isVencido ? 'bold' : 'normal' }]}>
+                  {isVencido ? 'Venció el' : 'Vence:'} {targetDate.toLocaleDateString('es-AR', { day: 'numeric', month: 'long' })}
                 </Text>
-                <Text style={styles.servicioTuParte}>Pagó: {gasto.pagador}</Text>
+                <Text style={styles.servicioDate}>
+                  Pagó: <Text style={{fontWeight: '600', color: colors.textPrimary}}>{gasto.pagador}</Text>
+                </Text>
+                <Text style={[styles.servicioTuParte, { fontSize: 13, marginTop: 4 }]}>
+                  Tu parte: <Text style={{ fontWeight: 'bold', color: '#E65100' }}>
+                    ${(gasto.monto_responsabilidad_usuario || 0).toLocaleString('es-AR')}
+                  </Text>
+                </Text>
               </View>
               <View style={styles.servicioRight}>
                 <Text style={styles.servicioAmount}>${(gasto.monto || 0).toLocaleString('es-AR')}</Text>
-                <View style={styles.badgeAlDia}><Text style={styles.badgeAlDiaText}>Puntual</Text></View>
+                {gasto.status === 'PAGADO' ? (
+                  <View style={styles.badgeAlDia}><Text style={styles.badgeAlDiaText}>Pagado</Text></View>
+                ) : (
+                  <View style={styles.badgeLiquidado}><Text style={styles.badgeLiquidadoText}>Listo para pagar</Text></View>
+                )}
+
+                {gasto.status !== 'PAGADO' ? (
+                  <TouchableOpacity style={[styles.btnTick, { borderColor: colors.greenGlobal, backgroundColor: 'rgba(34, 197, 94, 0.1)', marginTop: 6 }]} onPress={(e) => {
+                    e.stopPropagation();
+                    Alert.alert(
+                      'Marcar como pagado',
+                      `¿Estás seguro de que deseas marcar el gasto "${gasto.nombre}" como pagado?`,
+                      [
+                        { text: 'Cancelar', style: 'cancel' },
+                        {
+                          text: 'Confirmar',
+                          onPress: async () => {
+                            try {
+                              await marcarPagadoVivienda('gastos', gasto.id);
+                              await cargarData();
+                            } catch (err) {
+                              Alert.alert('Error', err?.message || 'Error al marcar como pagado');
+                            }
+                          }
+                        }
+                      ]
+                    );
+                  }}>
+                    <Ionicons name="checkmark" size={20} color={colors.greenGlobal} />
+                  </TouchableOpacity>
+                ) : (
+                  <View style={[styles.btnTick, { borderColor: '#E5E7EB', backgroundColor: '#F3F4F6', marginTop: 6 }]}>
+                    <Ionicons name="checkmark" size={20} color={colors.textSecondary} />
+                  </View>
+                )}
+
+                {gasto.pagador === integranteInicial && (
+                  <TouchableOpacity
+                    style={[styles.btnTick, { borderColor: '#ec6c6a', marginTop: 6 }]}
+                    onPress={(e) => {
+                      e.stopPropagation();
+                      if (gasto.status === 'PAGADO') {
+                        Alert.alert('Acción denegada', 'No podés eliminar un gasto que ya figura como PAGADO. Revertí el pago primero para poder borrarlo.');
+                        return;
+                      }
+                      Alert.alert(
+                        'Eliminar gasto',
+                        `¿Querés eliminar "${gasto.nombre}"?`,
+                        [
+                          { text: 'Cancelar', style: 'cancel' },
+                          {
+                            text: 'Eliminar',
+                            style: 'destructive',
+                            onPress: async () => {
+                              try {
+                                await eliminarGastoVivienda(gasto.id);
+                                await cargarData();
+                              } catch (error) {
+                                console.log('Error al eliminar gasto:', error);
+                                Alert.alert('Error', error?.message || 'No se pudo eliminar el gasto');
+                              }
+                            },
+                          },
+                        ]
+                      );
+                    }}
+                  >
+                    <Ionicons name="trash-outline" size={18} color="#ec6c6a" />
+                  </TouchableOpacity>
+                )}
               </View>
             </View>
           );
@@ -487,6 +726,20 @@ const handleCompartirInvitacionVivienda = async () => {
           </View>
         )}
 
+        {vistaActiva === 'servicios' && serviciosOrdenados.length > 4 && (
+          <TouchableOpacity
+            style={styles.btnVerMas}
+            onPress={() => setMostrarTodosServicios(prev => !prev)}
+          >
+            <Text style={styles.btnVerMasText}>{mostrarTodosServicios ? 'Ver menos' : 'Ver más'}</Text>
+            <Ionicons
+              name={mostrarTodosServicios ? 'chevron-up' : 'chevron-down'}
+              size={16}
+              color={colors.primary}
+            />
+          </TouchableOpacity>
+        )}
+
         {vistaActiva === 'gastos' && (gastos || []).length === 0 && (
           <View style={styles.emptyState}>
             <Ionicons name="bag-outline" size={36} color={colors.textSecondary} />
@@ -495,7 +748,6 @@ const handleCompartirInvitacionVivienda = async () => {
         )}
       </ScrollView>
 
-      {/* ── Modal Detalles Servicio ────────────────────────────────────────── */}
       <Modal visible={!!servicioSeleccionado} transparent animationType="slide">
         <View style={styles.modalOverlay}>
           <TouchableOpacity style={StyleSheet.absoluteFill} onPress={() => setServicioSeleccionado(null)} />
@@ -523,12 +775,40 @@ const handleCompartirInvitacionVivienda = async () => {
                   <Text style={styles.badgePeriodoText}>{servicioSeleccionado.periodicidad}</Text>
                 </View>
                 <Text style={[styles.servicioAmount, { fontSize: 32, marginVertical: 8 }]}>
-                  ${servicioSeleccionado.monto.toLocaleString('es-AR')}
+                  {servicioSeleccionado.monto != null ? `$${servicioSeleccionado.monto.toLocaleString('es-AR')}` : '$ –'}
                 </Text>
+                {servicioSeleccionado.isVariable ? (
+                  <View style={[
+                    servicioSeleccionado.status === 'PENDIENTE' ? styles.badgePendiente :
+                      servicioSeleccionado.status === 'PAGADO' ? styles.badgeAlDia : styles.badgeLiquidado,
+                    { alignSelf: 'center', marginBottom: 8 }
+                  ]}>
+                    <Text style={
+                      servicioSeleccionado.status === 'PENDIENTE' ? styles.badgePendienteText :
+                        servicioSeleccionado.status === 'PAGADO' ? styles.badgeAlDiaText : styles.badgeLiquidadoText
+                    }>
+                      {servicioSeleccionado.status === 'PENDIENTE' ? 'Esperando Factura' :
+                        servicioSeleccionado.status === 'PAGADO' ? 'Pagado' : 'Listo para pagar'}
+                    </Text>
+                  </View>
+                ) : (
+                  <View style={[
+                    servicioSeleccionado.status === 'PAGADO' ? styles.badgeAlDia : styles.badgeLiquidado,
+                    { alignSelf: 'center', marginBottom: 8 }
+                  ]}>
+                    <Text style={
+                      servicioSeleccionado.status === 'PAGADO' ? styles.badgeAlDiaText : styles.badgeLiquidadoText
+                    }>
+                      {servicioSeleccionado.status === 'PAGADO' ? 'Pagado' : 'Listo para pagar'}
+                    </Text>
+                  </View>
+                )}
                 <View style={{ flexDirection: 'row', gap: 16, marginBottom: 8 }}>
                   <Text style={{ fontSize: 14, color: colors.textSecondary }}>
                     Tu parte: <Text style={{ fontWeight: 'bold' }}>
-                      ${(servicioSeleccionado.monto / (servicioSeleccionado.participantes?.length || 1)).toLocaleString('es-AR')}
+                      {servicioSeleccionado.monto_responsabilidad_usuario != null
+                        ? `$${servicioSeleccionado.monto_responsabilidad_usuario.toLocaleString('es-AR')}`
+                        : '$ –'}
                     </Text>
                   </Text>
                   <Text style={{ fontSize: 14, color: colors.textSecondary }}>•</Text>
@@ -548,16 +828,63 @@ const handleCompartirInvitacionVivienda = async () => {
                     </View>
                   ))}
                 </View>
-                <TouchableOpacity style={styles.btnMarcarPagado}>
-                  <Text style={styles.btnMarcarPagadoText}>Marcar como pagado</Text>
-                </TouchableOpacity>
+                {servicioSeleccionado.status !== 'PAGADO' && (
+                  <TouchableOpacity
+                    style={[
+                      styles.btnMarcarPagado,
+                      servicioSeleccionado.isVariable && servicioSeleccionado.status === 'PENDIENTE'
+                        ? { backgroundColor: '#E65100' }
+                        : { backgroundColor: colors.primary }
+                    ]}
+                    onPress={async () => {
+                      if (servicioSeleccionado.isVariable && servicioSeleccionado.status === 'PENDIENTE') {
+                        const srv = servicioSeleccionado;
+                        setServicioSeleccionado(null);
+                        setServicioALiquidar(srv);
+                        setLiquidarVisible(true);
+                      } else {
+                        Alert.alert(
+                          'Marcar como pagado',
+                          `¿Estás seguro de que deseas marcar el servicio "${servicioSeleccionado.nombre}" como pagado?`,
+                          [
+                            { text: 'Cancelar', style: 'cancel' },
+                            {
+                              text: 'Confirmar',
+                              onPress: async () => {
+                                try {
+                                  await marcarPagadoVivienda('servicios', servicioSeleccionado.id);
+                                  setServicioSeleccionado(null);
+                                  await cargarData();
+                                } catch (err) {
+                                  Alert.alert('Error', err?.message || 'Error al marcar como pagado');
+                                }
+                              }
+                            }
+                          ]
+                        );
+                      }
+                    }}
+                  >
+                    <Text style={styles.btnMarcarPagadoText}>
+                      {servicioSeleccionado.isVariable && servicioSeleccionado.status === 'PENDIENTE'
+                        ? 'Cargar Monto de la Factura'
+                        : 'Marcar como pagado'}
+                    </Text>
+                  </TouchableOpacity>
+                )}
               </View>
             </View>
           )}
         </View>
       </Modal>
 
-      {/* ── Modal Acuerdos de Reparto ──────────────────────────────────────── */}
+      <LiquidarServicioModal
+        visible={liquidarVisible}
+        servicio={servicioALiquidar}
+        onClose={() => { setLiquidarVisible(false); setServicioALiquidar(null); }}
+        onLiquidado={() => { setLiquidarVisible(false); setServicioALiquidar(null); cargarData(); }}
+      />
+
       <Modal visible={modalAcuerdosVisible} transparent animationType="fade">
         <KeyboardAvoidingView
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
@@ -567,10 +894,9 @@ const handleCompartirInvitacionVivienda = async () => {
             <Pressable style={StyleSheet.absoluteFill} onPress={cerrarModalAcuerdos} />
 
             <View style={styles.modalSheetCentered}>
-              {/* Header */}
               <View style={styles.modalHeader}>
                 <Text style={{ fontSize: 20, fontWeight: 'bold', color: colors.textPrimary }}>
-                  {vistaFormulario ? 'Nueva regla' : 'Reglas de división'}
+                  {vistaFormulario ? 'Nuevo acuerdo de división' : 'Acuerdos activos'}
                 </Text>
                 <TouchableOpacity onPress={cerrarModalAcuerdos}>
                   <Ionicons name="close" size={24} color={colors.textSecondary} />
@@ -578,7 +904,6 @@ const handleCompartirInvitacionVivienda = async () => {
               </View>
 
               {vistaFormulario ? (
-                /* ── VISTA FORMULARIO ────────────────────────────────────── */
                 <ScrollView
                   showsVerticalScrollIndicator={false}
                   keyboardShouldPersistTaps="handled"
@@ -587,7 +912,6 @@ const handleCompartirInvitacionVivienda = async () => {
                 >
                   <View style={styles.formContainer}>
 
-                    {/* Integrantes */}
                     <View style={styles.formSection}>
                       <Text style={styles.label}>Integrantes de la casa</Text>
                       <View style={styles.integrantesRow}>
@@ -606,98 +930,35 @@ const handleCompartirInvitacionVivienda = async () => {
                             <Text style={styles.avatarNombre} numberOfLines={1}>{nombre.split(' ')[0]}</Text>
                           </TouchableOpacity>
                         ))}
-
-                        <TouchableOpacity
-                          style={styles.avatarWrapper}
-                          onPress={() => setMostrarInputIntegrante(v => !v)}
-                        >
-                          <View style={styles.avatarAdd}>
-                            <Ionicons name="add" size={20} color={colors.textSecondary} />
-                          </View>
-                          <Text style={styles.avatarNombre}>Agregar</Text>
-                        </TouchableOpacity>
+                        {(miVivienda?.miembros || [])
+                          .map(m => m.name)
+                          .filter(nombre => !form.integrantes.includes(nombre))
+                          .map((nombre, i) => (
+                            <TouchableOpacity
+                              key={`disponible-${i}`}
+                              onPress={() => agregarIntegrante(nombre)}
+                              style={styles.avatarWrapper}
+                            >
+                              <View style={styles.avatarAdd}>
+                                <Ionicons name="add" size={20} color={colors.textSecondary} />
+                              </View>
+                              <Text style={styles.avatarNombre} numberOfLines={1}>{nombre.split(' ')[0]}</Text>
+                            </TouchableOpacity>
+                          ))}
                       </View>
-
-                      {mostrarInputIntegrante && (
-                        <View style={styles.inputRow}>
-                          <TextInput
-                            style={styles.textInput}
-                            placeholder="Nombre completo"
-                            placeholderTextColor={colors.textSecondary}
-                            value={nuevoIntegrante}
-                            onChangeText={setNuevoIntegrante}
-                            onSubmitEditing={agregarIntegrante}
-                            returnKeyType="done"
-                            autoFocus
-                          />
-                          <TouchableOpacity style={styles.btnInputConfirm} onPress={agregarIntegrante}>
-                            <Text style={{ color: '#fff', fontWeight: '600', fontSize: 13 }}>Agregar</Text>
-                          </TouchableOpacity>
-                        </View>
-                      )}
                     </View>
 
-                    {/* Categoría */}
                     <View style={styles.formSection}>
-                      <Text style={styles.label}>Categoría</Text>
-                      <TouchableOpacity
-                        style={styles.dropdownPlaceholder}
-                        onPress={() => setDropdownAbierto(v => !v)}
-                        activeOpacity={0.8}
-                      >
-                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                          <Ionicons name={form.categoria.icon} size={18} color={colors.primary} />
-                          <Text style={{ color: colors.textPrimary, fontSize: 15 }}>{form.categoria.label}</Text>
-                        </View>
-                        <Ionicons
-                          name={dropdownAbierto ? 'chevron-up' : 'chevron-down'}
-                          size={18}
-                          color={colors.textSecondary}
-                        />
-                      </TouchableOpacity>
-
-                      {dropdownAbierto && (
-                        <View style={styles.dropdownMenu}>
-                          {CATEGORIAS.map((cat, i) => {
-                            const seleccionada = cat.label === form.categoria.label;
-                            return (
-                              <TouchableOpacity
-                                key={i}
-                                style={[styles.dropdownItem, seleccionada && styles.dropdownItemSelected]}
-                                onPress={() => seleccionarCategoria(cat)}
-                              >
-                                <Ionicons
-                                  name={cat.icon}
-                                  size={18}
-                                  color={seleccionada ? colors.primary : colors.textSecondary}
-                                />
-                                <Text style={[
-                                  styles.dropdownItemText,
-                                  seleccionada && { color: colors.primary, fontWeight: '600' },
-                                ]}>
-                                  {cat.label}
-                                </Text>
-                                {seleccionada && (
-                                  <Ionicons name="checkmark" size={16} color={colors.primary} style={{ marginLeft: 'auto' }} />
-                                )}
-                              </TouchableOpacity>
-                            );
-                          })}
-                        </View>
-                      )}
-
-                      {form.categoria.label === 'Otro' && (
-                        <TextInput
-                          style={[styles.textInput, { marginTop: 8 }]}
-                          placeholder="Nombre del servicio"
-                          placeholderTextColor={colors.textSecondary}
-                          value={form.categoriaCustom}
-                          onChangeText={v => setForm(f => ({ ...f, categoriaCustom: v }))}
-                        />
-                      )}
+                      <Text style={styles.label}>Nombre del acuerdo</Text>
+                      <TextInput
+                        style={styles.textInput}
+                        placeholder="Ej: Proporcional por sueldos, Regla 60-40, Fondo Común..."
+                        placeholderTextColor={colors.textSecondary}
+                        value={form.nombreAcuerdo}
+                        onChangeText={v => setForm(f => ({ ...f, nombreAcuerdo: v }))}
+                      />
                     </View>
 
-                    {/* Modelo de división */}
                     <View style={styles.formSection}>
                       <Text style={styles.label}>Modelo de división</Text>
                       <View style={styles.rowModelos}>
@@ -717,7 +978,6 @@ const handleCompartirInvitacionVivienda = async () => {
                       </View>
                     </View>
 
-                    {/* ── Sección Proporcional (dinámica) ────────────────── */}
                     {form.modeloIdx === 1 && (
                       <View style={styles.formSection}>
                         <Text style={styles.label}>Datos por integrante</Text>
@@ -758,7 +1018,6 @@ const handleCompartirInvitacionVivienda = async () => {
                       </View>
                     )}
 
-                    {/* Botones acción */}
                     <View style={styles.botonesAccionRow}>
                       <TouchableOpacity
                         style={[styles.btnAccion, { backgroundColor: '#eee' }]}
@@ -768,9 +1027,9 @@ const handleCompartirInvitacionVivienda = async () => {
                       </TouchableOpacity>
                       <TouchableOpacity
                         style={[styles.btnAccion, { backgroundColor: colors.primary }]}
-                        onPress={guardarRegla}
+                        onPress={guardarAcuerdoForm}
                       >
-                        <Text style={{ color: '#fff', fontWeight: 'bold' }}>Guardar regla</Text>
+                        <Text style={{ color: '#fff', fontWeight: 'bold' }}>Guardar acuerdo</Text>
                       </TouchableOpacity>
                     </View>
 
@@ -778,68 +1037,74 @@ const handleCompartirInvitacionVivienda = async () => {
                 </ScrollView>
 
               ) : (
-                /* ── VISTA LISTA ─────────────────────────────────────────── */
                 <View style={{ width: '100%' }}>
                   {reglas.length === 0 ? (
                     <View style={styles.emptyState}>
                       <Ionicons name="document-text-outline" size={36} color={colors.textSecondary} />
-                      <Text style={styles.emptyStateText}>Todavía no hay reglas definidas</Text>
+                      <Text style={styles.emptyStateText}>Todavía no hay acuerdos definidos</Text>
                     </View>
                   ) : (
                     <ScrollView
                       showsVerticalScrollIndicator={false}
                       style={{ width: '100%', maxHeight: 300 }}
                     >
-{reglas.map((regla) => {
-  // Aseguramos valores por defecto para evitar errores de renderizado
-  const modeloKey = regla.modelo ?? 'partes_iguales';
-  const modeloObj = MODELO_MAP[modeloKey] ?? {
-    label: modeloKey,
-    icon: 'git-branch-outline',
-  };
-  
-  const iconName = ICONS_MAP[regla.nombre] ?? 'receipt-outline';
+                      {reglas.map((regla) => {
+                        const modeloKey = regla.modelo ?? 'partes_iguales';
+                        const modeloObj = MODELO_MAP[modeloKey] ?? {
+                          label: modeloKey,
+                          icon: 'git-branch-outline',
+                        };
 
-  return (
-    <View key={regla.id} style={styles.reglaCard}>
-      <View style={styles.reglaIconWrap}>
-        <Ionicons name={iconName} size={22} color={colors.primary} />
-      </View>
-      
-      <View style={styles.reglaInfo}>
-        <Text style={styles.reglaNombre}>{regla.nombre ?? 'Sin nombre'}</Text>
-        <View style={styles.reglaBadgeRow}>
-          <View style={styles.reglaBadge}>
-            <Ionicons name={modeloObj.icon} size={11} color={colors.primary} />
-            <Text style={styles.reglaBadgeText}>{modeloObj.label}</Text>
-          </View>
-          <Text style={styles.reglaIntegrantes}>
-            {(regla.participantes ?? []).map(p => p.nombre.split(' ')[0]).join(', ')}
-          </Text>
-        </View>
-      </View>
+                        const iconName = ICONS_MAP[regla.nombre] ?? 'receipt-outline';
 
-      <TouchableOpacity
-        style={{ padding: 8 }}
-        onPress={async () => {
-          try {
-            await eliminarAcuerdoReparto(regla.id);
-            await recargar();
-          } catch (error) {
-            Alert.alert('Error', 'No se pudo eliminar');
-          }
-        }}
-      >
-        <Ionicons name="trash-outline" size={20} color="#ec6c6a" />
-      </TouchableOpacity>
-    </View>
-  );
-})}
+                        return (
+                          <View key={regla.id} style={styles.reglaCard}>
+                            <View style={styles.reglaIconWrap}>
+                              <Ionicons name={iconName} size={22} color={colors.primary} />
+                            </View>
+
+                            <View style={styles.reglaInfo}>
+                              <Text style={styles.reglaNombre}>{regla.nombre ?? 'Sin nombre'}</Text>
+                              <View style={styles.reglaBadgeRow}>
+                                <View style={styles.reglaBadge}>
+                                  <Ionicons name={modeloObj.icon} size={11} color={colors.primary} />
+                                  <Text style={styles.reglaBadgeText}>{modeloObj.label}</Text>
+                                </View>
+                                <Text style={styles.reglaIntegrantes}>
+                                  {(regla.participantes ?? []).map(p => p.nombre.split(' ')[0]).join(', ')}
+                                </Text>
+                              </View>
+                            </View>
+
+                            <View style={{ flexDirection: 'row', gap: 4 }}>
+                              <TouchableOpacity
+                                style={{ padding: 8 }}
+                                onPress={() => abrirFormularioEdicion(regla)}
+                              >
+                               <Ionicons name="create-outline" size={20} color={colors.primary} />
+                              </TouchableOpacity>
+                              <TouchableOpacity
+                                style={{ padding: 8 }}
+                                onPress={async () => {
+                                  try {
+                                    await eliminarAcuerdoReparto(regla.id);
+                                    await recargar();
+                                  } catch (error) {
+                                    Alert.alert('Error', 'No se pudo eliminar');
+                                  }
+                                }}
+                              >
+                                <Ionicons name="trash-outline" size={20} color="#ec6c6a" />
+                              </TouchableOpacity>
+                            </View>
+                          </View>
+                        );
+                      })}
                     </ScrollView>
                   )}
 
-                  <TouchableOpacity style={styles.btnMarcarPagado} onPress={abrirFormulario}>
-                    <Text style={styles.btnMarcarPagadoText}>+ Nueva regla</Text>
+                  <TouchableOpacity style={styles.btnMarcarPagado} onPress={abrirFormularioAcuerdo}>
+                    <Text style={styles.btnMarcarPagadoText}>+ Nuevo acuerdo</Text>
                   </TouchableOpacity>
                 </View>
               )}
@@ -848,7 +1113,6 @@ const handleCompartirInvitacionVivienda = async () => {
         </KeyboardAvoidingView>
       </Modal>
 
-      {/* ── Modal Inicio Vivienda (crear o unirse) ───────────────────────── */}
       <Modal visible={modalMiembrosVisible} transparent animationType="fade">
         <View style={styles.modalOverlayFade}>
           <Pressable style={StyleSheet.absoluteFill} onPress={() => setModalMiembrosVisible(false)} />
@@ -874,9 +1138,23 @@ const handleCompartirInvitacionVivienda = async () => {
                     <View style={[styles.miembroAvatar, { backgroundColor: getColorByNombre(m?.name || 'NN') }]}>
                       <Text style={styles.miembroAvatarText}>{getIniciales(m?.name || 'NN')}</Text>
                     </View>
-                    <View style={{ flex: 1 }}>
-                      <Text style={styles.miembroNombre}>{m?.name || 'Sin nombre'}</Text>
-                      {esCreador && <Text style={styles.miembroRol}>Creador</Text>}
+                    <View style={{ flex: 1, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <View>
+                        <Text style={styles.miembroNombre}>{m?.name || 'Sin nombre'}</Text>
+                        {esCreador && <Text style={styles.miembroRol}>Creador</Text>}
+                      </View>
+                      {m?.alias ? (
+                        <TouchableOpacity 
+                          style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}
+                          onPress={async () => {
+                            await Clipboard.setStringAsync(m.alias);
+                            mostrarToast('Alias/CBU copiado', 'success');
+                          }}
+                        >
+                          <Text style={{ fontSize: 12, color: colors.textSecondary }}>{m.alias}</Text>
+                          <Ionicons name="copy-outline" size={14} color={colors.textSecondary} />
+                        </TouchableOpacity>
+                      ) : null}
                     </View>
                   </View>
                 );
@@ -886,7 +1164,6 @@ const handleCompartirInvitacionVivienda = async () => {
         </View>
       </Modal>
 
-      {/* ── Modal Inicio Vivienda (crear o unirse) ───────────────────────── */}
       <Modal visible={modalInicioViviendaVisible} transparent animationType="fade">
         <View style={styles.modalOverlayFade}>
           <View style={styles.modalInicioCard}>
@@ -928,28 +1205,27 @@ const handleCompartirInvitacionVivienda = async () => {
   );
 }
 
-// ─── Estilos ─────────────────────────────────────────────────────────────────
 const styles = StyleSheet.create({
-  container:        { flex: 1, backgroundColor: colors.background },
-  scroll:           { padding: 20, paddingTop: 56, paddingBottom: 100 },
-  headerTitle:      { color: colors.textSecondary, fontSize: 13 },
-  headerRow:        { marginBottom: 20, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10 },
-  mainTitle:        { fontSize: 28, fontWeight: 'bold', color: colors.textPrimary, flexShrink: 1 },
-  headerActionsScroll:{ flexGrow: 0 },
-  headerActions:    { flexDirection: 'row', gap: 8, paddingRight: 4 },
+  container: { flex: 1, backgroundColor: colors.background },
+  scroll: { padding: 20, paddingTop: 56, paddingBottom: 100 },
+  headerTitle: { color: colors.textSecondary, fontSize: 13 },
+  headerRow: { marginBottom: 20, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10 },
+  mainTitle: { fontSize: 28, fontWeight: 'bold', color: colors.textPrimary, flexShrink: 1 },
+  headerActionsScroll: { flexGrow: 0 },
+  headerActions: { flexDirection: 'row', gap: 8, paddingRight: 4 },
 
-  btnGasto:         { flexDirection: 'row', backgroundColor: colors.textSecondary, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 18, alignItems: 'center', gap: 4 },
-  btnGastoText:     { color: '#fff', fontWeight: '600', fontSize: 13 },
-  btnAcuerdos:      { flexDirection: 'row', backgroundColor: '#F0F4F8', paddingHorizontal: 10, paddingVertical: 8, borderRadius: 18, alignItems: 'center', gap: 4, borderWidth: 1, borderColor: colors.textSecondary },
-  btnAcuerdosText:  { color: colors.textSecondary, fontWeight: '600', fontSize: 13 },
+  btnGasto: { flexDirection: 'row', backgroundColor: colors.textSecondary, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 18, alignItems: 'center', gap: 4 },
+  btnGastoText: { color: '#fff', fontWeight: '600', fontSize: 13 },
+  btnAcuerdos: { flexDirection: 'row', backgroundColor: '#F0F4F8', paddingHorizontal: 10, paddingVertical: 8, borderRadius: 18, alignItems: 'center', gap: 4, borderWidth: 1, borderColor: colors.textSecondary },
+  btnAcuerdosText: { color: colors.textSecondary, fontWeight: '600', fontSize: 13 },
 
-  totalCard:        { backgroundColor: colors.textSecondary, borderRadius: 20, padding: 20, marginBottom: 30 },
-  totalLabel:       { color: 'rgba(255,255,255,0.7)', fontSize: 13, marginBottom: 8 },
-  totalAmount:      { color: '#fff', fontSize: 36, fontWeight: 'bold', marginVertical: 8 },
-  badgesRow:        { flexDirection: 'row', gap: 12, marginTop: 10 },
-  badge:            { backgroundColor: 'rgba(255,255,255,0.15)', padding: 12, borderRadius: 12, flex: 1 },
-  badgeLabel:       { color: 'rgba(255,255,255,0.7)', fontSize: 12, marginBottom: 4 },
-  badgeValue:       { color: '#F1948A', fontSize: 16, fontWeight: 'bold' },
+  totalCard: { backgroundColor: colors.textSecondary, borderRadius: 20, padding: 20, marginBottom: 30 },
+  totalLabel: { color: 'rgba(255,255,255,0.7)', fontSize: 13, marginBottom: 8 },
+  totalAmount: { color: '#fff', fontSize: 36, fontWeight: 'bold', marginVertical: 8 },
+  badgesRow: { flexDirection: 'row', gap: 12, marginTop: 10 },
+  badge: { backgroundColor: 'rgba(255,255,255,0.15)', padding: 12, borderRadius: 12, flex: 1 },
+  badgeLabel: { color: 'rgba(255,255,255,0.7)', fontSize: 12, marginBottom: 4 },
+  badgeValue: { color: '#F1948A', fontSize: 16, fontWeight: 'bold' },
   integrantesQuick: {
     marginTop: 12,
     paddingTop: 10,
@@ -961,44 +1237,44 @@ const styles = StyleSheet.create({
   },
   integrantesQuickLabel: { color: 'rgba(255,255,255,0.82)', fontSize: 13, fontWeight: '600' },
 
-  sectionTitle:     { fontSize: 14, fontWeight: '600', color: colors.textPrimary, marginBottom: 16 },
+  sectionTitle: { fontSize: 14, fontWeight: '600', color: colors.textPrimary, marginBottom: 16 },
 
-  tabsFiltroRow:    { flexDirection: 'row', backgroundColor: '#EAF4FF', borderRadius: 16, padding: 4, marginBottom: 14, gap: 6 },
-  tabFiltroBtn:     { flex: 1, paddingVertical: 10, borderRadius: 12, alignItems: 'center' },
-  tabFiltroBtnActiva:{ backgroundColor: '#526D82' },
-  tabFiltroText:    { fontSize: 13, fontWeight: '700', color: colors.textSecondary },
-  tabFiltroTextActiva:{ color: '#FFFFFF' },
+  tabsFiltroRow: { flexDirection: 'row', backgroundColor: '#EAF4FF', borderRadius: 16, padding: 4, marginBottom: 14, gap: 6 },
+  tabFiltroBtn: { flex: 1, paddingVertical: 10, borderRadius: 12, alignItems: 'center' },
+  tabFiltroBtnActiva: { backgroundColor: '#526D82' },
+  tabFiltroText: { fontSize: 13, fontWeight: '700', color: colors.textSecondary },
+  tabFiltroTextActiva: { color: '#FFFFFF' },
 
-  servicioCard:     { backgroundColor: colors.cardBg, padding: 16, borderRadius: 16, flexDirection: 'row', alignItems: 'flex-start', marginBottom: 12, gap: 12 },
-  servicioIcon:     { width: 48, height: 48, borderRadius: 16, backgroundColor: '#FDECEC', justifyContent: 'center', alignItems: 'center' },
-  servicioInfo:     { flex: 1 },
-  servicioName:     { fontSize: 15, fontWeight: '600', color: colors.textPrimary },
-  badgePeriodo:     { flexDirection: 'row', backgroundColor: colors.secondary, paddingHorizontal: 8, paddingVertical: 2, borderRadius: 10, alignItems: 'center', gap: 4 },
+  servicioCard: { backgroundColor: colors.cardBg, padding: 16, borderRadius: 16, flexDirection: 'row', alignItems: 'flex-start', marginBottom: 12, gap: 12 },
+  servicioIcon: { width: 48, height: 48, borderRadius: 16, backgroundColor: '#FDECEC', justifyContent: 'center', alignItems: 'center' },
+  servicioInfo: { flex: 1 },
+  servicioName: { fontSize: 15, fontWeight: '600', color: colors.textPrimary },
+  badgePeriodo: { flexDirection: 'row', backgroundColor: colors.secondary, paddingHorizontal: 8, paddingVertical: 2, borderRadius: 10, alignItems: 'center', gap: 4 },
   badgePeriodoText: { fontSize: 10, fontWeight: 'bold', color: colors.primary },
-  servicioDate:     { fontSize: 13, color: colors.textSecondary, marginTop: 4 },
-  servicioTuParte:  { fontSize: 13, color: colors.textSecondary, marginTop: 2 },
-  servicioRight:    { alignItems: 'flex-end', justifyContent: 'space-between', alignSelf: 'stretch' },
-  servicioAmount:   { fontSize: 15, fontWeight: '700', color: colors.textPrimary },
+  servicioDate: { fontSize: 13, color: colors.textSecondary, marginTop: 4 },
+  servicioTuParte: { fontSize: 13, color: colors.textSecondary, marginTop: 2 },
+  servicioRight: { alignItems: 'flex-end', justifyContent: 'space-between', alignSelf: 'stretch' },
+  servicioAmount: { fontSize: 15, fontWeight: '700', color: colors.textPrimary },
 
-  badgeUrgente:     { backgroundColor: '#FDECEC', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 8, marginTop: 4 },
+  badgeUrgente: { backgroundColor: '#FDECEC', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 8, marginTop: 4 },
   badgeUrgenteText: { fontSize: 10, color: colors.redGlobal, fontWeight: 'bold' },
-  badgeAlDia:       { backgroundColor: '#E9F7EF', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 8, marginTop: 4 },
-  badgeAlDiaText:   { fontSize: 10, color: colors.greenGlobal, fontWeight: 'bold' },
+  badgeAlDia: { backgroundColor: '#E9F7EF', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 8, marginTop: 4 },
+  badgeAlDiaText: { fontSize: 10, color: colors.greenGlobal, fontWeight: 'bold' },
 
-  btnTick:          { width: 40, height: 40, borderRadius: 20, borderWidth: 1, borderColor: '#ccc', backgroundColor: '#F8F9FA', justifyContent: 'center', alignItems: 'center', marginTop: 12 },
+  btnTick: { width: 40, height: 40, borderRadius: 20, borderWidth: 1, borderColor: '#ccc', backgroundColor: '#F8F9FA', justifyContent: 'center', alignItems: 'center', marginTop: 12 },
 
-  avatarStack:      { flexDirection: 'row' },
-  avatar:           { width: 20, height: 20, borderRadius: 10, justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: colors.cardBg },
-  avatarTexto:      { color: 'white', fontSize: 7, fontWeight: 'bold' },
+  avatarStack: { flexDirection: 'row' },
+  avatar: { width: 20, height: 20, borderRadius: 10, justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: colors.cardBg },
+  avatarTexto: { color: 'white', fontSize: 7, fontWeight: 'bold' },
 
-  modalOverlay:     { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
-  modalSheet:       { backgroundColor: '#fff', borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 24, paddingBottom: 40 },
-  modalHeader:      { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 },
-  modalBody:        { alignItems: 'center', marginTop: 10 },
-  modalSubtitle:    { fontSize: 14, fontWeight: 'bold', color: colors.textSecondary, alignSelf: 'flex-start' },
-  modalDivider:     { height: 1, backgroundColor: '#eee', width: '100%', marginVertical: 20 },
+  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
+  modalSheet: { backgroundColor: '#fff', borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 24, paddingBottom: 40 },
+  modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 },
+  modalBody: { alignItems: 'center', marginTop: 10 },
+  modalSubtitle: { fontSize: 14, fontWeight: 'bold', color: colors.textSecondary, alignSelf: 'flex-start' },
+  modalDivider: { height: 1, backgroundColor: '#eee', width: '100%', marginVertical: 20 },
 
-  modalOverlayFade:   { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'stretch', padding: 20 },
+  modalOverlayFade: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'stretch', padding: 20 },
   modalSheetCentered: { backgroundColor: '#fff', borderRadius: 24, width: '100%', padding: 24, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.25, shadowRadius: 4, elevation: 5, maxHeight: '90%' },
   modalInicioCard: {
     backgroundColor: '#fff', borderRadius: 24, padding: 24,
@@ -1044,57 +1320,62 @@ const styles = StyleSheet.create({
   miembroNombre: { fontSize: 14, color: colors.textPrimary, fontWeight: '600' },
   miembroRol: { fontSize: 12, color: colors.textSecondary, marginTop: 2 },
 
-  formContainer:    { width: '100%', gap: 16, paddingBottom: 8 },
-  formSection:      { width: '100%' },
+  formContainer: { width: '100%', gap: 16, paddingBottom: 8 },
+  formSection: { width: '100%' },
   botonesAccionRow: { flexDirection: 'row', gap: 10, marginTop: 8, width: '100%' },
 
-  btnMarcarPagado:     { backgroundColor: colors.textSecondary, width: '100%', padding: 16, borderRadius: 16, alignItems: 'center', marginTop: 16 },
+  btnMarcarPagado: { backgroundColor: colors.textSecondary, width: '100%', padding: 16, borderRadius: 16, alignItems: 'center', marginTop: 16 },
   btnMarcarPagadoText: { color: '#fff', fontWeight: 'bold', fontSize: 16 },
 
   label: { fontSize: 14, fontWeight: '600', color: colors.textPrimary, marginBottom: 10 },
 
-  integrantesRow:    { flexDirection: 'row', flexWrap: 'wrap', gap: 12, alignItems: 'flex-start', width: '100%' },
-  avatarWrapper:     { alignItems: 'center', position: 'relative', width: 52 },
-  avatarForm:        { width: 44, height: 44, borderRadius: 22, justifyContent: 'center', alignItems: 'center' },
-  avatarFormTexto:   { color: '#fff', fontSize: 13, fontWeight: 'bold' },
-  avatarNombre:      { fontSize: 10, color: colors.textSecondary, marginTop: 4, textAlign: 'center', maxWidth: 52 },
+  integrantesRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 12, alignItems: 'flex-start', width: '100%' },
+  avatarWrapper: { alignItems: 'center', position: 'relative', width: 52 },
+  avatarForm: { width: 44, height: 44, borderRadius: 22, justifyContent: 'center', alignItems: 'center' },
+  avatarFormTexto: { color: '#fff', fontSize: 13, fontWeight: 'bold' },
+  avatarNombre: { fontSize: 10, color: colors.textSecondary, marginTop: 4, textAlign: 'center', maxWidth: 52 },
   avatarRemoveBadge: { position: 'absolute', top: -2, right: 2, width: 16, height: 16, borderRadius: 8, backgroundColor: '#ec6c6a', justifyContent: 'center', alignItems: 'center', borderWidth: 1.5, borderColor: '#fff' },
-  avatarAdd:         { width: 44, height: 44, borderRadius: 22, borderWidth: 1.5, borderStyle: 'dashed', borderColor: colors.textSecondary, backgroundColor: '#F0F4F8', justifyContent: 'center', alignItems: 'center' },
+  avatarAdd: { width: 44, height: 44, borderRadius: 22, borderWidth: 1.5, borderStyle: 'dashed', borderColor: colors.textSecondary, backgroundColor: '#F0F4F8', justifyContent: 'center', alignItems: 'center' },
 
-  inputRow:         { flexDirection: 'row', gap: 8, marginTop: 10, alignItems: 'center', width: '100%' },
-  textInput:        { flex: 1, padding: 12, borderWidth: 1, borderColor: '#ddd', borderRadius: 12, fontSize: 14, color: colors.textPrimary, backgroundColor: '#fff' },
-  btnInputConfirm:  { paddingHorizontal: 14, paddingVertical: 12, backgroundColor: colors.primary, borderRadius: 12 },
+  inputRow: { flexDirection: 'row', gap: 8, marginTop: 10, alignItems: 'center', width: '100%' },
+  textInput: { flex: 1, padding: 12, borderWidth: 1, borderColor: '#ddd', borderRadius: 12, fontSize: 14, color: colors.textPrimary, backgroundColor: '#fff' },
+  btnInputConfirm: { paddingHorizontal: 14, paddingVertical: 12, backgroundColor: colors.primary, borderRadius: 12 },
 
-  dropdownPlaceholder:  { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 14, borderWidth: 1, borderColor: '#ddd', borderRadius: 16, width: '100%', backgroundColor: '#fff' },
-  dropdownMenu:         { borderWidth: 1, borderColor: '#eee', borderRadius: 16, overflow: 'hidden', marginTop: 4, backgroundColor: '#fff', width: '100%' },
-  dropdownItem:         { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 12, paddingHorizontal: 14 },
+  dropdownPlaceholder: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 14, borderWidth: 1, borderColor: '#ddd', borderRadius: 16, width: '100%', backgroundColor: '#fff' },
+  dropdownMenu: { borderWidth: 1, borderColor: '#eee', borderRadius: 16, overflow: 'hidden', marginTop: 4, backgroundColor: '#fff', width: '100%' },
+  dropdownItem: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 12, paddingHorizontal: 14 },
   dropdownItemSelected: { backgroundColor: '#F0F4FF' },
-  dropdownItemText:     { fontSize: 14, color: colors.textPrimary, flex: 1 },
+  dropdownItemText: { fontSize: 14, color: colors.textPrimary, flex: 1 },
 
-  rowModelos:     { flexDirection: 'row', gap: 10, width: '100%' },
-  modeloBtn:      { flex: 1, paddingVertical: 12, paddingHorizontal: 8, alignItems: 'center', borderWidth: 1, borderColor: '#ddd', borderRadius: 16, backgroundColor: '#fff' },
+  rowModelos: { flexDirection: 'row', gap: 10, width: '100%' },
+  modeloBtn: { flex: 1, paddingVertical: 12, paddingHorizontal: 8, alignItems: 'center', borderWidth: 1, borderColor: '#ddd', borderRadius: 16, backgroundColor: '#fff' },
   modeloSelected: { borderColor: colors.primary, backgroundColor: '#F0F4FF' },
-  modeloText:     { fontSize: 10, marginTop: 6, textAlign: 'center', fontWeight: '500', color: colors.textSecondary },
+  modeloText: { fontSize: 10, marginTop: 6, textAlign: 'center', fontWeight: '500', color: colors.textSecondary },
 
   btnAccion: { flex: 1, padding: 16, borderRadius: 16, alignItems: 'center' },
 
-  proporcionalRow:       { flexDirection: 'row', alignItems: 'flex-start', gap: 10, marginBottom: 12, width: '100%' },
-  proporcionalInputs:    { flex: 1 },
-  proporcionalNombre:    { fontSize: 13, fontWeight: '600', color: colors.textPrimary, marginBottom: 6 },
-  proporcionalFields:    { flexDirection: 'row', gap: 8 },
+  proporcionalRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 10, marginBottom: 12, width: '100%' },
+  proporcionalInputs: { flex: 1 },
+  proporcionalNombre: { fontSize: 13, fontWeight: '600', color: colors.textPrimary, marginBottom: 6 },
+  proporcionalFields: { flexDirection: 'row', gap: 8 },
   proporcionalFieldWrap: { flex: 1 },
-  proporcionalFieldLabel:{ fontSize: 11, color: colors.textSecondary, marginBottom: 4 },
-  proporcionalInput:     { padding: 10, borderWidth: 1, borderColor: '#ddd', borderRadius: 10, fontSize: 14, color: colors.textPrimary, backgroundColor: '#fff' },
+  proporcionalFieldLabel: { fontSize: 11, color: colors.textSecondary, marginBottom: 4 },
+  proporcionalInput: { padding: 10, borderWidth: 1, borderColor: '#ddd', borderRadius: 10, fontSize: 14, color: colors.textPrimary, backgroundColor: '#fff' },
 
-  emptyState:      { alignItems: 'center', paddingVertical: 24, gap: 8 },
-  emptyStateText:  { fontSize: 13, color: colors.textSecondary, textAlign: 'center' },
+  emptyState: { alignItems: 'center', paddingVertical: 24, gap: 8 },
+  emptyStateText: { fontSize: 13, color: colors.textSecondary, textAlign: 'center' },
 
-  reglaCard:       { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 14, backgroundColor: '#F8F9FA', borderRadius: 14, marginBottom: 10, width: '100%' },
-  reglaIconWrap:   { width: 40, height: 40, borderRadius: 12, backgroundColor: '#F0F4FF', justifyContent: 'center', alignItems: 'center' },
-  reglaInfo:       { flex: 1 },
-  reglaNombre:     { fontSize: 14, fontWeight: '600', color: colors.textPrimary, marginBottom: 4 },
-  reglaBadgeRow:   { flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap' },
-  reglaBadge:      { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: '#EEEDFE', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 8 },
-  reglaBadgeText:  { fontSize: 11, color: colors.primary, fontWeight: '600' },
-  reglaIntegrantes:{ fontSize: 11, color: colors.textSecondary },
+  reglaCard: { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 14, backgroundColor: '#F8F9FA', borderRadius: 14, marginBottom: 10, width: '100%' },
+  reglaIconWrap: { width: 40, height: 40, borderRadius: 12, backgroundColor: '#F0F4FF', justifyContent: 'center', alignItems: 'center' },
+  reglaInfo: { flex: 1 },
+  reglaNombre: { fontSize: 14, fontWeight: '600', color: colors.textPrimary, marginBottom: 4 },
+  reglaBadgeRow: { flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap' },
+  reglaBadge: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: '#EEEDFE', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 8 },
+  reglaBadgeText: { fontSize: 11, color: colors.primary, fontWeight: '600' },
+  reglaIntegrantes: { fontSize: 11, color: colors.textSecondary },
+
+  badgePendiente: { backgroundColor: '#FFF3E0', borderRadius: 8, paddingHorizontal: 8, paddingVertical: 3 },
+  badgePendienteText: { fontSize: 10, fontWeight: '700', color: '#E65100' },
+  badgeLiquidado: { backgroundColor: '#E8F5E9', borderRadius: 8, paddingHorizontal: 8, paddingVertical: 3 },
+  badgeLiquidadoText: { fontSize: 10, fontWeight: '700', color: '#2E7D32' },
 });

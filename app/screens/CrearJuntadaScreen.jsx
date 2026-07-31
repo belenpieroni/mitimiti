@@ -6,7 +6,14 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { colors } from '../theme/colors';
-import { crearJuntada as crearJuntadaService, editarJuntada as editarJuntadaService, generarInvitacion } from '../services/juntadasService';
+import { 
+  crearJuntada as crearJuntadaService, 
+  editarJuntada as editarJuntadaService, 
+  generarInvitacion,
+  getLocalJuntadas,
+  setLocalJuntadas,
+  registerPendingCreation
+} from '../services/juntadasService';
 import { useAuth } from '../context/AuthContext';
 
 function formatFecha(date) {
@@ -42,7 +49,6 @@ export default function CrearJuntadaScreen({ navigation, route }) {
       return;
     }
 
-    // En iOS algunos builds pueden no informar event.type
     if (!tipo && selectedDate) {
       setFecha(selectedDate);
       setShowPicker(false);
@@ -60,7 +66,6 @@ export default function CrearJuntadaScreen({ navigation, route }) {
       const mensaje = `¡Te invito a unirte a "${juntadaNombre}" en MitiMiti!\n\nHacé clic acá para sumarte: ${invitacion.deepLink}`;
       await Share.share({ message: mensaje, title: 'Invitación a juntada' });
     } catch (e) {
-      // share cancelado o error silencioso
     }
   }
 
@@ -75,13 +80,66 @@ export default function CrearJuntadaScreen({ navigation, route }) {
         });
         navigation.goBack();
       } else {
-        const nuevaJuntada = await crearJuntadaService({
+        const tempId = 'temp-' + Date.now();
+        const pcolor = '#473472';
+        
+        const optimistic = {
+          id: tempId,
+          nombre: nombre.trim(),
+          descripcion: descripcion.trim(),
+          fecha: fecha.toISOString().split('T')[0],
+          cantidadParticipantes: 1,
+          cantidadGastos: 0,
+          totalGastado: 0,
+          participantes: [{ 
+            id: user?.id, 
+            nombre: user?.name || user?.nombre || 'Usuario', 
+            iniciales: user?.iniciales || 'US', 
+            color: pcolor 
+          }],
+          gastos: [],
+          pagosDeudas: [],
+          subgrupos: [],
+          saldos: [],
+          balance: {
+            totalGastado: 0,
+            parteIgualPorPersona: 0,
+            cantidadParticipantes: 1,
+            saldos: [],
+            transferenciasOriginales: [],
+            transferencias: []
+          },
+          deuda: 0,
+          tipo: 'ninguna',
+          isOptimistic: true,
+        };
+
+        const currentList = getLocalJuntadas();
+        setLocalJuntadas([optimistic, ...currentList]);
+
+        const promise = crearJuntadaService({
           nombre: nombre.trim(),
           descripcion: descripcion.trim(),
         });
-        // Ir al detalle y ofrecer compartir enlace
-        navigation.replace('JuntadaDetalle', { juntadaId: nuevaJuntada.id });
-        setTimeout(() => compartirEnlace(nuevaJuntada.id, nuevaJuntada.nombre), 600);
+        registerPendingCreation(tempId, promise);
+
+        navigation.replace('JuntadaDetalle', { juntadaId: tempId, optimisticData: optimistic });
+
+        promise.then(
+          (nuevaJuntada) => {
+            const dataJ = nuevaJuntada?.data?.data || nuevaJuntada?.data || nuevaJuntada;
+            const updated = getLocalJuntadas().map(j => 
+              j.id === tempId ? { ...j, id: dataJ.id, isOptimistic: false } : j
+            );
+            setLocalJuntadas(updated);
+            setTimeout(() => compartirEnlace(dataJ.id, dataJ.nombre), 600);
+          },
+          (err) => {
+            console.error('Error creando juntada:', err);
+            const updated = getLocalJuntadas().filter(j => j.id !== tempId);
+            setLocalJuntadas(updated);
+          }
+        );
       }
     } catch (e) {
       Alert.alert('Error', e.message || 'No se pudo guardar la juntada.');
@@ -97,7 +155,6 @@ export default function CrearJuntadaScreen({ navigation, route }) {
     >
       <View style={styles.container}>
 
-        {/* Header */}
         <View style={styles.header}>
           <TouchableOpacity style={styles.btnVolver} onPress={() => navigation.goBack()}>
             <Ionicons name="chevron-back" size={22} color={colors.textPrimary} />
@@ -145,7 +202,6 @@ export default function CrearJuntadaScreen({ navigation, route }) {
             />
           )}
 
-          {/* Info card sobre el sistema de invitaciones */}
           {!editando && (
             <View style={styles.infoCard}>
               <Ionicons name="link-outline" size={20} color={colors.primary} />
@@ -155,7 +211,7 @@ export default function CrearJuntadaScreen({ navigation, route }) {
             </View>
           )}
 
-          {/* Participante inicial (el creador) */}
+          
           {!editando && user && (
             <View>
               <Text style={styles.label}>PARTICIPANTES INICIALES</Text>
@@ -179,7 +235,7 @@ export default function CrearJuntadaScreen({ navigation, route }) {
 
         </ScrollView>
 
-        {/* Footer */}
+        
         <View style={styles.footer}>
           <TouchableOpacity
             style={[styles.btnCrear, !puedeGuardar && styles.btnCrearDeshabilitado]}

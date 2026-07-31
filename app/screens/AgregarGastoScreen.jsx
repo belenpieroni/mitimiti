@@ -12,9 +12,12 @@ import { colors } from '../theme/colors';
 import { obtenerJuntada, agregarGasto } from '../services/juntadasService';
 import { uploadTicketPhoto } from '../services/uploadService';
 import CaptureTicketModal from '../components/CaptureTicketModal';
+import { useAuth } from '../context/AuthContext';
+import { calcularParte } from '../utils/mathUtils';
 
 export default function AgregarGastoScreen({ route, navigation }) {
   const { juntadaId } = route.params;
+  const { user } = useAuth();
   
   const [juntada, setJuntada] = useState(null);
   const [participantes, setParticipantes] = useState([]);
@@ -64,24 +67,20 @@ export default function AgregarGastoScreen({ route, navigation }) {
     }
   }
 
-  // Tildar o destildar un subgrupo familiar entero
   function toggleFamiliaCompleta(integrantes) {
     const todosTildados = integrantes.every(i => seleccionados.includes(i));
     if (todosTildados) {
-      // Si estaban todos, removemos a todos los integrantes de este grupo
       setSeleccionados(seleccionados.filter(n => !integrantes.includes(n)));
     } else {
-      // Si faltaba alguno, agregamos los que no estén seleccionados todavía
       const nuevos = integrantes.filter(i => !seleccionados.includes(i));
       setSeleccionados([...seleccionados, ...nuevos]);
     }
   }
 
-  // Separar los participantes que no tienen familia asignada ("Sueltos")
   const integrantesEnGrupos = (juntada?.subgrupos || []).flatMap(sg => sg.integrantes || []);
   const participantesSueltos = participantes.filter(p => !integrantesEnGrupos.includes(p.nombre));
 
-  const montoNum = parseInt(monto) || 0;
+  const montoNum = parseFloat(monto.replace(',', '.')) || 0;
   const puedeGuardar = nombre.trim() && montoNum > 0 && pagador && 
     (splitMode === 'equal' ? seleccionados.length > 0 : juntada?.subgrupos?.length > 0);
 
@@ -101,8 +100,9 @@ export default function AgregarGastoScreen({ route, navigation }) {
         datosGasto.splitSubgroups = juntada.subgrupos.map(sg => sg.id);
       }
 
-      if (splitMode === 'equal' && seleccionados.length > 0) {
+       if (splitMode === 'equal' && seleccionados.length > 0) {
         datosGasto.dividirEntre = seleccionados;
+        datosGasto.beneficiarios = seleccionados;
       }
 
       if (adjuntoTicket) {
@@ -159,7 +159,6 @@ export default function AgregarGastoScreen({ route, navigation }) {
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
         >
-          {/* Monto Principal */}
           <View style={styles.montoSection}>
             <Text style={styles.montoLabel}>$</Text>
             <TextInput
@@ -167,13 +166,12 @@ export default function AgregarGastoScreen({ route, navigation }) {
               placeholder="0"
               keyboardType="numeric"
               value={monto}
-              onChangeText={(text) => setMonto(text.replace(/\D/g, ''))}
+              onChangeText={(text) => setMonto(text.replace(/[^0-9.,]/g, ''))}
               editable={!guardando}
               placeholderTextColor={colors.textSecondary + '80'}
             />
           </View>
 
-          {/* Botón Escanear Ticket (OCR) */}
           <TouchableOpacity 
             style={[styles.btnEscanearTicket, adjuntoTicket && styles.btnEscanearTicketActivo]}
             onPress={() => setMostrarOCR(true)}
@@ -193,7 +191,6 @@ export default function AgregarGastoScreen({ route, navigation }) {
             )}
           </TouchableOpacity>
 
-          {/* Concepto */}
           <Text style={styles.label}>CONCEPTO</Text>
           <View style={styles.fieldBox}>
             <TextInput
@@ -206,7 +203,6 @@ export default function AgregarGastoScreen({ route, navigation }) {
             />
           </View>
 
-          {/* Pagado por */}
           <Text style={styles.label}>PAGADO POR</Text>
           <TouchableOpacity
             style={styles.pagadorCard}
@@ -218,7 +214,9 @@ export default function AgregarGastoScreen({ route, navigation }) {
                 {participantes.find(p => p.nombre === pagador)?.iniciales || pagador.slice(0, 2).toUpperCase()}
               </Text>
             </View>
-            <Text style={styles.pagadorNombre}>{pagador}</Text>
+            <Text style={styles.pagadorNombre}>
+              {pagador} {user?.name?.toLowerCase() === pagador.toLowerCase() && <Text style={{ color: colors.textSecondary, fontSize: 12, fontWeight: 'normal' }}>(vos)</Text>}
+            </Text>
             <Ionicons name="chevron-down" size={18} color={colors.textSecondary} />
           </TouchableOpacity>
 
@@ -236,7 +234,9 @@ export default function AgregarGastoScreen({ route, navigation }) {
                   <View style={[styles.pagadorAvatar, { backgroundColor: p.color }]}>
                     <Text style={styles.pagadorAvatarTexto}>{p.iniciales}</Text>
                   </View>
-                  <Text style={styles.pagadorOptionTexto}>{p.nombre}</Text>
+                  <Text style={styles.pagadorOptionTexto}>
+                    {p.nombre} {user?.name?.toLowerCase() === p.nombre.toLowerCase() && <Text style={{ color: colors.textSecondary, fontSize: 12 }}>(vos)</Text>}
+                  </Text>
                   {pagador === p.nombre && (
                     <Ionicons name="checkmark" size={18} color={colors.primary} style={{ marginLeft: 'auto' }} />
                   )}
@@ -245,7 +245,7 @@ export default function AgregarGastoScreen({ route, navigation }) {
             </View>
           )}
 
-          {/* Método de división */}
+          
           <Text style={styles.label}>MÉTODO DE DIVISIÓN</Text>
           <View style={styles.metodosContainer}>
             <TouchableOpacity
@@ -268,11 +268,11 @@ export default function AgregarGastoScreen({ route, navigation }) {
               activeOpacity={0.7}
             >
               <Ionicons name="people" size={18} color={splitMode === 'subgroups' ? 'white' : colors.textSecondary} />
-              <Text style={[styles.metodoTitulo, splitMode === 'subgroups' && { color: 'white' }]}>Por familias</Text>
+              <Text style={[styles.metodoTitulo, splitMode === 'subgroups' && { color: 'white' }]}>Por Subgrupos</Text>
             </TouchableOpacity>
           </View>
 
-          {/* Mostrar subgrupos o participantes */}
+          
           {splitMode === 'subgroups' && juntada.subgrupos?.length > 0 ? (
             <>
               <Text style={styles.label}>SUBGRUPOS SELECCIONADOS · {juntada.subgrupos.length}</Text>
@@ -306,9 +306,9 @@ export default function AgregarGastoScreen({ route, navigation }) {
                 </View>
               </View>
               
-              {/* ── CHECKLIST GRUPAL / FAMILIAR ── */}
+              
               <View style={styles.checklistContainer}>
-                {/* Renderizar Familias */}
+                
                 {(juntada.subgrupos || []).map(sg => {
                   const todosTildados = sg.integrantes.every(i => seleccionados.includes(i));
                   return (
@@ -339,7 +339,7 @@ export default function AgregarGastoScreen({ route, navigation }) {
                                 <Text style={styles.avatarTextoExtraChico}>{p.iniciales}</Text>
                               </View>
                               <Text style={[styles.chipNombre, activo && { fontWeight: '700', color: 'white' }]}>
-                                {p.nombre}
+                                {p.nombre} {user?.name?.toLowerCase() === p.nombre.toLowerCase() && <Text style={{ fontWeight: 'normal', color: activo ? 'white' : colors.textSecondary, fontSize: 12 }}>(vos)</Text>}
                               </Text>
                             </TouchableOpacity>
                           );
@@ -349,7 +349,7 @@ export default function AgregarGastoScreen({ route, navigation }) {
                   );
                 })}
 
-                {/* Renderizar los que van solos */}
+                
                 {participantesSueltos.length > 0 && (
                   <View style={styles.familiaCard}>
                     <View style={styles.familiaHeader}>
@@ -370,7 +370,7 @@ export default function AgregarGastoScreen({ route, navigation }) {
                               <Text style={styles.avatarTextoExtraChico}>{p.iniciales}</Text>
                             </View>
                             <Text style={[styles.chipNombre, activo && { fontWeight: '700', color: 'white' }]}>
-                              {p.nombre}
+                              {p.nombre} {user?.name?.toLowerCase() === p.nombre.toLowerCase() && <Text style={{ fontWeight: 'normal', color: activo ? 'white' : colors.textSecondary, fontSize: 12 }}>(vos)</Text>}
                             </Text>
                           </TouchableOpacity>
                         );
@@ -383,14 +383,14 @@ export default function AgregarGastoScreen({ route, navigation }) {
               {montoNum > 0 && seleccionados.length > 0 && (
                 <Text style={styles.calcularDiv}>
                   Cada uno paga <Text style={{ fontWeight: '800', color: colors.primary }}>
-                    ${Math.round(montoNum / seleccionados.length).toLocaleString('es-AR')}
+                    ${calcularParte(montoNum, seleccionados.length).toLocaleString('es-AR')}
                   </Text>
                 </Text>
               )}
             </>
           ) : null}
 
-          {/* Fecha */}
+          
           <Text style={styles.label}>FECHA DEL GASTO</Text>
           <TouchableOpacity 
             style={styles.fieldBox} 
@@ -424,7 +424,7 @@ export default function AgregarGastoScreen({ route, navigation }) {
             />
           )}
 
-          {/* Botón guardar */}
+          
           <TouchableOpacity
             style={[styles.btnGuardarGasto, !puedeGuardar && { opacity: 0.5, backgroundColor: colors.textSecondary }]}
             onPress={handleGuardar}
@@ -467,7 +467,6 @@ const styles = StyleSheet.create({
     backgroundColor: colors.background,
   },
   
-  // Header Figma Style
   header: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -498,7 +497,6 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
 
-  // Monto (Gigante al centro)
   montoSection: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -522,7 +520,6 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
 
-  // OCR Button
   btnEscanearTicket: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -547,7 +544,6 @@ const styles = StyleSheet.create({
     color: colors.primary,
   },
 
-  // Inputs & Labels genéricos
   label: {
     fontSize: 11,
     fontWeight: '700',
@@ -574,7 +570,6 @@ const styles = StyleSheet.create({
     padding: 0,
   },
 
-  // Pagador
   pagadorCard: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -629,7 +624,6 @@ const styles = StyleSheet.create({
     color: colors.textPrimary,
   },
 
-  // Método de División
   metodosContainer: {
     flexDirection: 'row',
     gap: 12,
@@ -657,7 +651,6 @@ const styles = StyleSheet.create({
     color: colors.textPrimary,
   },
 
-  // Dividir entre...
   dividirEntreHeader: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -670,7 +663,6 @@ const styles = StyleSheet.create({
     color: colors.primary,
   },
   
-  // Agrupación Familiar e Interfaz Checklist
   checklistContainer: {
     gap: 14,
     marginBottom: 12,
@@ -743,7 +735,6 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
 
-  // Subgrupos list (Modo División por Familias puro)
   subgruposListDivision: {
     gap: 12,
     marginBottom: 24,
@@ -778,7 +769,6 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
 
-  // Botón Principal
   btnGuardarGasto: {
     backgroundColor: colors.primary,
     borderRadius: 16,

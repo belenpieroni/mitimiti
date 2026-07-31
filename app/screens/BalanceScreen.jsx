@@ -5,40 +5,13 @@ import { Ionicons } from '@expo/vector-icons';
 import * as Clipboard from 'expo-clipboard';
 import { colors } from '../theme/colors';
 import { obtenerBalance } from '../services/juntadasService';
+import Toast from '../components/Toast';
 
 function formatPesos(monto) {
   return '$' + Math.abs(monto).toLocaleString('es-AR');
 }
 
-// Toast Component
-const Toast = ({ visible, message, type }) => {
-  const translateY = useRef(new Animated.Value(-100)).current;
 
-  useEffect(() => {
-    if (visible) {
-      Animated.spring(translateY, {
-        toValue: 50,
-        useNativeDriver: true,
-      }).start();
-    } else {
-      Animated.timing(translateY, {
-        toValue: -100,
-        duration: 250,
-        useNativeDriver: true,
-      }).start();
-    }
-  }, [visible]);
-
-  const bgColor = type === 'error' ? colors.redGlobal : colors.greenGlobal;
-  const icon = type === 'error' ? 'alert-circle' : 'checkmark-circle';
-
-  return (
-    <Animated.View style={[styles.toastContainer, { transform: [{ translateY }], backgroundColor: bgColor }]}>
-      <Ionicons name={icon} size={20} color="white" />
-      <Text style={styles.toastText}>{message}</Text>
-    </Animated.View>
-  );
-};
 
 export default function BalanceScreen({ route, navigation }) {
   const { juntadaId } = route.params;
@@ -78,7 +51,6 @@ export default function BalanceScreen({ route, navigation }) {
     ...[useCallback(() => { cargarBalance(); }, [cargarBalance])]
   );
 
-  // Helper para buscar datos del avatar (color e iniciales) de la familia o persona
   const getGrupoInfo = (nombre) => {
     if (!balance || !balance.saldos) return { iniciales: nombre.slice(0, 2).toUpperCase(), color: colors.primary };
     const grupo = balance.saldos.find(s => s.nombre === nombre);
@@ -109,7 +81,6 @@ export default function BalanceScreen({ route, navigation }) {
     <View style={styles.container}>
       <Toast visible={toast.visible} message={toast.message} type={toast.type} />
       
-      {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity style={styles.btnVolver} onPress={() => navigation.goBack()}>
           <Ionicons name="chevron-back" size={20} color={colors.textPrimary} />
@@ -122,7 +93,6 @@ export default function BalanceScreen({ route, navigation }) {
 
       <ScrollView contentContainerStyle={styles.content}>
         
-        {/* Transferencias Pendientes entre Familias/Grupos */}
         <Text style={styles.seccionTituloPrincipal}>TRANSFERENCIAS PENDIENTES</Text>
         {balance.transferencias.length === 0 ? (
           <View style={styles.saldadoCentrado}>
@@ -167,20 +137,12 @@ export default function BalanceScreen({ route, navigation }) {
                   </View>
                 </TouchableOpacity>
 
-                {/* Botón Marcar Pagado */}
-                <TouchableOpacity 
-                  style={styles.btnMarcarPagado}
-                  onPress={() => mostrarToast('Funcionalidad de pagos en desarrollo', 'success')}
-                >
-                  <Ionicons name="checkmark" size={16} color={colors.greenGlobal} style={{ marginTop: 2 }} />
-                  <Text style={styles.btnMarcarPagadoTexto}>Marcar como pagado</Text>
-                </TouchableOpacity>
+
               </View>
             );
           })
         )}
 
-        {/* Resumen por Grupo / Familia */}
         <Text style={[styles.seccionTituloPrincipal, { marginTop: 32 }]}>RESUMEN POR FAMILIA / GRUPO</Text>
         <View style={styles.listaSaldos}>
           {balance.saldos.map((s, i) => (
@@ -189,7 +151,21 @@ export default function BalanceScreen({ route, navigation }) {
                 <View style={[styles.avatarChico, { backgroundColor: s.color || colors.primary }]}>
                   <Text style={styles.avatarTexto}>{s.iniciales || s.nombre.slice(0,2).toUpperCase()}</Text>
                 </View>
-                <Text style={styles.saldoNombreFigma}>{s.nombre}</Text>
+                <View>
+                  <Text style={styles.saldoNombreFigma}>{s.nombre}</Text>
+                  {s.alias ? (
+                    <TouchableOpacity 
+                      style={{ flexDirection: 'row', alignItems: 'center', marginTop: 2, gap: 4 }} 
+                      onPress={async () => {
+                        await Clipboard.setStringAsync(s.alias);
+                        mostrarToast('Alias/CBU copiado', 'success');
+                      }}
+                    >
+                      <Ionicons name="copy-outline" size={14} color={colors.textSecondary} />
+                      <Text style={{ fontSize: 12, color: colors.textSecondary }}>{s.alias}</Text>
+                    </TouchableOpacity>
+                  ) : null}
+                </View>
               </View>
               <Text style={[
                 styles.saldoMontoFigma, 
@@ -201,7 +177,6 @@ export default function BalanceScreen({ route, navigation }) {
           ))}
         </View>
 
-        {/* Desplegable de Cálculos Inteligente */}
         <TouchableOpacity 
           style={styles.acordeonHeader} 
           onPress={() => setMostrarDetalle(!mostrarDetalle)}
@@ -242,7 +217,6 @@ export default function BalanceScreen({ route, navigation }) {
             <Text style={styles.formula}>Balance = Total Aportado − Consumo Total del Grupo</Text>
             
             {balance.saldos.map((s, i) => {
-              // Si el backend no envía 's.consumido', lo calculamos como: lo que puso menos su saldo final.
               const consumidoGrupo = s.consumido !== undefined ? s.consumido : (s.pagado - s.saldo);
               return (
                 <View key={i} style={styles.filaExplicacion}>
@@ -315,14 +289,12 @@ const styles = StyleSheet.create({
   avatarGrande: { width: 44, height: 44, borderRadius: 22, justifyContent: 'center', alignItems: 'center' },
   avatarTextoGrande: { color: 'white', fontSize: 14, fontWeight: '700' },
   
-  // Botón "Marcar como pagado"
   btnMarcarPagado: {
     marginTop: 20, backgroundColor: '#E8F4EF', borderRadius: 14, paddingVertical: 14,
     flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 6,
   },
   btnMarcarPagadoTexto: { color: colors.greenGlobal, fontWeight: '700', fontSize: 14 },
 
-  // Resumen Individual
   listaSaldos: { marginBottom: 16 },
   saldoFilaFigma: { 
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',

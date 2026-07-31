@@ -1,12 +1,13 @@
+
 /**
  * balanceService.js
  * ─────────────────
  * Lógica de negocio central de Miti Miti (Versión Familiar por Consumo + Subgrupos Variables)
  */
  
-/**
- * Redondea a 2 decimales para evitar errores de punto flotante.
- */
+const { calcularParte } = require('../helpers/mathUtils');
+
+
 function redondear(n) {
   return Math.round(n * 100) / 100;
 }
@@ -44,79 +45,86 @@ function aplicarPagosATransferencias(transferencias, pagosDeudas = []) {
   return pendientes;
 }
  
-/**
- * Dado un objeto juntada (con participantes, gastos y subgrupos), calcula:
- * - totalGastado
- * - saldos: array con deudas consolidadas por grupo familiar (sin deudas internas)
- * - transferencias: lista mínima de pagos entre familias/unidades
- */
+
 function calcularBalance(juntada) {
   const { participantes = [], gastos = [], subgrupos = [], pagosDeudas = [] } = juntada;
   const n = participantes.length;
  
   const totalGastado = gastos.reduce((sum, g) => sum + g.monto, 0);
  
-  // Trackers individuales iniciales de consumo y pago real
+  
   const pagadoPor = {};
   const correspondePor = {};
 
+  const nombreMap = {};
   participantes.forEach((p) => {
     pagadoPor[p.nombre] = 0;
     correspondePor[p.nombre] = 0;
+    nombreMap[p.nombre.toLowerCase()] = p.nombre;
   });
 
-  // 1. PROCESAR CADA GASTO SEGÚN CONSUMO REAL (CA3: Soporte para Subgrupos Dinámicos)
+  
   gastos.forEach((g) => {
-    // Acreditar el pago a la persona física que puso la plata
-    if (pagadoPor[g.pagador] !== undefined) {
-      pagadoPor[g.pagador] = redondear(pagadoPor[g.pagador] + g.monto);
+    
+    const pagadorNormalizado = g.pagador ? g.pagador.trim().toLowerCase() : '';
+    const pagadorOriginal = nombreMap[pagadorNormalizado];
+    if (pagadorOriginal && pagadoPor[pagadorOriginal] !== undefined) {
+      pagadoPor[pagadorOriginal] = redondear(pagadoPor[pagadorOriginal] + g.monto);
     }
 
     let consumidores = [];
-
-    // GASTO POR SUBGRUPOS (Criterio de Aceptación 3)
-    if (g.tipoDivision === 'subgrupos' && g.subgruposIds && g.subgruposIds.length > 0) {
-      const setIntegrantesUnicos = new Set();
-      
-      // Buscamos los subgrupos seleccionados en este gasto dentro del array de la juntada
-      const sgAsignados = subgrupos.filter(sg => g.subgruposIds.includes(sg.id));
-      
-      sgAsignados.forEach(sg => {
-        const integrantesActivos = sg.integrantes || [];
-        // Se extraen los usuarios reales en este preciso instante
-        integrantesActivos.forEach(nombre => setIntegrantesUnicos.add(nombre));
-      });
-
-      consumidores = Array.from(setIntegrantesUnicos);
-
-    } else if (g.beneficiarios && g.beneficiarios.length > 0) {
-      // Sistema clásico de Checklist individual
+    if (g.beneficiarios && g.beneficiarios.length > 0) {
       consumidores = g.beneficiarios;
-    } else {
-      // Fallback: división general entre todos
-      consumidores = participantes.map(p => p.nombre);
-    }
-      
-    // VALIDACIÓN MATEMÁTICA CRÍTICA (CA3): Si el subgrupo está vacío en este instante, 
-    // su length es 0. Al validar > 0 evitamos la división por cero (monto / 0 = Infinity/NaN)
-    if (consumidores.length > 0) {
-      const cuotaPorCabeza = g.monto / consumidores.length;
-      
-      consumidores.forEach(nombreConsumidor => {
-        if (correspondePor[nombreConsumidor] !== undefined) {
-          correspondePor[nombreConsumidor] += cuotaPorCabeza;
+    } else if (g.splitMode === 'subgroups' && Array.isArray(g.splitSubgroups) && g.splitSubgroups.length > 0) {
+      const integrantes = new Set();
+      g.splitSubgroups.forEach((subgroupId) => {
+        const sg = subgrupos.find((group) => group.id === subgroupId);
+        if (sg?.integrantes?.length > 0) {
+          sg.integrantes.forEach((nombre) => integrantes.add(nombre));
         }
       });
+      consumidores = Array.from(integrantes);
+    } else {
+      consumidores = participantes.map(p => p.nombre);
     }
+
+    consumidores = consumidores
+      .map(c => nombreMap[c ? c.trim().toLowerCase() : ''])
+      .filter(Boolean);
+
+      if (consumidores.length > 0) {
+        const calcularDivision = (total, cantidad) => {
+          if (cantidad === 0) return [];
+          const totalCentavos = Math.round(total * 100);
+          const cuotaBaseCentavos = Math.floor(totalCentavos / cantidad);
+          let restoCentavos = totalCentavos - (cuotaBaseCentavos * cantidad);
+          
+          const distribucion = [];
+          for (let i = 0; i < cantidad; i++) {
+            let cuota = cuotaBaseCentavos;
+            if (restoCentavos > 0) {
+              cuota += 1;
+              restoCentavos -= 1;
+            }
+            distribucion.push(cuota / 100);
+          }
+          return distribucion;
+        };
+
+        const cuotas = calcularDivision(g.monto, consumidores.length);
+        
+        consumidores.forEach((nombreConsumidor, index) => {
+          if (correspondePor[nombreConsumidor] !== undefined) {
+            correspondePor[nombreConsumidor] += cuotas[index];
+          }
+        });
+      }
   });
 
-  // 2. CONSOLIDACIÓN FAMILIAR (Filtrado de seguridad)
   const pagadoConsolidado = { ...pagadoPor };
   const correspondeConsolidado = { ...correspondePor };
 
   subgrupos.forEach(sg => {
-    // REGLA DE SEGURIDAD: Solo consolidamos si el subgrupo está marcado explícitamente como familiar/núcleo.
-    // Si es un subgrupo de consumo variable (asado, bebidas), saltamos la consolidación.
     if (sg.tipo !== 'familiar') return; 
     
     const integrantes = sg.integrantes || [];
@@ -148,7 +156,6 @@ function calcularBalance(juntada) {
     correspondeConsolidado[representante] = grupoTotalCorresponde;
   });
  
-  // 3. GENERAR SALDOS FINALES LIMPIOS
   const saldos = participantes.map((p) => {
     const pagado = redondear(pagadoConsolidado[p.nombre] || 0);
     const corresponde = redondear(correspondeConsolidado[p.nombre] || 0);
@@ -158,6 +165,7 @@ function calcularBalance(juntada) {
       nombre: p.nombre,
       iniciales: p.iniciales,
       color: p.color,
+      alias: p.alias,
       pagado,
       corresponde,
       saldo,
@@ -186,7 +194,7 @@ function calcularBalance(juntada) {
     saldoPendiente: redondear(saldoPendientePor[s.nombre] || 0),
   }));
  
-  const parteIgual = n > 0 ? redondear(totalGastado / n) : 0;
+  const parteIgual = calcularParte(totalGastado, n);
 
   return {
     totalGastado,
@@ -224,7 +232,6 @@ function calcularLiquidacion(saldos) {
     });
  
     deudor.saldo = redondear(deudor.saldo + monto);
-    acreedor.saldo = redondear-acreedor.saldo - monto;
     acreedor.saldo = redondear(acreedor.saldo - monto);
   }
  
@@ -233,17 +240,21 @@ function calcularLiquidacion(saldos) {
  
 function calcularBalanceGlobal(nombreParticipante, juntadas) {
   let porCobrar = 0;
-  let porPagar = 0;
+  let porPagar  = 0;
  
   juntadas.forEach((juntada) => {
     const balance = calcularBalance(juntada);
-    const saldo = balance.saldos.find((s) => s.nombre === nombreParticipante);
+    const saldo   = balance.saldos.find((s) => s.nombre.trim().toLowerCase() === nombreParticipante.trim().toLowerCase());
     if (!saldo) return;
 
-    const saldoNeto = typeof saldo.saldoPendiente === 'number' ? saldo.saldoPendiente : saldo.saldo;
- 
-    if (saldoNeto > 0) porCobrar = redondear(porCobrar + saldoNeto);
-    if (saldoNeto < 0) porPagar = redondear(porPagar + Math.abs(saldoNeto));
+    const saldoPendiente = typeof saldo.saldoPendiente === 'number' ? saldo.saldoPendiente : null;
+    const saldoBruto     = saldo.saldo ?? 0;
+    const saldoNeto      = (saldoPendiente !== null && saldoPendiente !== 0)
+      ? saldoPendiente
+      : saldoBruto;
+
+    if (saldoNeto > 0.01)  porCobrar = redondear(porCobrar + saldoNeto);
+    if (saldoNeto < -0.01) porPagar  = redondear(porPagar  + Math.abs(saldoNeto));
   });
  
   return {

@@ -1,6 +1,5 @@
 import { NativeModules, Platform } from 'react-native';
 
-// Módulo de token de autenticación (actualizado desde AppNavigator al iniciar sesión)
 let _authToken = null;
 export function setAuthToken(token) { _authToken = token; }
 export function getAuthToken() { return _authToken; }
@@ -36,7 +35,8 @@ function getApiBase() {
   }
 
   if (Platform.OS === 'web' && typeof window !== 'undefined') {
-    return normalizeBaseUrl(`${window.location.origin}/api`);
+    const host = window.location.hostname;
+    return normalizeBaseUrl(`http://${host}:3000/api`);
   }
 
   const host = getExpoHost();

@@ -4,8 +4,6 @@ const crypto = require('crypto');
 const { pool } = require('../db');
 const { sendPushToTokens } = require('../services/pushNotificationService');
 
-// ── Validaciones ────────────────────────────────────────────────────────────
-
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const MIN_PASSWORD_LENGTH = 8;
 const MIN_NAME_LENGTH = 2;
@@ -17,12 +15,9 @@ const validateName = (name) => name && name.trim().length >= MIN_NAME_LENGTH;
 const extractInitials = (name) =>
   name.trim().split(' ').map((w) => w[0]).join('').substring(0, 2).toUpperCase() || 'XX';
 
-// ── Controladores ───────────────────────────────────────────────────────────
-
 exports.register = async (req, res, next) => {
   console.log('═══════════════════════');
   console.log('REGISTER RECIBIDO');
-  console.log(req.body);
 
   try {
     const { name, email, password } = req.body;
@@ -62,7 +57,6 @@ exports.register = async (req, res, next) => {
 exports.login = async (req, res, next) => {
   console.log('═══════════════════════');
   console.log('LOGIN RECIBIDO');
-  console.log(req.body);
 
   try {
     const { email, password } = req.body;

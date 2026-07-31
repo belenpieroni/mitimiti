@@ -1,18 +1,16 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, StyleSheet, ActivityIndicator } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { colors } from '../theme/colors';
-import { listarJuntadas } from '../services/juntadasService';
+import { listarJuntadas, subscribeLocalJuntadas } from '../services/juntadasService';
 import { useAuth } from '../context/AuthContext';
 
-// ── Colores disponibles para asignar a participantes ──────────────────────────
 export const coloresDisponibles = [
   '#473472', '#526D82', '#9DB2BF', '#42b271',
   '#c084fc', '#f97316', '#ec6c6a', '#38bdf8',
 ];
 
-// ── Helpers ───────────────────────────────────────────────────────────────────
 export function getIniciales(nombre) {
   if (!nombre) return '??';
   const partes = nombre.trim().split(' ');
@@ -44,12 +42,18 @@ function AvatarStack({ personas }) {
   );
 }
 
-// ── Componente ────────────────────────────────────────────────────────────────
 export default function JuntadasScreen({ navigation }) {
   const { user } = useAuth(); 
   const [juntadas, setJuntadas] = useState([]);
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState(null);
+
+  useEffect(() => {
+    const unsubscribe = subscribeLocalJuntadas((list) => {
+      setJuntadas(list);
+    });
+    return unsubscribe;
+  }, []);
 
   const cargarJuntadas = useCallback(async () => {
     const nombreUsuario = user?.name || user?.nombre;
@@ -63,8 +67,6 @@ export default function JuntadasScreen({ navigation }) {
     setError(null);
     try {
       const response = await listarJuntadas(nombreUsuario); 
-      const datos = response?.data || response;
-      setJuntadas(Array.isArray(datos) ? datos : []);
     } catch (e) {
       console.error("Error cargando juntadas:", e);
       setError('No se pudo conectar con el servidor.');
@@ -79,7 +81,6 @@ export default function JuntadasScreen({ navigation }) {
     }, [cargarJuntadas])
   );
 
-  // ── Render estados ────────────────────────────────────────────────────────
   if (cargando) {
     return (
       <View style={[styles.container, styles.centrado]}>
@@ -173,7 +174,6 @@ export default function JuntadasScreen({ navigation }) {
                     {tipoDeuda === 'pagar'  && <Text style={styles.teDebes}>Debés {formatPesos(montoDeuda)}</Text>}
                     {tipoDeuda === 'ninguna' && <Text style={styles.sinDeuda}>Sin deudas</Text>}
                   </View>
-                  <Ionicons name="ellipsis-horizontal" size={18} color={colors.textSecondary} />
                 </View>
               </TouchableOpacity>
             );
@@ -184,7 +184,6 @@ export default function JuntadasScreen({ navigation }) {
   );
 }
 
-// ── Estilos ──────────────────────────────────────────────────────────────────
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background },
   centrado: { flex: 1, justifyContent: 'center', alignItems: 'center', gap: 12, padding: 32 },

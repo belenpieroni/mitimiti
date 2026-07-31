@@ -5,11 +5,7 @@ const { scanTicket } = require('../services/ocrService');
 
 const router = express.Router();
 
-/**
- * POST /api/uploads
- * Carga una foto de ticket (sin OCR).
- * Multipart form-data con campo 'file'
- */
+
 router.post('/', upload.single('file'), (req, res) => {
   try {
     if (!req.file) {
@@ -36,12 +32,7 @@ router.post('/', upload.single('file'), (req, res) => {
   }
 });
 
-/**
- * POST /api/uploads/scan
- * Carga la foto del ticket Y corre OCR sobre ella.
- * Devuelve la URL guardada + el importe detectado + el texto crudo.
- * Multipart form-data con campo 'file'
- */
+
 router.post('/scan', upload.single('file'), async (req, res) => {
   try {
     if (!req.file) {
@@ -61,8 +52,8 @@ router.post('/scan', upload.single('file'), async (req, res) => {
         url: `/uploads/${req.file.filename}`,
         mimetype: req.file.mimetype,
         size: req.file.size,
-        amount, // number | null
-        text,   // texto crudo del OCR (útil para debug)
+        amount, 
+        text,   
       },
     });
   } catch (error) {

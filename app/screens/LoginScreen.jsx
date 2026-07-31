@@ -7,7 +7,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { colors } from '../theme/colors';
 import { useAuth } from '../context/AuthContext';
 import { loginUser, registerUser } from '../services/authService';
-import { registrarTokenDispositivo } from '../services/notificationsService';
+import { registrarTokenDispositivo, isExpoGoAndroid } from '../services/notificationsService';
 
 export default function LoginScreen() {
   const { login } = useAuth();
@@ -15,12 +15,10 @@ export default function LoginScreen() {
   const [loading, setLoading] = useState(false);
   const [secureText, setSecureText] = useState(true);
 
-  // Estados del Formulario
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
 
-  // Validación dinámica para el color del botón principal
   const isFormValid = activeTab === 'login' 
     ? email.length > 0 && password.length > 0 
     : name.length > 0 && email.length > 0 && password.length > 0;
@@ -39,7 +37,6 @@ export default function LoginScreen() {
 
         Alert.alert('¡Éxito!', 'Cuenta creada. Ahora iniciá sesión.');
         
-        // Limpiar formulario
         setActiveTab('login');
         setName('');
         setEmail('');        // ✅ CORREGIDO: Se limpia email
@@ -55,10 +52,14 @@ export default function LoginScreen() {
           token: authData.token,
         });
 
-        try {
-          await registrarTokenDispositivo(authData.token);
-        } catch (pushError) {
-          console.warn('[push] No se pudo registrar token de dispositivo:', pushError.message);
+        if (!isExpoGoAndroid()) {
+          try {
+            await registrarTokenDispositivo(authData.token);
+          } catch (pushError) {
+            console.warn('[push] No se pudo registrar token de dispositivo:', pushError.message);
+          }
+        } else {
+          console.warn('[push] Se omitió el registro de token en Expo Go Android. Usa un development build para push.');
         }
       }
     } catch (error) {
@@ -81,7 +82,7 @@ export default function LoginScreen() {
         showsVerticalScrollIndicator={false}
       >
         
-        {/* LOGO E ISOTIPO */}
+        
         <View style={styles.logoContainer}>
           <View style={styles.logoBox}>
             <Image 
@@ -94,7 +95,7 @@ export default function LoginScreen() {
           <Text style={styles.subtitle}>Dividí gastos sin complicarte</Text>
         </View>
 
-        {/* CONTROLLER DE PESTAÑAS */}
+        
         <View style={styles.tabContainer}>
           <TouchableOpacity 
             style={[styles.tabButton, activeTab === 'login' && styles.tabButtonActive]} 
@@ -114,7 +115,7 @@ export default function LoginScreen() {
           </TouchableOpacity>
         </View>
 
-        {/* FORMULARIO DE INPUTS */}
+        
         <View style={styles.formContainer}>
           {activeTab === 'register' && (
             <View style={styles.inputWrapper}>
@@ -191,7 +192,7 @@ export default function LoginScreen() {
           )}
         </View>
 
-        {/* BOTÓN PRINCIPAL */}
+        
         <TouchableOpacity 
           style={[
             styles.btnPrimary, 
@@ -209,7 +210,7 @@ export default function LoginScreen() {
           )}
         </TouchableOpacity>
 
-        {/* FOOTER TOGGLE */}
+        
         <TouchableOpacity 
           style={styles.footerToggle} 
           onPress={() => setActiveTab(activeTab === 'login' ? 'register' : 'login')}
@@ -227,8 +228,6 @@ export default function LoginScreen() {
     </RootContainer>
   );
 }
-
-// ── Estilos ──────────────────────────────────────────────────────────────────
 
 const styles = StyleSheet.create({
   container: {

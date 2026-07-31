@@ -1,15 +1,18 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import {
   View, Text, StyleSheet, TextInput, TouchableOpacity,
-  ScrollView, Alert, Modal, Platform, KeyboardAvoidingView,
+  ScrollView, Alert, Modal, Platform, KeyboardAvoidingView, Switch,
 } from 'react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { Ionicons } from '@expo/vector-icons';
 import { colors } from '../../theme/colors';
 import { useVivienda } from '../../context/ViviendaContext';
-import { getGastosVivienda, getServiciosVivienda, guardarGastoVivienda, crearServicioVivienda } from '../../services/viviendaService';
+import { 
+  getGastosVivienda, getServiciosVivienda, guardarGastoVivienda, crearServicioVivienda,
+  actualizarGastoVivienda, actualizarServicioVivienda, getMiVivienda
+} from '../../services/viviendaService';
+import { useAuth } from '../../context/AuthContext';
 
-// ─── Constants ────────────────────────────────────────────────────────────────
 
 const FRECUENCIAS = ['Semanal', 'Quincenal', 'Mensual', 'Bimestral', 'Semestral', 'Anual'];
 
@@ -19,10 +22,31 @@ const CATEGORIAS = [
   'Hogar', 'Indumentaria', 'Shopping', 'Otras categorías',
 ];
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
+const SERVICIOS_OPCIONES = [
+  'Agua', 'Luz', 'Gas', 'Internet', 'Netflix', 'Expensas', 'Limpieza', 'Otro'
+];
+
+const coloresDisponibles = [
+  '#473472', '#526D82', '#9DB2BF', '#42b271',
+  '#c084fc', '#f97316', '#ec6c6a', '#38bdf8',
+];
+
 
 function iniciales(nombre = '') {
   return nombre.trim().split(/\s+/).map(n => n[0] ?? '').join('').toUpperCase().slice(0, 2);
+}
+
+function getIniciales(nombre) {
+  if (typeof nombre !== 'string') return '??';
+  const partes = nombre.trim().split(' ');
+  if (partes.length >= 2) return (partes[0][0] + partes[1][0]).toUpperCase();
+  return nombre.slice(0, 2).toUpperCase();
+}
+
+function getColorByNombre(nombre) {
+  let hash = 0;
+  for (let i = 0; i < nombre.length; i++) hash = nombre.charCodeAt(i) + ((hash << 5) - hash);
+  return coloresDisponibles[Math.abs(hash) % coloresDisponibles.length];
 }
 
 function labelModelo(modelo) {
@@ -45,26 +69,28 @@ function calcularDivision(total, regla) {
 
   if (modelo === 'partes_iguales') {
     const share = total / participantes.length;
-    return participantes.map(p => ({ nombre: p.nombre, monto: share }));
+    const pct = `${Math.round(100 / participantes.length)}%`;
+    return participantes.map(p => ({ nombre: p.nombre, monto: share, pctLabel: pct }));
   }
 
   if (modelo === 'responsable_unico') {
-    return participantes.map((p, i) => ({ nombre: p.nombre, monto: i === 0 ? total : 0 }));
+    return participantes.map((p, i) => ({ nombre: p.nombre, monto: i === 0 ? total : 0, pctLabel: i === 0 ? '100%' : '0%' }));
   }
 
   const sumPct = participantes.reduce((acc, p) => acc + (Number(p.porcentaje) || 0), 0);
   if (sumPct === 0) {
     const share = total / participantes.length;
-    return participantes.map(p => ({ nombre: p.nombre, monto: share }));
+    const pct = `${Math.round(100 / participantes.length)}%`;
+    return participantes.map(p => ({ nombre: p.nombre, monto: share, pctLabel: pct }));
   }
 
   return participantes.map(p => ({
     nombre: p.nombre,
     monto: total * (Number(p.porcentaje) || 0) / sumPct,
+    pctLabel: `${Number(p.porcentaje) || 0}%`
   }));
 }
 
-// ─── Sub-components ───────────────────────────────────────────────────────────
 
 function ReglaCard({ regla, onEditarRegla }) {
   if (!regla) return null;
@@ -78,10 +104,12 @@ function ReglaCard({ regla, onEditarRegla }) {
           <Ionicons name="git-branch-outline" size={14} color={colors.textSecondary} />
           <Text style={styles.reglaBadgeText}>{labelModelo(modelo)}</Text>
         </View>
-        <TouchableOpacity style={styles.btnEditarRegla} onPress={onEditarRegla}>
-          <Ionicons name="create-outline" size={13} color={colors.textSecondary} />
-          <Text style={styles.btnEditarReglaText}>Editar regla</Text>
-        </TouchableOpacity>
+        {onEditarRegla && (
+          <TouchableOpacity style={styles.btnEditarRegla} onPress={onEditarRegla}>
+            <Ionicons name="create-outline" size={13} color={colors.textSecondary} />
+            <Text style={styles.btnEditarReglaText}>Editar regla</Text>
+          </TouchableOpacity>
+        )}
       </View>
       {participantes.length === 0 ? (
         <Text style={{ fontSize: 12, color: colors.textSecondary, marginTop: 4 }}>
@@ -116,24 +144,54 @@ function CalculoEnTiempoReal({ monto, regla }) {
   if (!divisiones.length) return null;
 
   return (
-    <View style={styles.calculoSection}>
-      <Text style={styles.calculoLabel}>CUÁNTO PAGA CADA UNO</Text>
+    <View style={{ marginTop: 16 }}>
       {divisiones.map((d, i) => (
-        <View key={i} style={[styles.calculoRow, i < divisiones.length - 1 && styles.calculoRowBorder]}>
-          <View style={styles.reglaPersona}>
-            <View style={styles.avatar}>
-              <Text style={styles.avatarText}>{iniciales(d.nombre)}</Text>
+        <View key={i} style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 8 }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
+            <View style={[styles.avatar, { width: 28, height: 28, marginRight: 10 }]}>
+              <Text style={[styles.avatarText, { fontSize: 11 }]}>{iniciales(d.nombre)}</Text>
             </View>
-            <Text style={styles.calculoNombre}>{d.nombre}</Text>
+            <Text style={{ fontSize: 15, color: colors.textPrimary, flex: 1 }} numberOfLines={1}>{d.nombre}</Text>
           </View>
-          <Text style={styles.calculoMonto}>${Math.round(d.monto).toLocaleString('es-AR')}</Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center', minWidth: 80, justifyContent: 'flex-end' }}>
+            <Text style={{ fontSize: 13, color: colors.textSecondary, marginRight: 12 }}>{d.pctLabel}</Text>
+            <Text style={{ fontSize: 16, color: colors.textPrimary, fontWeight: '500' }}>
+              ${Math.round(d.monto).toLocaleString('es-AR')}
+            </Text>
+          </View>
         </View>
       ))}
     </View>
   );
 }
 
-// ─── Selector de fecha cross-platform ────────────────────────────────────────
+function CalculoGastoPuntualEnTiempoReal({ total, participantes }) {
+  if (!total || total <= 0 || !participantes.length) return null;
+  const share = total / participantes.length;
+  const pct = `${Math.round(100 / participantes.length)}%`;
+
+  return (
+    <View style={{ marginTop: 16 }}>
+      {participantes.map((nombre, i) => (
+        <View key={i} style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 8 }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
+            <View style={[styles.avatar, { width: 28, height: 28, marginRight: 10, backgroundColor: getColorByNombre(nombre) }]}>
+              <Text style={[styles.avatarText, { fontSize: 11, color: '#fff' }]}>{getIniciales(nombre)}</Text>
+            </View>
+            <Text style={{ fontSize: 15, color: colors.textPrimary, flex: 1 }} numberOfLines={1}>{nombre}</Text>
+          </View>
+          <View style={{ flexDirection: 'row', alignItems: 'center', minWidth: 80, justifyContent: 'flex-end' }}>
+            <Text style={{ fontSize: 13, color: colors.textSecondary, marginRight: 12 }}>{pct}</Text>
+            <Text style={{ fontSize: 16, color: colors.textPrimary, fontWeight: '500' }}>
+              ${Math.round(share).toLocaleString('es-AR')}
+            </Text>
+          </View>
+        </View>
+      ))}
+    </View>
+  );
+}
+
 
 function FechaVencimientoSelector({ fecha, onChange }) {
   const [mostrarPicker, setMostrarPicker] = useState(false);
@@ -141,18 +199,15 @@ function FechaVencimientoSelector({ fecha, onChange }) {
   const dateValue = (fecha instanceof Date) ? fecha : new Date();
 
 const handleChange = (event, selectedDate) => {
-    // Si el usuario cancela, cerramos y no hacemos nada más
     if (event.type === 'dismissed') {
       setMostrarPicker(false);
       return;
     }
 
-    // 2. Si hay fecha seleccionada, la guardamos
     if (selectedDate) {
       onChange(selectedDate);
     }
 
-    // 3. Cerramos picker solo en Android
     if (Platform.OS === 'android') {
       setMostrarPicker(false);
     }
@@ -167,13 +222,13 @@ const handleChange = (event, selectedDate) => {
           setMostrarPicker(true);
         }}
       >
-        {/* Usamos toLocaleDateString de forma segura */}
+        
         <Text style={styles.inputText}>
           {dateValue.toLocaleDateString()}
         </Text>
       </TouchableOpacity>
 
-      {/* Android: diálogo nativo */}
+      
       {Platform.OS === 'android' && mostrarPicker && (
         <DateTimePicker
           value={dateValue}
@@ -183,7 +238,7 @@ const handleChange = (event, selectedDate) => {
         />
       )}
 
-      {/* iOS: modal con spinner, sin absoluteFill para no interferir con el picker */}
+      
       {Platform.OS === 'ios' && (
         <Modal visible={mostrarPicker} transparent animationType="slide">
           <View style={styles.modalOverlay}>
@@ -218,13 +273,13 @@ const handleChange = (event, selectedDate) => {
   );
 }
 
-// ─── Main Screen ──────────────────────────────────────────────────────────────
-
 export default function AgregarViviendaScreen({ route, navigation }) {
   const editMode = route?.params?.editMode ?? false;
   const data = route?.params?.data ?? null;
 
   const { reglas } = useVivienda();
+  const { user } = useAuth();
+  const [isSaving, setIsSaving] = useState(false);
 
   const [esServicio, setEsServicio] = useState(true);
   const [nombre, setNombre] = useState('');
@@ -234,20 +289,40 @@ export default function AgregarViviendaScreen({ route, navigation }) {
   const [categoria, setCategoria] = useState('Supermercado');
   const [modalCatVisible, setModalCatVisible] = useState(false);
   const [modalServicioVisible, setModalServicioVisible] = useState(false);
+  const [modalAcuerdosVisible, setModalAcuerdosVisible] = useState(false);
+  const [acuerdoId, setAcuerdoId] = useState(null);
   const [regla, setRegla] = useState(null);
   const [pagador, setPagador] = useState('');
-  const [participantesServicio, setParticipantesServicio] = useState([]);
-  const [nuevoParticipanteServicio, setNuevoParticipanteServicio] = useState('');
-  const [participantesGasto, setParticipantesGasto] = useState([]);
-  const [nuevoParticipanteGasto, setNuevoParticipanteGasto] = useState('');
+  const [isVariable, setIsVariable] = useState(false);
+  const [esOtroServicio, setEsOtroServicio] = useState(false);
 
-  // ── FECHA DE VENCIMIENTO: estado propio, separado de new Date() ───────────
-  // El bug original usaba siempre new Date() al guardar en lugar del valor
-  // elegido por el usuario. Ahora se inicializa en null y solo se setea
-  // cuando el usuario selecciona una fecha en el picker.
- // 1. Inicialización
-const [fechaVencimiento, setFechaVencimiento] = useState(new Date());
-  // ── Carga en modo edición ──────────────────────────────────────────────────
+  const [miembrosVivienda, setMiembrosVivienda] = useState([]);
+  const [participantesGasto, setParticipantesGasto] = useState([]);
+
+  const [fechaVencimiento, setFechaVencimiento] = useState(new Date());
+
+  useEffect(() => {
+    async function loadVivienda() {
+      try {
+        const mv = await getMiVivienda();
+        if (mv && mv.miembros) {
+          const names = mv.miembros.map(m => m.name);
+          setMiembrosVivienda(names);
+          if (!editMode && !esServicio) {
+            setParticipantesGasto(names);
+            const defaultPagador = (user && user.name && names.includes(user.name)) 
+              ? user.name 
+              : (names[0] || '');
+            setPagador(defaultPagador);
+          }
+        }
+      } catch (e) {
+        console.error('Error al cargar miembros de vivienda:', e);
+      }
+    }
+    loadVivienda();
+  }, [editMode, esServicio, user]);
+
   useEffect(() => {
     if (editMode && data) {
       setEsServicio(!!data.periodicidad);
@@ -261,65 +336,45 @@ const [fechaVencimiento, setFechaVencimiento] = useState(new Date());
         setFrecuencia(p.charAt(0).toUpperCase() + p.slice(1));
       }
       if (data.categoria) setCategoria(data.categoria);
-      // Al editar, pre-cargamos la fecha existente del registro
       if (data.proximoVencimiento) setFechaVencimiento(new Date(data.proximoVencimiento));
-      if (Array.isArray(data.participantes)) {
-        setParticipantesServicio(data.participantes);
-        setParticipantesGasto(data.participantes);
-      }
+      if (data.acuerdoId) setAcuerdoId(data.acuerdoId);
+      setIsVariable(!!(data.isVariable || data.is_variable));
+      if (data.pagador) setPagador(data.pagador);
+      if (data.participantes) setParticipantesGasto(data.participantes);
     }
   }, [editMode, data]);
 
   useEffect(() => {
-    if (editMode && data?.nombre && reglas.length > 0) {
-      const encontrada = reglas.find(
-        r => r.nombre.toLowerCase().trim() === data.nombre.toLowerCase().trim()
-      );
-      if (encontrada) setRegla(encontrada);
+    if (editMode && data && reglas.length > 0) {
+      const targetId = data.acuerdoId || data.acuerdo_id;
+      if (targetId) {
+        const encontrada = reglas.find(r => r.id === targetId);
+        if (encontrada) {
+          setRegla(encontrada);
+          setAcuerdoId(encontrada.id);
+        }
+      }
     }
   }, [editMode, data, reglas]);
 
-  const seleccionarServicio = useCallback((nombreSeleccionado) => {
-    setNombre(nombreSeleccionado);
-    const encontrada = reglas.find(
-      r => r.nombre.toLowerCase().trim() === nombreSeleccionado.toLowerCase().trim()
-    );
+  useEffect(() => {
+    if (!esServicio && pagador && !participantesGasto.includes(pagador)) {
+      setPagador('');
+    }
+  }, [participantesGasto, pagador, esServicio]);
+
+  const seleccionarAcuerdo = useCallback((idAcuerdo) => {
+    setAcuerdoId(idAcuerdo);
+    const encontrada = reglas.find(r => r.id === idAcuerdo);
     setRegla(encontrada ?? null);
-    const participantesRegla = (encontrada?.participantes ?? []).map((p) => p.nombre).filter(Boolean);
-    setParticipantesServicio(participantesRegla);
-    setParticipantesGasto(participantesRegla);
-    setModalServicioVisible(false);
+    setModalAcuerdosVisible(false);
   }, [reglas]);
 
-  const agregarParticipanteServicio = () => {
-    const nombreLimpio = nuevoParticipanteServicio.trim();
-    if (!nombreLimpio) return;
-    const yaExiste = participantesServicio.some(
-      (p) => p.toLowerCase() === nombreLimpio.toLowerCase()
-    );
-    if (yaExiste) return;
-    setParticipantesServicio((prev) => [...prev, nombreLimpio]);
-    setNuevoParticipanteServicio('');
-  };
-
-  const quitarParticipanteServicio = (nombreAQuitar) => {
-    setParticipantesServicio((prev) => prev.filter((p) => p !== nombreAQuitar));
-  };
-
-  const agregarParticipanteGasto = () => {
-    const nombreLimpio = nuevoParticipanteGasto.trim();
-    if (!nombreLimpio) return;
-    const yaExiste = participantesGasto.some(
-      (p) => p.toLowerCase() === nombreLimpio.toLowerCase()
-    );
-    if (yaExiste) return;
-    setParticipantesGasto((prev) => [...prev, nombreLimpio]);
-    setNuevoParticipanteGasto('');
-  };
-
-  const quitarParticipanteGasto = (nombreAQuitar) => {
-    setParticipantesGasto((prev) => prev.filter((p) => p !== nombreAQuitar));
-  };
+  const seleccionarServicio = useCallback((nombreSeleccionado) => {
+    setEsOtroServicio(false);
+    setNombre(nombreSeleccionado);
+    setModalServicioVisible(false);
+  }, []);
 
   const handleMontoChange = (text) => {
     const raw = text.replace(/^\$\s*/, '').replace(/\D/g, '');
@@ -327,66 +382,106 @@ const [fechaVencimiento, setFechaVencimiento] = useState(new Date());
     setMontoNumerico(Number(raw) || 0);
   };
 
-  const handleEditarRegla = () => {
-    Alert.alert('Editar regla', `Próximamente podrás editar la regla de "${nombre}"`);
-  };
-
   const handleGuardar = async () => {
-    console.log({ nombre, montoNumerico, esServicio, pagador, fechaVencimiento });
-    if (!nombre.trim()) { Alert.alert('Error', 'Falta el nombre'); return; }
-    if (montoNumerico <= 0) { Alert.alert('Error', 'El monto debe ser mayor a 0'); return; }
-    // Validamos que el usuario haya elegido una fecha real en el picker
-    if (esServicio && !fechaVencimiento) { Alert.alert('Error', 'Seleccioná la fecha de vencimiento'); return; }
-    if (esServicio && participantesServicio.length === 0) { Alert.alert('Error', 'Agregá al menos un participante al servicio'); return; }
-    if (!esServicio && participantesGasto.length === 0) { Alert.alert('Error', 'Agregá al menos un participante involucrado en el gasto'); return; }
-    if (!esServicio && !pagador) { Alert.alert('Error', 'Debes seleccionar quién pagó'); return; }
+    console.log('[AgregarViviendaScreen] handleGuardar click event triggered!');
+    console.log('[AgregarViviendaScreen] Form state - esServicio:', esServicio);
+    console.log('[AgregarViviendaScreen] Form state - nombre:', nombre);
+    console.log('[AgregarViviendaScreen] Form state - montoNumerico:', montoNumerico);
+    console.log('[AgregarViviendaScreen] Form state - pagador:', pagador);
+    console.log('[AgregarViviendaScreen] Form state - participantesGasto:', participantesGasto);
+    console.log('[AgregarViviendaScreen] Form state - acuerdoId:', acuerdoId);
 
-    console.log("Iniciando guardado...");
+    if (esServicio && !acuerdoId) {
+      console.log('[AgregarViviendaScreen] Validation failed: Service requires an agreement');
+      Alert.alert('Error', 'Debes seleccionar un acuerdo para continuar');
+      return;
+    }
+    if (!nombre.trim()) {
+      console.log('[AgregarViviendaScreen] Validation failed: Empty name');
+      Alert.alert('Error', 'Falta el nombre del servicio/gasto');
+      return;
+    }
+    if (!isVariable && montoNumerico <= 0) {
+      console.log('[AgregarViviendaScreen] Validation failed: Amount <= 0');
+      Alert.alert('Error', 'El monto debe ser mayor a 0');
+      return;
+    }
+    if (esServicio && !fechaVencimiento) {
+      console.log('[AgregarViviendaScreen] Validation failed: Service requires due date');
+      Alert.alert('Error', 'Seleccioná la fecha de vencimiento');
+      return;
+    }
+    if (!esServicio && !pagador) {
+      console.log('[AgregarViviendaScreen] Validation failed: Expense requires a payer');
+      Alert.alert('Error', 'Debes seleccionar quién pagó');
+      return;
+    }
+    if (!esServicio && (!participantesGasto || !participantesGasto.length)) {
+      console.log('[AgregarViviendaScreen] Validation failed: Expense requires at least 1 participant');
+      Alert.alert('Error', 'Debes seleccionar al menos un participante para dividir el gasto.');
+      return;
+    }
+
+    setIsSaving(true);
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => {
+      console.warn('[AgregarViviendaScreen] Request timed out. Aborting fetch call...');
+      controller.abort();
+    }, 8000);
 
     try {
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 8000);
       let response;
 
       if (esServicio) {
         const dataServicio = {
-          nombre,
-          monto: Number(montoNumerico),
-          periodicidad: frecuencia.toLowerCase(),
-          // ✅ FIX: usa la fecha elegida por el usuario, no new Date()
+          acuerdoId,
+          nombreServicio: nombre,
+          monto: isVariable ? null : Number(montoNumerico),
+          frecuencia: frecuencia,
           proximoVencimiento: fechaVencimiento.toISOString(),
-          participantes: participantesServicio,
+          isVariable,
         };
-        console.log("Enviando Servicio:", JSON.stringify(dataServicio, null, 2));
-        response = await crearServicioVivienda(dataServicio);
+        console.log('[AgregarViviendaScreen] Dispatching crear/actualizar servicio:', dataServicio);
+        if (editMode) {
+          response = await actualizarServicioVivienda(data.id, dataServicio, { signal: controller.signal });
+        } else {
+          response = await crearServicioVivienda(dataServicio, { signal: controller.signal });
+        }
       } else {
         const dataGasto = {
-          nombre,
+          acuerdoId: null,
+          nombreServicio: nombre,
           monto: Number(montoNumerico),
           categoria,
           fecha: new Date().toISOString().split('T')[0],
           pagador,
           participantes: participantesGasto,
         };
-        console.log("Enviando Gasto:", JSON.stringify(dataGasto, null, 2));
-        response = await guardarGastoVivienda(dataGasto);
+        console.log('[AgregarViviendaScreen] Dispatching crear/actualizar gasto:', dataGasto);
+        if (editMode) {
+          response = await actualizarGastoVivienda(data.id, dataGasto, { signal: controller.signal });
+        } else {
+          response = await guardarGastoVivienda(dataGasto, { signal: controller.signal });
+        }
       }
 
+      console.log('[AgregarViviendaScreen] Save operation succeeded! Response:', response);
       clearTimeout(timeoutId);
-      console.log("Respuesta del servidor:", response);
       Alert.alert('✅ Éxito', 'Guardado correctamente.');
       navigation.goBack();
     } catch (error) {
+      clearTimeout(timeoutId);
+      console.error("[AgregarViviendaScreen] ERROR DETALLADO:", error.response?.data || error.message || error);
       if (error.name === 'AbortError') {
         Alert.alert('Error', 'El servidor tardó demasiado en responder.');
       } else {
-        console.error("ERROR DETALLADO:", error.response?.data || error.message);
-        Alert.alert('Error', 'El servidor rechazó los datos. Mirá la consola.');
+        Alert.alert('Error', error.message || 'El servidor rechazó los datos. Mirá la consola.');
       }
+    } finally {
+      setIsSaving(false);
     }
   };
 
-  // ─── Render ───────────────────────────────────────────────────────────────
   return (
     <KeyboardAvoidingView
       style={{ flex: 1 }}
@@ -406,7 +501,7 @@ const [fechaVencimiento, setFechaVencimiento] = useState(new Date());
 
       <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
 
-        {/* Tabs */}
+        
         <View style={styles.tabsRow}>
           <TouchableOpacity
             style={[styles.tab, esServicio && styles.tabActive]}
@@ -429,74 +524,130 @@ const [fechaVencimiento, setFechaVencimiento] = useState(new Date());
           </TouchableOpacity>
         </View>
 
-        {/* Nombre */}
+        
+        {esServicio && (
+          <>
+            <Text style={styles.label}>ACUERDO ASOCIADO</Text>
+            <TouchableOpacity
+              style={[styles.input, { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }]}
+              onPress={() => setModalAcuerdosVisible(true)}
+              activeOpacity={0.7}
+            >
+              <Text style={{ fontSize: 16, color: acuerdoId ? colors.textPrimary : colors.textSecondary }}>
+                {regla?.nombre || 'Seleccioná un acuerdo...'}
+              </Text>
+              <Ionicons name="chevron-down" size={18} color={colors.textSecondary} />
+            </TouchableOpacity>
+          </>
+        )}
+
+
+
+        
+        <Modal visible={modalAcuerdosVisible} transparent animationType="slide">
+          <View style={styles.modalOverlay}>
+            <TouchableOpacity style={StyleSheet.absoluteFill} onPress={() => setModalAcuerdosVisible(false)} />
+            <View style={styles.modalSheet}>
+              <View style={styles.modalHeader}>
+                <Text style={styles.modalTitle}>Seleccioná un acuerdo</Text>
+                <TouchableOpacity onPress={() => setModalAcuerdosVisible(false)}>
+                  <Ionicons name="close" size={24} color={colors.textSecondary} />
+                </TouchableOpacity>
+              </View>
+              <ScrollView keyboardShouldPersistTaps="handled">
+                {reglas.length === 0 ? (
+                  <View style={{ padding: 24, alignItems: 'center', gap: 10 }}>
+                    <Ionicons name="document-text-outline" size={36} color={colors.textSecondary} />
+                    <Text style={{ color: colors.textSecondary, textAlign: 'center', fontSize: 14, lineHeight: 20 }}>
+                      No hay acuerdos configurados.{'\n'}Creá uno desde "Acuerdos" en Vivienda.
+                    </Text>
+                  </View>
+                ) : (
+                  reglas.map((r) => (
+                    <TouchableOpacity
+                      key={r.id}
+                      style={[styles.catItem, acuerdoId === r.id && { backgroundColor: '#F0F4FF' }]}
+                      onPress={() => seleccionarAcuerdo(r.id)}
+                    >
+                      <View style={{ flex: 1 }}>
+                        <Text style={[styles.catItemText, acuerdoId === r.id && { color: colors.primary, fontWeight: 'bold' }]}>
+                          {r.nombre}
+                        </Text>
+                        <Text style={{ fontSize: 12, color: colors.textSecondary, marginTop: 2 }}>
+                          {labelModelo(r.modelo)} · {(r.participantes ?? []).map(p => p.nombre.split(' ')[0]).join(', ')}
+                        </Text>
+                      </View>
+                      {acuerdoId === r.id && <Ionicons name="checkmark-circle" size={20} color={colors.primary} />}
+                    </TouchableOpacity>
+                  ))
+                )}
+              </ScrollView>
+            </View>
+          </View>
+        </Modal>
+
+        
         <Text style={styles.label}>{esServicio ? 'SERVICIO' : 'GASTO'}</Text>
 
         {esServicio ? (
           <>
             <TouchableOpacity
               style={[styles.input, { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }]}
-              onPress={() => !editMode && setModalServicioVisible(true)}
-              activeOpacity={editMode ? 1 : 0.7}
+              onPress={() => setModalServicioVisible(true)}
+              activeOpacity={0.7}
             >
-              <Text style={{ fontSize: 16, color: nombre ? colors.textPrimary : colors.textSecondary }}>
-                {nombre || 'Seleccioná un servicio...'}
+              <Text style={{ fontSize: 16, color: (nombre || esOtroServicio) ? colors.textPrimary : colors.textSecondary }}>
+                {esOtroServicio ? 'Otro servicio (escribí abajo)' : (nombre || 'Seleccioná un servicio...')}
               </Text>
-              {!editMode && <Ionicons name="chevron-down" size={18} color={colors.textSecondary} />}
+              <Ionicons name="chevron-down" size={18} color={colors.textSecondary} />
             </TouchableOpacity>
+
+            {esOtroServicio && (
+              <TextInput
+                style={[styles.input, { marginTop: 10 }]}
+                placeholder="Escribí el nombre del servicio..."
+                value={nombre}
+                onChangeText={setNombre}
+                autoFocus
+              />
+            )}
 
             <Modal visible={modalServicioVisible} transparent animationType="slide">
               <View style={styles.modalOverlay}>
                 <TouchableOpacity style={StyleSheet.absoluteFill} onPress={() => setModalServicioVisible(false)} />
                 <View style={styles.modalSheet}>
                   <View style={styles.modalHeader}>
-                    <Text style={styles.modalTitle}>Seleccioná un servicio</Text>
+                    <Text style={styles.modalTitle}>Tipo de servicio</Text>
                     <TouchableOpacity onPress={() => setModalServicioVisible(false)}>
                       <Ionicons name="close" size={24} color={colors.textSecondary} />
                     </TouchableOpacity>
                   </View>
                   <ScrollView keyboardShouldPersistTaps="handled">
-                    {reglas.length === 0 ? (
-                      <View style={{ padding: 24, alignItems: 'center', gap: 10 }}>
-                        <Ionicons name="document-text-outline" size={36} color={colors.textSecondary} />
-                        <Text style={{ color: colors.textSecondary, textAlign: 'center', fontSize: 14, lineHeight: 20 }}>
-                          No hay reglas configuradas.{'\n'}Creá una desde "Acuerdos" en Vivienda.
-                        </Text>
-                      </View>
-                    ) : (
-                      reglas.map((r) => {
-                        const seleccionado = nombre === r.nombre;
-                        return (
-                          <TouchableOpacity
-                            key={r.id}
-                            style={[styles.catItem, seleccionado && { backgroundColor: '#F0F4FF' }]}
-                            onPress={() => seleccionarServicio(r.nombre)}
-                          >
-                            <View style={{ flex: 1 }}>
-                              <Text style={[styles.catItemText, seleccionado && { color: colors.primary, fontWeight: 'bold' }]}>
-                                {r.nombre}
-                              </Text>
-                              <Text style={{ fontSize: 12, color: colors.textSecondary, marginTop: 2 }}>
-                                {labelModelo(r.modelo)} · {(r.participantes ?? []).map(p => p.nombre.split(' ')[0]).join(', ')}
-                              </Text>
-                            </View>
-                            {seleccionado && <Ionicons name="checkmark-circle" size={20} color={colors.primary} />}
-                          </TouchableOpacity>
-                        );
-                      })
-                    )}
+                    {SERVICIOS_OPCIONES.map((srv) => {
+                      if (srv === 'Otro') return null;
+                      const seleccionado = nombre === srv;
+                      return (
+                        <TouchableOpacity
+                          key={srv}
+                          style={[styles.catItem, seleccionado && { backgroundColor: '#F0F4FF' }]}
+                          onPress={() => seleccionarServicio(srv)}
+                        >
+                          <Text style={[styles.catItemText, seleccionado && { color: colors.primary, fontWeight: 'bold' }]}>
+                            {srv}
+                          </Text>
+                          {seleccionado && <Ionicons name="checkmark-circle" size={20} color={colors.primary} />}
+                        </TouchableOpacity>
+                      );
+                    })}
                     <TouchableOpacity
                       style={[styles.catItem, { borderBottomWidth: 0 }]}
                       onPress={() => {
+                        setEsOtroServicio(true);
+                        setNombre('');
                         setModalServicioVisible(false);
-                        if (Alert.prompt) {
-                          Alert.prompt('Otro servicio', 'Ingresá el nombre del servicio:',
-                            (text) => { if (text?.trim()) seleccionarServicio(text.trim()); }
-                          );
-                        }
                       }}
                     >
-                      <Text style={[styles.catItemText, { color: colors.textSecondary }]}>Otro (sin regla)...</Text>
+                      <Text style={[styles.catItemText, { color: colors.textSecondary }]}>Otro (personalizado)...</Text>
                       <Ionicons name="add-circle-outline" size={20} color={colors.textSecondary} />
                     </TouchableOpacity>
                   </ScrollView>
@@ -509,34 +660,115 @@ const [fechaVencimiento, setFechaVencimiento] = useState(new Date());
             style={styles.input}
             placeholder="Ej: Super, Ferretería..."
             value={nombre}
-            onChangeText={(text) => { setNombre(text); setRegla(null); }}
+            onChangeText={setNombre}
           />
         )}
 
-        {/* Regla (si existe) */}
-        {regla && (
-          <>
-            <Text style={styles.label}>DIVISIÓN APLICADA</Text>
-            <ReglaCard regla={regla} onEditarRegla={handleEditarRegla} />
-          </>
+        
+        <Text style={styles.label}>MONTO</Text>
+        {esServicio && (
+          <View style={[
+            styles.switchRow,
+            {
+              borderWidth: 1,
+              borderRadius: 8,
+              padding: 16,
+              borderColor: isVariable ? '#E65100' : '#E0E0E0',
+              backgroundColor: isVariable ? 'rgba(230, 81, 0, 0.05)' : '#fff'
+            }
+          ]}>
+            <View style={{ flex: 1, paddingRight: 10 }}>
+              <Text style={styles.switchLabel}>Importe variable</Text>
+              <Text style={styles.switchHint}>
+                {isVariable 
+                  ? 'El monto se cargará cuando llegue la factura.' 
+                  : 'Activar si el importe varía por período.'}
+              </Text>
+            </View>
+            <Switch
+              value={isVariable}
+              onValueChange={setIsVariable}
+              trackColor={{ false: '#D1D5DB', true: '#E65100' }}
+              thumbColor={Platform.OS === 'ios' ? '#FFFFFF' : (isVariable ? '#E65100' : '#f4f3f4')}
+            />
+          </View>
+        )}
+        {esServicio && isVariable && (
+          <View style={styles.variableBanner}>
+            <Ionicons name="information-circle-outline" size={20} color="#E65100" />
+            <View style={{ flex: 1, marginLeft: 10 }}>
+              <Text style={styles.variableBannerTitle}>Servicio de importe variable</Text>
+              <Text style={styles.variableBannerSub}>
+                El monto y comprobante se cargarán desde la pantalla de servicios, cuando llegue la boleta.
+              </Text>
+            </View>
+          </View>
+        )}
+        {!(isVariable && esServicio) && (
+          <TextInput
+            style={[styles.input]}
+            placeholder='$ 0'
+            keyboardType="numeric"
+            value={montoDisplay ? `$ ${montoDisplay}` : ''}
+            onChangeText={handleMontoChange}
+          />
         )}
 
-        {/* Monto */}
-        <Text style={styles.label}>MONTO</Text>
-        <TextInput
-          style={styles.input}
-          placeholder="$ 0"
-          keyboardType="numeric"
-          value={montoDisplay ? `$ ${montoDisplay}` : ''}
-          onChangeText={handleMontoChange}
-        />
+        
+        {!esServicio && (
+          <View style={{ marginTop: 16 }}>
+            <Text style={styles.label}>PARTICIPANTES DEL GASTO</Text>
+            <View style={styles.integrantesRow}>
+              {participantesGasto.map((nombre, i) => (
+                <TouchableOpacity
+                  key={i}
+                  onPress={() => {
+                    setParticipantesGasto(prev => prev.filter(n => n !== nombre));
+                  }}
+                  style={styles.avatarWrapper}
+                >
+                  <View style={[styles.avatarForm, { backgroundColor: getColorByNombre(nombre) }]}>
+                    <Text style={styles.avatarFormTexto}>{getIniciales(nombre)}</Text>
+                  </View>
+                  <View style={styles.avatarRemoveBadge}>
+                    <Ionicons name="remove" size={10} color="#fff" />
+                  </View>
+                  <Text style={styles.avatarNombre} numberOfLines={1}>
+                    {nombre.split(' ')[0]} {user?.name?.toLowerCase() === nombre.toLowerCase() && <Text style={{ color: colors.textSecondary, fontSize: 10, fontWeight: 'normal' }}>(vos)</Text>}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+              {miembrosVivienda
+                .filter(nombre => !participantesGasto.includes(nombre))
+                .map((nombre, i) => (
+                  <TouchableOpacity
+                    key={`excluido-${i}`}
+                    onPress={() => {
+                      setParticipantesGasto(prev => [...prev, nombre]);
+                    }}
+                    style={styles.avatarWrapper}
+                  >
+                    <View style={styles.avatarAdd}>
+                      <Ionicons name="add" size={20} color={colors.textSecondary} />
+                    </View>
+                    <Text style={styles.avatarNombre} numberOfLines={1}>
+                      {nombre.split(' ')[0]} {user?.name?.toLowerCase() === nombre.toLowerCase() && <Text style={{ color: colors.textSecondary, fontSize: 10, fontWeight: 'normal' }}>(vos)</Text>}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+            </View>
+          </View>
+        )}
 
-        {/* Cálculo en tiempo real */}
-        {regla && montoNumerico > 0 && (
+        
+        {esServicio && regla && montoNumerico > 0 && (
           <CalculoEnTiempoReal monto={montoNumerico} regla={regla} />
         )}
+        {!esServicio && montoNumerico > 0 && (
+          <CalculoGastoPuntualEnTiempoReal total={montoNumerico} participantes={participantesGasto} />
+        )}
 
-        {/* ── FECHA DE VENCIMIENTO (solo Servicios) ── */}
+        
         {esServicio && (
           <>
             <Text style={styles.label}>FECHA DE VENCIMIENTO</Text>
@@ -550,36 +782,9 @@ const [fechaVencimiento, setFechaVencimiento] = useState(new Date());
           </>
         )}
 
-        {/* Frecuencia (solo Servicios) */}
+        
         {esServicio && (
           <>
-            <Text style={styles.label}>PARTICIPANTES</Text>
-            <View style={styles.participantesWrap}>
-              {participantesServicio.map((nombreParticipante) => (
-                <TouchableOpacity
-                  key={nombreParticipante}
-                  style={styles.participanteChip}
-                  onPress={() => quitarParticipanteServicio(nombreParticipante)}
-                >
-                  <Text style={styles.participanteChipText}>{nombreParticipante}</Text>
-                  <Ionicons name="close" size={14} color={colors.textSecondary} />
-                </TouchableOpacity>
-              ))}
-            </View>
-
-            <View style={styles.participanteInputRow}>
-              <TextInput
-                style={[styles.input, { flex: 1 }]}
-                placeholder="Agregar participante"
-                value={nuevoParticipanteServicio}
-                onChangeText={setNuevoParticipanteServicio}
-                onSubmitEditing={agregarParticipanteServicio}
-                returnKeyType="done"
-              />
-              <TouchableOpacity style={styles.btnAddParticipante} onPress={agregarParticipanteServicio}>
-                <Ionicons name="add" size={18} color="#fff" />
-              </TouchableOpacity>
-            </View>
 
             <Text style={styles.label}>FRECUENCIA</Text>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.frecuenciaScroll}>
@@ -596,7 +801,7 @@ const [fechaVencimiento, setFechaVencimiento] = useState(new Date());
           </>
         )}
 
-        {/* Categoría (solo Gastos) */}
+        
         {!esServicio && (
           <>
             <Text style={styles.label}>CATEGORÍA</Text>
@@ -635,50 +840,22 @@ const [fechaVencimiento, setFechaVencimiento] = useState(new Date());
           </>
         )}
 
-        {/* Pagador (solo Gastos) */}
+        
         {!esServicio && (
           <>
-            <Text style={styles.label}>PARTICIPANTES INVOLUCRADOS</Text>
-            <View style={styles.participantesWrap}>
-              {participantesGasto.map((nombreParticipante) => (
-                <TouchableOpacity
-                  key={nombreParticipante}
-                  style={styles.participanteChip}
-                  onPress={() => quitarParticipanteGasto(nombreParticipante)}
-                >
-                  <Text style={styles.participanteChipText}>{nombreParticipante}</Text>
-                  <Ionicons name="close" size={14} color={colors.textSecondary} />
-                </TouchableOpacity>
-              ))}
-            </View>
-
-            <View style={styles.participanteInputRow}>
-              <TextInput
-                style={[styles.input, { flex: 1 }]}
-                placeholder="Agregar participante involucrado"
-                value={nuevoParticipanteGasto}
-                onChangeText={setNuevoParticipanteGasto}
-                onSubmitEditing={agregarParticipanteGasto}
-                returnKeyType="done"
-              />
-              <TouchableOpacity style={styles.btnAddParticipante} onPress={agregarParticipanteGasto}>
-                <Ionicons name="add" size={18} color="#fff" />
-              </TouchableOpacity>
-            </View>
-
             <Text style={styles.label}>¿QUIÉN PAGÓ?</Text>
-            {regla?.participantes?.length > 0 ? (
+            {participantesGasto.length > 0 ? (
               <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
-                {regla.participantes.map((p) => {
-                  const seleccionado = pagador === p.nombre;
+                {participantesGasto.map((nombre) => {
+                  const seleccionado = pagador === nombre;
                   return (
                     <TouchableOpacity
-                      key={p.nombre}
+                      key={nombre}
                       style={[styles.frecBtn, seleccionado && styles.frecBtnActive]}
-                      onPress={() => setPagador(p.nombre)}
+                      onPress={() => setPagador(nombre)}
                     >
                       <Text style={[styles.frecBtnText, seleccionado && styles.frecBtnTextActive]}>
-                        {p.nombre.split(' ')[0]}
+                        {nombre.split(' ')[0]} {user?.name?.toLowerCase() === nombre.toLowerCase() && <Text style={{ color: seleccionado ? 'white' : colors.textSecondary, fontSize: 12, fontWeight: 'normal' }}>(vos)</Text>}
                       </Text>
                     </TouchableOpacity>
                   );
@@ -695,9 +872,15 @@ const [fechaVencimiento, setFechaVencimiento] = useState(new Date());
           </>
         )}
 
-        {/* Guardar */}
-        <TouchableOpacity style={styles.btnGuardar} onPress={handleGuardar}>
-          <Text style={styles.btnGuardarText}>{editMode ? 'Actualizar' : 'Guardar'}</Text>
+        
+        <TouchableOpacity 
+          style={[styles.btnGuardar, isSaving && { opacity: 0.6 }]} 
+          onPress={handleGuardar}
+          disabled={isSaving}
+        >
+          <Text style={styles.btnGuardarText}>
+            {isSaving ? 'Guardando...' : (editMode ? 'Actualizar' : 'Guardar')}
+          </Text>
         </TouchableOpacity>
 
       </ScrollView>
@@ -706,7 +889,6 @@ const [fechaVencimiento, setFechaVencimiento] = useState(new Date());
   );
 }
 
-// ─── Styles ───────────────────────────────────────────────────────────────────
 
 const styles = StyleSheet.create({
   container:        { flex: 1, backgroundColor: colors.background },
@@ -769,4 +951,85 @@ const styles = StyleSheet.create({
 
   btnGuardar:       { backgroundColor: colors.textSecondary, padding: 16, borderRadius: 16, alignItems: 'center', marginTop: 40 },
   btnGuardarText:   { color: '#fff', fontWeight: 'bold', fontSize: 16 },
+
+  switchRow:        { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: '#FFF8F0', borderRadius: 12, padding: 14, marginBottom: 10, borderWidth: 1, borderColor: '#FFE0B2' },
+  switchLabel:      { fontSize: 14, fontWeight: '700', color: colors.textPrimary },
+  switchHint:       { fontSize: 11, color: colors.textSecondary, marginTop: 2 },
+  inputDisabled:    { backgroundColor: '#F0F0F0', color: '#aaa' },
+
+  integrantesRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 12, alignItems: 'flex-start', width: '100%', marginTop: 8 },
+  avatarWrapper: { alignItems: 'center', position: 'relative', width: 52 },
+  avatarForm: { width: 44, height: 44, borderRadius: 22, justifyContent: 'center', alignItems: 'center' },
+  avatarFormTexto: { color: '#fff', fontSize: 13, fontWeight: 'bold' },
+  avatarNombre: { fontSize: 10, color: colors.textSecondary, marginTop: 4, textAlign: 'center', maxWidth: 52 },
+  avatarRemoveBadge: { position: 'absolute', top: -2, right: 2, width: 16, height: 16, borderRadius: 8, backgroundColor: '#ec6c6a', justifyContent: 'center', alignItems: 'center', borderWidth: 1.5, borderColor: '#fff' },
+  avatarAdd: { width: 44, height: 44, borderRadius: 22, borderWidth: 1.5, borderStyle: 'dashed', borderColor: colors.textSecondary, backgroundColor: '#F0F4F8', justifyContent: 'center', alignItems: 'center' },
+
+  variableBanner: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    backgroundColor: '#FFF3E0',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#FFCC80',
+    padding: 14,
+    marginTop: 12,
+  },
+  variableBannerTitle: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#E65100',
+    marginBottom: 3,
+  },
+  variableBannerSub: {
+    fontSize: 12,
+    color: '#BF360C',
+    lineHeight: 17,
+  },
+
+  attachmentRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    gap: 12,
+    marginBottom: 20,
+    marginTop: 8,
+  },
+  attachmentBtn: {
+    flex: 1,
+    backgroundColor: '#F5F7FA',
+    borderWidth: 1.5,
+    borderColor: '#E4E7EC',
+    borderStyle: 'dashed',
+    borderRadius: 14,
+    padding: 16,
+    alignItems: 'center',
+  },
+  attachmentBtnText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: colors.textPrimary,
+    marginTop: 8,
+  },
+  attachmentBtnSub: {
+    fontSize: 11,
+    color: colors.textSecondary,
+    marginTop: 2,
+  },
+  attachmentPreview: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#E8F5E9',
+    borderRadius: 12,
+    padding: 12,
+    marginTop: 10,
+    borderWidth: 1,
+    borderColor: '#C8E6C9',
+  },
+  attachmentPreviewText: {
+    flex: 1,
+    fontSize: 14,
+    color: '#2E7D32',
+    fontWeight: '600',
+    marginLeft: 8,
+  },
 });

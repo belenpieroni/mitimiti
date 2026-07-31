@@ -17,14 +17,18 @@ router.post('/join/:token', ctrl.unirseViaToken);
 router.get('/gastos', ctrl.listarGastos);
 router.post('/gastos', ctrl.crearGasto);
 router.put('/gastos/:id', ctrl.editarGasto);
+router.delete('/gastos/:id', ctrl.eliminarGasto);
 
 router.get('/servicios', ctrl.listarServicios);
 router.post('/servicios', ctrl.crearServicio);
 router.put('/servicios/:id', ctrl.editarServicio);
 router.delete('/servicios/:id', ctrl.eliminarServicio);
-//NURVO//
+router.patch('/servicios/:id/liquidar', ctrl.liquidarServicio);
+router.patch('/:tipo/:id/pagar', ctrl.marcarComoPagado);
+router.patch('/:tipo/:id/revertir', ctrl.revertirPago);
 router.get('/acuerdos', ctrl.listarAcuerdos);
 router.post('/acuerdos', ctrl.guardarAcuerdo);
+router.put('/acuerdos/:id', ctrl.editarAcuerdo);
 router.delete('/acuerdos/:id', ctrl.eliminarAcuerdo);
 
 module.exports = router;
