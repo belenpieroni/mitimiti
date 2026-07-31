@@ -37,7 +37,7 @@ export default function JuntadaDetalleScreen({ route, navigation }) {
   const [subgruposVisible, setSubgruposVisible] = useState(false);
   const [actionsVisible, setActionsVisible]     = useState(false);
   const [confirmEliminar, setConfirmEliminar]   = useState(false);
-  const [fotoTicket, setFotoTicket]             = useState(null); // URL de la foto que se está viendo
+  const [fotoTicket, setFotoTicket]             = useState(null);
   const [miembrosVisible, setMiembrosVisible]   = useState(false);
   const [toast, setToast]                       = useState({ visible: false, message: '', type: 'success' });
 

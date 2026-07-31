@@ -1,5 +1,5 @@
 -- Miti Miti — Schema PostgreSQL
--- Ejecutado automáticamente por db.js en cada arranque (idempotente).
+-- Ejecutado automáticamente por db.js en cada arranque.
 
 -- Usuarios y auth
 CREATE TABLE IF NOT EXISTS usuarios (

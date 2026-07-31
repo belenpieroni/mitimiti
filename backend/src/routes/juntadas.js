@@ -55,8 +55,6 @@ router.post('/:id/subgrupos', ctrl.agregarSubgrupo);
 router.patch('/:id/subgrupos/:sgid', ctrl.editarSubgrupo);
 router.delete('/:id/subgrupos/:sgid', ctrl.eliminarSubgrupo);
 
-
-// Métodos del Refactor (Array dinámico)
 router.post('/:id/subgrupos/:sgid/unirse', requireAuth, ctrl.unirseSubgrupo);
 router.post('/:id/subgrupos/:sgid/salir',  requireAuth, ctrl.salirSubgrupo);
 

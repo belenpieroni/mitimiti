@@ -39,7 +39,7 @@ export default function LoginScreen() {
         
         setActiveTab('login');
         setName('');
-        setEmail('');        // ✅ CORREGIDO: Se limpia email
+        setEmail('');
         setPassword('');
       } else {
         const authData = await loginUser({

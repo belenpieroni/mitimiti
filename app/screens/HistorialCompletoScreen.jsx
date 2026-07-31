@@ -153,7 +153,7 @@ export default function HistorialCompletoScreen({ navigation, route }) {
                         <Text style={styles.cardTitle}>{item.titulo}</Text>
                         {item.sub ? <Text style={styles.cardSub}>{item.sub}</Text> : null}
                       </View>
-                      
+
                       <View style={styles.amountContainer}>
                         <Text style={[styles.amountText, isComp ? styles.amountComp : styles.amountPago]}>
                           ${formatPesos(item.monto)}

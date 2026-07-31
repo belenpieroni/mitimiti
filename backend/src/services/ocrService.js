@@ -147,7 +147,6 @@ function extractAmountFromText(text) {
    */
   const montoRe = /\$?\s*(\d{1,3}(?:[.,]\d{3})*[.,]\d{2}|\d{1,3}(?:[.,]\d{3})+|\d+[.,]\d{2}|\d{4,})/g;
 
-  /** Devuelve todos los montos válidos (>= $100, no años) de un string. */
   function extraerMontos(str) {
     const resultados = [];
     for (const m of str.matchAll(montoRe)) {
