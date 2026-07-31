@@ -232,7 +232,6 @@ function calcularLiquidacion(saldos) {
     });
  
     deudor.saldo = redondear(deudor.saldo + monto);
-    acreedor.saldo = redondear-acreedor.saldo - monto;
     acreedor.saldo = redondear(acreedor.saldo - monto);
   }
  
