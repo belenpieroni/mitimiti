@@ -46,7 +46,6 @@ async function listarJuntadas(req, res, next) {
         (s) => s.nombre.trim().toLowerCase() === usuario.trim().toLowerCase()
       );
 
-      // Usamos siempre el saldo bruto para que el Home refleje cuánto aportó el usuario frente a lo que le corresponde.
       const saldoBruto = saldoUsuario ? (saldoUsuario.saldo ?? 0) : 0;
 
       return {
@@ -533,47 +532,53 @@ const agregarSubgrupo = async (req, res) => {
     if (!juntada) return res.status(404).json({ error: 'Juntada no encontrada' });
 
     const sgId = uuidv4();
-    await pool.query(
-      'INSERT INTO juntada_subgrupos (id, juntada_id, nombre) VALUES ($1, $2, $3)',
-      [sgId, id, nombre.trim()]
-    );
-    for (const integrante of integrantes) {
-      await pool.query(
-        'INSERT INTO subgrupo_integrantes (subgrupo_id, nombre) VALUES ($1, $2) ON CONFLICT DO NOTHING',
-        [sgId, integrante]
-      );
-    }
+    
+    const query = `
+      INSERT INTO juntada_subgrupos (id, juntada_id, nombre, integrantes) 
+      VALUES ($1, $2, $3, $4)
+      RETURNING *;
+    `;
+    
+    const { rows: [nuevoSubgrupo] } = await pool.query(query, [
+      sgId, 
+      id, 
+      nombre.trim(), 
+      integrantes
+    ]);
 
-    res.status(201).json({ ok: true, data: { id: sgId, nombre: nombre.trim(), integrantes } });
+    res.status(201).json({ ok: true, data: nuevoSubgrupo });
   } catch (error) {
-    res.status(500).json({ error: 'Error al crear el subgrupo' });
+    res.status(500).json({ error: 'Error al crear el subgrupo', detalle: error.message });
   }
 };
 
 const editarSubgrupo = async (req, res) => {
   try {
-    const { id, sgid } = req.params;
-    const { nombre, integrantes } = req.body;
+    const { id, sgid } = req.params; // id = juntada_id, sgid = subgrupo_id
+    const { nombre, integrantes } = req.body; // integrantes: ['uuid1', 'uuid2']
 
     if (!nombre || !integrantes || integrantes.length < 1)
       return res.status(400).json({ error: 'El subgrupo debe tener un nombre y al menos 1 integrante.' });
 
-    const { rows: [sg] } = await pool.query(
-      'SELECT id FROM juntada_subgrupos WHERE id = $1 AND juntada_id = $2', [sgid, id]
-    );
-    if (!sg) return res.status(404).json({ error: 'Subgrupo no encontrado' });
+    const query = `
+      UPDATE juntada_subgrupos 
+      SET nombre = $1, integrantes = $2 
+      WHERE id = $3 AND juntada_id = $4
+      RETURNING *;
+    `;
 
-    await pool.query('UPDATE juntada_subgrupos SET nombre = $1 WHERE id = $2', [nombre.trim(), sgid]);
-    await pool.query('DELETE FROM subgrupo_integrantes WHERE subgrupo_id = $1', [sgid]);
-    for (const integrante of integrantes) {
-      await pool.query(
-        'INSERT INTO subgrupo_integrantes (subgrupo_id, nombre) VALUES ($1, $2)', [sgid, integrante]
-      );
-    }
+    const { rows: [subgrupoActualizado], rowCount } = await pool.query(query, [
+      nombre.trim(), 
+      integrantes, 
+      sgid, 
+      id
+    ]);
 
-    res.json({ ok: true, data: { id: sgid, nombre: nombre.trim(), integrantes } });
+    if (rowCount === 0) return res.status(404).json({ error: 'Subgrupo no encontrado' });
+
+    res.json({ ok: true, data: subgrupoActualizado });
   } catch (error) {
-    res.status(500).json({ error: 'Error al editar el subgrupo' });
+    res.status(500).json({ error: 'Error al editar el subgrupo', detalle: error.message });
   }
 };
 
@@ -581,7 +586,8 @@ const eliminarSubgrupo = async (req, res) => {
   try {
     const { id, sgid } = req.params;
     const { rowCount } = await pool.query(
-      'DELETE FROM juntada_subgrupos WHERE id = $1 AND juntada_id = $2', [sgid, id]
+      'DELETE FROM juntada_subgrupos WHERE id = $1 AND juntada_id = $2', 
+      [sgid, id]
     );
     if (rowCount === 0) return res.status(404).json({ error: 'Subgrupo no encontrado' });
     res.status(200).json({ ok: true, mensaje: 'Subgrupo eliminado' });
@@ -589,8 +595,57 @@ const eliminarSubgrupo = async (req, res) => {
     res.status(500).json({ error: 'Error al eliminar el subgrupo' });
   }
 };
+const unirseSubgrupo = async (req, res) => {
+  try {
+    const { id, sgid } = req.params;
+    const usuarioId = req.user.id; 
 
 
+    const query = `
+      UPDATE juntada_subgrupos
+      SET integrantes = array_append(integrantes, $1)
+      WHERE id = $2 AND NOT ($1 = ANY(integrantes))
+      RETURNING *;
+    `;
+    const { rows, rowCount } = await pool.query(query, [usuarioId, sgid]);
+
+    if (rowCount === 0) {
+      const { rows: existeRows } = await pool.query('SELECT * FROM juntada_subgrupos WHERE id = $1', [sgid]);
+      if (existeRows.length === 0) {
+        return res.status(404).json({ error: 'Subgrupo no encontrado.' });
+      }
+      return res.status(200).json({ ok: true, data: existeRows[0], mensaje: 'Ya formás parte de este subgrupo.' });
+    }
+
+    res.status(200).json({ ok: true, data: rows[0] });
+  } catch (error) {
+    res.status(500).json({ error: 'Error al unirse al subgrupo', detalle: error.message });
+  }
+};
+
+const salirSubgrupo = async (req, res) => {
+  try {
+    const { id, sgid } = req.params;
+    const usuarioId = req.user.id;
+
+    const query = `
+      UPDATE juntada_subgrupos
+      SET integrantes = array_remove(integrantes, $1)
+      WHERE id = $2
+      RETURNING *;
+    `;
+    const { rows, rowCount } = await pool.query(query, [usuarioId, sgid]);
+
+    if (rowCount === 0) {
+      return res.status(404).json({ error: 'Subgrupo no encontrado.' });
+    }
+
+    res.status(200).json({ ok: true, data: rows[0] });
+  } catch (error) {
+    res.status(500).json({ error: 'Error al salir del subgrupo', detalle: error.message });
+  }
+};
+// ── Invitaciones ─────────────────────────────────────────────────────────────
 
 async function generarObtenerInvitacion(req, res, next) {
   try {
@@ -706,6 +761,6 @@ module.exports = {
   agregarParticipante, quitarParticipante,
   agregarGasto, eliminarGasto,
   obtenerBalance, obtenerBalanceGlobal,
-  agregarSubgrupo, editarSubgrupo, eliminarSubgrupo,
+  agregarSubgrupo, editarSubgrupo, eliminarSubgrupo, unirseSubgrupo, salirSubgrupo,
   generarObtenerInvitacion, unirseViaToken,
 };
