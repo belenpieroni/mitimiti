@@ -52,9 +52,7 @@ services:
     environment:
       EXPO_PUBLIC_API_URL: ${EXPO_PUBLIC_API_URL:-http://localhost:3000/api}
       REACT_NATIVE_PACKAGER_HOSTNAME: ${REACT_NATIVE_PACKAGER_HOSTNAME:-}
-      EXPO_TOKEN: ${EXPO_TOKEN:-}
       EXPO_NO_TELEMETRY: "1"
-      EXPO_OFFLINE: "1"
     ports:
       - "8081:8081"
       - "19000:19000"

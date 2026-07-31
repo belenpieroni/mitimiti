@@ -7,7 +7,7 @@
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
-    "sdkVersion": "52",
+    "sdkVersion": "54.0.0",
     "newArchEnabled": true,
     "updates": {
       "enabled": false
