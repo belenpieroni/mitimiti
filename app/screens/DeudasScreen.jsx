@@ -124,11 +124,26 @@ export default function DeudasScreen({ navigation }) {
     }, [user])
   );
 
-  const totalAcreedores = pendientes.reduce((acc, a) => {
+  let totalGastosJuntadas = 0;
+  let totalGastosVivienda = 0;
+
+  pendientes.forEach(a => {
     const activeConcepts = a.conceptos.filter(c => !uncheckedItems.has(c.id));
     const netTotal = activeConcepts.reduce((sum, c) => sum + (c.tipoOperacion === 'resta' ? -c.monto : c.monto), 0);
-    return acc + Math.max(0, netTotal);
-  }, 0);
+    
+    if (netTotal > 0) {
+      const sumaJuntada = activeConcepts.filter(c => c.tipoOperacion === 'suma' && !c.esVivienda).reduce((sum, c) => sum + c.monto, 0);
+      const sumaVivienda = activeConcepts.filter(c => c.tipoOperacion === 'suma' && c.esVivienda).reduce((sum, c) => sum + c.monto, 0);
+      
+      const totalSuma = sumaJuntada + sumaVivienda;
+      if (totalSuma > 0) {
+        totalGastosJuntadas += (sumaJuntada / totalSuma) * netTotal;
+        totalGastosVivienda += (sumaVivienda / totalSuma) * netTotal;
+      }
+    }
+  });
+
+  const totalAcreedores = totalGastosJuntadas + totalGastosVivienda;
 
   const totalAFavor = pendientes.reduce((acc, a) => {
     const activeConcepts = a.conceptos.filter(c => !uncheckedItems.has(c.id));
@@ -350,7 +365,14 @@ export default function DeudasScreen({ navigation }) {
                   <Ionicons name="people-outline" size={16} color="white" />
                   <Text style={styles.detailCollapseText}>Gastos de Juntadas:</Text>
                 </View>
-                <Text style={styles.detailCollapseValue}>${formatPesos(totalAcreedores)}</Text>
+                <Text style={styles.detailCollapseValue}>${formatPesos(totalGastosJuntadas)}</Text>
+              </View>
+              <View style={styles.detailCollapseRow}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                  <Ionicons name="home-outline" size={16} color="white" />
+                  <Text style={styles.detailCollapseText}>Gastos de Vivienda:</Text>
+                </View>
+                <Text style={styles.detailCollapseValue}>${formatPesos(totalGastosVivienda)}</Text>
               </View>
               <View style={styles.detailCollapseRow}>
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
