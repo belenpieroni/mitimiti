@@ -548,7 +548,7 @@ export default function ViviendaDashboard({ navigation }) {
                     <Ionicons name="wallet-outline" size={18} color="#E65100" />
                   </TouchableOpacity>
                 ) : srv.status === 'PROCESADO' || (!srv.isVariable && srv.status !== 'PAGADO') ? (
-                  <TouchableOpacity style={[styles.btnTick, { borderColor: colors.primary }]} onPress={(e) => {
+                  <TouchableOpacity style={[styles.btnTick, { borderColor: colors.greenGlobal, backgroundColor: 'rgba(34, 197, 94, 0.1)' }]} onPress={(e) => {
                     e.stopPropagation();
                     Alert.alert(
                       'Marcar como pagado',
@@ -569,11 +569,11 @@ export default function ViviendaDashboard({ navigation }) {
                       ]
                     );
                   }}>
-                    <Ionicons name="checkmark-outline" size={20} color={colors.primary} />
+                    <Ionicons name="checkmark" size={20} color={colors.greenGlobal} />
                   </TouchableOpacity>
                 ) : (
-                  <View style={styles.btnTick}>
-                    <Ionicons name="checkmark" size={20} color={colors.greenGlobal} />
+                  <View style={[styles.btnTick, { borderColor: '#E5E7EB', backgroundColor: '#F3F4F6' }]}>
+                    <Ionicons name="checkmark" size={20} color={colors.textSecondary} />
                   </View>
                 )}
 
@@ -651,7 +651,7 @@ export default function ViviendaDashboard({ navigation }) {
                 )}
 
                 {gasto.status !== 'PAGADO' ? (
-                  <TouchableOpacity style={[styles.btnTick, { borderColor: colors.primary, marginTop: 6 }]} onPress={(e) => {
+                  <TouchableOpacity style={[styles.btnTick, { borderColor: colors.greenGlobal, backgroundColor: 'rgba(34, 197, 94, 0.1)', marginTop: 6 }]} onPress={(e) => {
                     e.stopPropagation();
                     Alert.alert(
                       'Marcar como pagado',
@@ -672,11 +672,11 @@ export default function ViviendaDashboard({ navigation }) {
                       ]
                     );
                   }}>
-                    <Ionicons name="checkmark-outline" size={20} color={colors.primary} />
+                    <Ionicons name="checkmark" size={20} color={colors.greenGlobal} />
                   </TouchableOpacity>
                 ) : (
-                  <View style={[styles.btnTick, { marginTop: 6 }]}>
-                    <Ionicons name="checkmark" size={20} color={colors.greenGlobal} />
+                  <View style={[styles.btnTick, { borderColor: '#E5E7EB', backgroundColor: '#F3F4F6', marginTop: 6 }]}>
+                    <Ionicons name="checkmark" size={20} color={colors.textSecondary} />
                   </View>
                 )}
 
