@@ -38,6 +38,7 @@ export default function SalidasPorCategoriaScreen({ navigation }) {
 
   const getMonthDate = (offset) => {
     const d = new Date();
+    d.setDate(1);
     d.setMonth(d.getMonth() - offset);
     return d;
   };
